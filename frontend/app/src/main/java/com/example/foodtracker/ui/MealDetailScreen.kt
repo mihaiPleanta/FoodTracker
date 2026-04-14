@@ -1,5 +1,6 @@
 package com.example.foodtracker.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
@@ -105,6 +106,16 @@ fun MealDetailScreen(
     // Read from shared ViewModel — reactive to changes
     val loggedFoods by viewModel.getFoodsFlow(mealName).collectAsState()
 
+    // Keep back behavior consistent: always return to Home from this screen.
+    val goBackToHome = {
+        navController.navigate("home") {
+            popUpTo("home") { inclusive = false }
+            launchSingleTop = true
+        }
+    }
+
+    BackHandler(onBack = goBackToHome)
+
     var searchQuery  by remember { mutableStateOf("") }
     var searchActive by remember { mutableStateOf(false) }
 
@@ -135,10 +146,7 @@ fun MealDetailScreen(
                 mealName    = mealName,
                 mealIcon    = mealIcon,
                 accentColor = accentColor,
-                onBack      = {
-                    navController.popBackStack()
-                    viewModel.openMealSelector()   // reopen the pop-up after going back
-                }
+                onBack      = goBackToHome
             )
 
             SearchBar(
@@ -762,15 +770,5 @@ fun MealDetailPreview() {
         }
     }
 }
-
-
-
-
-
-
-
-
-
-
 
 

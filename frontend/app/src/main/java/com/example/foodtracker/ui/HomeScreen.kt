@@ -36,6 +36,8 @@ import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.ui.theme.accentCard
 import com.example.foodtracker.ui.theme.glassCard
 import com.example.foodtracker.viewmodel.FoodViewModel
+import com.example.foodtracker.viewmodel.WeightCheckIn
+import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -78,8 +80,14 @@ data class MealSection(
 @Composable
 fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
     val calendarDays = remember { generateCalendarDays() }
-    val todayIndex   = calendarDays.indexOfFirst { it.isToday }
-    var selectedDate by remember { mutableStateOf(calendarDays[todayIndex].date) }
+    val todayIndex = calendarDays.indexOfFirst { it.isToday }
+    val selectedDate by viewModel.selectedHomeDate.collectAsState()
+
+    LaunchedEffect(Unit) {
+        // Keep the same startup behavior as before, but route date ownership through ViewModel.
+        val fallbackDate = if (todayIndex >= 0) calendarDays[todayIndex].date else Date()
+        viewModel.setSelectedHomeDate(fallbackDate)
+    }
 
     val headerTitle = remember(selectedDate) {
         val cal = Calendar.getInstance().apply { time = selectedDate }
@@ -97,6 +105,8 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
     val lunchFoods     by viewModel.lunchFoods.collectAsState()
     val dinnerFoods    by viewModel.dinnerFoods.collectAsState()
     val snacksFoods    by viewModel.snacksFoods.collectAsState()
+    val hydrationLiters by viewModel.hydrationTodayLiters.collectAsState()
+    val weightHistory   by viewModel.weightHistory.collectAsState()
 
     val consumedCalories = remember(breakfastFoods, lunchFoods, dinnerFoods, snacksFoods) {
         (breakfastFoods + lunchFoods + dinnerFoods + snacksFoods).sumOf { it.calories }
@@ -163,7 +173,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
             Spacer(Modifier.height(20.dp))
 
             WeekCalendar(days = calendarDays, selectedDate = selectedDate,
-                onDaySelected = { selectedDate = it },
+                onDaySelected = { viewModel.setSelectedHomeDate(it) },
                 modifier = Modifier.padding(horizontal = 20.dp))
 
             Spacer(Modifier.height(24.dp))
@@ -175,6 +185,26 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
                 consumedFat = consumedFat,           fatGoal = goals.fatGoal,
                 modifier = Modifier.padding(horizontal = 20.dp)
             )
+
+            Spacer(Modifier.height(14.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                HydrationMiniWidget(
+                    consumedLiters = hydrationLiters,
+                    goalLiters = viewModel.hydrationGoalLiters,
+                    onQuickIncrement = { viewModel.incrementHydration() },
+                    modifier = Modifier.weight(1f)
+                )
+                WeightMiniWidget(
+                    weightHistory = weightHistory,
+                    modifier = Modifier.weight(1f)
+                )
+            }
 
             Spacer(Modifier.height(28.dp))
 
@@ -190,7 +220,15 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
             Spacer(Modifier.height(12.dp))
 
             meals.forEach { meal ->
-                MealCard(meal = meal, modifier = Modifier.padding(horizontal = 20.dp))
+                MealCard(
+                    meal = meal,
+                    onQuickAdd = {
+                        val encodedIcon = URLEncoder.encode(meal.icon, "UTF-8")
+                        val colorHex = meal.accentColor.value.toString(16).uppercase().takeLast(6)
+                        navController.navigate("meal/${meal.name}/$encodedIcon/$colorHex")
+                    },
+                    modifier = Modifier.padding(horizontal = 20.dp)
+                )
                 Spacer(Modifier.height(12.dp))
             }
 
@@ -415,7 +453,11 @@ fun CalorieRing(progress: Float, modifier: Modifier = Modifier) {
 // ── Meal card ─────────────────────────────────────────────────────────────────
 
 @Composable
-fun MealCard(meal: MealSection, modifier: Modifier = Modifier) {
+fun MealCard(
+    meal: MealSection,
+    onQuickAdd: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     var expanded by remember { mutableStateOf(false) }
     val arrowAngle by animateFloatAsState(
         if (expanded) 180f else 0f, tween(300), label = "arrow")
@@ -463,27 +505,20 @@ fun MealCard(meal: MealSection, modifier: Modifier = Modifier) {
 
                 Spacer(Modifier.width(8.dp))
 
-                // expand / add button
-                Box(
-                    Modifier.size(34.dp).clip(CircleShape)
-                        .background(meal.accentColor.copy(.12f))
-                        .border(1.dp, meal.accentColor.copy(.25f), CircleShape)
-                        .then(if (!isEmpty) Modifier.clickable { expanded = !expanded }
-                              else Modifier),
-                    Alignment.Center
-                ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HomeMealActionButton(
+                        icon = "+",
+                        accentColor = meal.accentColor,
+                        onClick = onQuickAdd
+                    )
+
                     if (!isEmpty) {
-                        Text(
-                            text = "⌄",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = meal.accentColor,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.rotate(arrowAngle)
+                        HomeMealActionButton(
+                            icon = "⌄",
+                            accentColor = meal.accentColor,
+                            rotation = arrowAngle,
+                            onClick = { expanded = !expanded }
                         )
-                    } else {
-                        Text("+", fontSize = 20.sp, fontWeight = FontWeight.Bold,
-                            color = meal.accentColor, textAlign = TextAlign.Center)
                     }
                 }
             }
@@ -504,6 +539,31 @@ fun MealCard(meal: MealSection, modifier: Modifier = Modifier) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun HomeMealActionButton(
+    icon: String,
+    accentColor: Color,
+    rotation: Float = 0f,
+    onClick: () -> Unit
+) {
+    Box(
+        Modifier.size(34.dp).clip(CircleShape)
+            .background(accentColor.copy(.12f))
+            .border(1.dp, accentColor.copy(.25f), CircleShape)
+            .clickable { onClick() },
+        Alignment.Center
+    ) {
+        Text(
+            text = icon,
+            fontSize = if (icon == "+") 20.sp else 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = accentColor,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.rotate(rotation)
+        )
     }
 }
 
@@ -530,6 +590,125 @@ fun MealEntryRow(entry: MealEntry, accentColor: Color) {
         }
         Text("${entry.grams}g  ·  ${entry.calories} kcal",
             fontSize = 12.sp, color = GlassColors.textSecondary)
+    }
+}
+
+// ── Hydration and weight mini-widgets ─────────────────────────────────────────
+
+@Composable
+fun HydrationMiniWidget(
+    consumedLiters: Float,
+    goalLiters: Float,
+    onQuickIncrement: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val progress = if (goalLiters > 0f) (consumedLiters / goalLiters).coerceIn(0f, 1f) else 0f
+
+    Column(
+        modifier
+            .glassCard(16)
+            .padding(14.dp)
+    ) {
+        Text(
+            "Hydration",
+            fontSize = 12.sp,
+            color = GlassColors.textSecondary,
+            fontWeight = FontWeight.Medium
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "${"%.1f".format(Locale.ENGLISH, consumedLiters)}/${"%.1f".format(Locale.ENGLISH, goalLiters)} L",
+            fontSize = 18.sp,
+            color = GlassColors.textPrimary,
+            fontWeight = FontWeight.ExtraBold
+        )
+        Spacer(Modifier.height(8.dp))
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(GlassColors.accentBlue.copy(alpha = 0.18f))
+        ) {
+            Box(
+                Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(progress)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(GlassColors.accentBlue)
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(GlassColors.accentBlue.copy(alpha = 0.16f))
+                    .border(1.dp, GlassColors.accentBlue.copy(alpha = 0.32f), RoundedCornerShape(12.dp))
+                    .clickable { onQuickIncrement() }
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    "+250 ml",
+                    fontSize = 11.sp,
+                    color = GlassColors.accentBlue,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun WeightMiniWidget(
+    weightHistory: List<WeightCheckIn>,
+    modifier: Modifier = Modifier
+) {
+    val latestWeight = weightHistory.lastOrNull()?.weightKg
+    val delta7Days = if (weightHistory.size >= 2) {
+        weightHistory.last().weightKg - weightHistory.first().weightKg
+    } else null
+
+    Column(
+        modifier
+            .glassCard(16)
+            .padding(14.dp)
+    ) {
+        Text(
+            "Weight",
+            fontSize = 12.sp,
+            color = GlassColors.textSecondary,
+            fontWeight = FontWeight.Medium
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            latestWeight?.let { "${"%.1f".format(Locale.ENGLISH, it)} kg" } ?: "No check-in",
+            fontSize = 18.sp,
+            color = GlassColors.textPrimary,
+            fontWeight = FontWeight.ExtraBold
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            when {
+                delta7Days == null -> "Trend 7d unavailable"
+                delta7Days > 0f -> "7d trend: +${"%.1f".format(Locale.ENGLISH, delta7Days)} kg"
+                delta7Days < 0f -> "7d trend: ${"%.1f".format(Locale.ENGLISH, delta7Days)} kg"
+                else -> "7d trend: stable"
+            },
+            fontSize = 12.sp,
+            color = if ((delta7Days ?: 0f) <= 0f) GlassColors.accentGreen else GlassColors.accentOrange,
+            fontWeight = FontWeight.SemiBold
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Last 7 days",
+            fontSize = 11.sp,
+            color = GlassColors.textTertiary
+        )
     }
 }
 
@@ -586,7 +765,7 @@ fun HomeScreenPreview() {
                     MealSection("Dinner","🌙","500–600",0,0,0,0,emptyList(),Color(0xFF448AFF)),
                     MealSection("Snacks","🍎","150–200",0,0,0,0,emptyList(),Color(0xFFFF6D00))
                 ).forEach { meal ->
-                    MealCard(meal); Spacer(Modifier.height(12.dp))
+                    MealCard(meal = meal, onQuickAdd = {}); Spacer(Modifier.height(12.dp))
                 }
             }
         }
