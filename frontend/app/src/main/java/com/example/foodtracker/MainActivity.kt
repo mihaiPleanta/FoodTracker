@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.*
 import com.example.foodtracker.ui.*
+import com.example.foodtracker.ui.StatsScreen
 import com.example.foodtracker.ui.theme.FoodTrackerTheme
 import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.viewmodel.FoodViewModel
@@ -66,7 +67,7 @@ class MainActivity : ComponentActivity() {
                                     HomeScreen(navController, viewModel)
                                 }
                                 composable("stats") {
-                                    PlaceholderScreen("Stats")
+                                    StatsScreen(viewModel)
                                 }
                                 composable("meals") {
                                     PlaceholderScreen("Meals")
