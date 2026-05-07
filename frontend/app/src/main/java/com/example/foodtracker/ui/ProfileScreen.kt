@@ -17,7 +17,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -273,10 +272,12 @@ fun ProfileTextField(
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = keyboard),
                 decorationBox = { inner ->
-                    if (value.isEmpty()) {
-                        Text("–", color = GlassColors.textTertiary, fontSize = 14.sp)
+                    Box {
+                        if (value.isEmpty()) {
+                            Text("–", color = GlassColors.textTertiary, fontSize = 14.sp)
+                        }
+                        inner()
                     }
-                    inner()
                 }
             )
             if (suffix.isNotEmpty()) {
