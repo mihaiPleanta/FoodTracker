@@ -2,8 +2,10 @@ package com.example.foodtracker.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.foodtracker.model.AppSettings
 import com.example.foodtracker.model.Food
 import com.example.foodtracker.model.MealType
+import com.example.foodtracker.model.UserProfile
 import com.example.foodtracker.ui.FoodItem
 import com.example.foodtracker.ui.LoggedFood
 import com.example.foodtracker.ui.foodDatabase
@@ -43,6 +45,16 @@ class FoodViewModel : ViewModel() {
     fun openMealSelector()  { _showMealSelector.value = true  }
     fun closeMealSelector() { _showMealSelector.value = false }
     fun toggleMealSelector() { _showMealSelector.value = !_showMealSelector.value }
+
+    // ── User profile ──────────────────────────────────────────────────────────────
+    private val _userProfile = MutableStateFlow(UserProfile())
+    val userProfile: StateFlow<UserProfile> = _userProfile.asStateFlow()
+    fun updateUserProfile(profile: UserProfile) { _userProfile.value = profile }
+
+    // ── App settings ──────────────────────────────────────────────────────────────
+    private val _appSettings = MutableStateFlow(AppSettings())
+    val appSettings: StateFlow<AppSettings> = _appSettings.asStateFlow()
+    fun updateAppSettings(settings: AppSettings) { _appSettings.value = settings }
 
     // ── Date-driven food history ───────────────────────────────────────────────
     private val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.US)
