@@ -14,6 +14,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
@@ -167,8 +169,12 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
         ) {
             Spacer(Modifier.height(20.dp))
 
-            HomeHeader(title = headerTitle, subtitle = headerSubtitle,
-                modifier = Modifier.padding(horizontal = 20.dp))
+            HomeHeader(
+                title = headerTitle,
+                subtitle = headerSubtitle,
+                onSettingsClick = { navController.navigate("settings") },
+                modifier = Modifier.padding(horizontal = 20.dp)
+            )
 
             Spacer(Modifier.height(20.dp))
 
@@ -240,7 +246,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
 // ── Header ────────────────────────────────────────────────────────────────────
 
 @Composable
-fun HomeHeader(title: String, subtitle: String, modifier: Modifier = Modifier) {
+fun HomeHeader(title: String, subtitle: String, onSettingsClick: () -> Unit, modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
         Column {
             Text(subtitle, fontSize = 13.sp, color = GlassColors.textSecondary)
@@ -251,12 +257,20 @@ fun HomeHeader(title: String, subtitle: String, modifier: Modifier = Modifier) {
         Row(verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Box(
-                Modifier.size(42.dp).clip(CircleShape)
+                Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
                     .background(GlassColors.cardBackground)
-                    .border(1.dp, GlassColors.cardBorder, CircleShape),
+                    .border(1.dp, GlassColors.cardBorder, CircleShape)
+                    .clickable { onSettingsClick() },
                 Alignment.Center
             ) {
-                Text("🔔", fontSize = 16.sp, textAlign = TextAlign.Center)
+                Icon(
+                    imageVector = Icons.Outlined.Settings,
+                    contentDescription = "Setări",
+                    tint = GlassColors.textSecondary,
+                    modifier = Modifier.size(20.dp)
+                )
             }
             Box(
                 Modifier.size(42.dp).clip(CircleShape)
@@ -751,7 +765,7 @@ fun HomeScreenPreview() {
                     .verticalScroll(rememberScrollState())
             ) {
                 Spacer(Modifier.height(12.dp))
-                HomeHeader("Today", "4 March 2026")
+                HomeHeader("Today", "4 March 2026", onSettingsClick = {})
                 Spacer(Modifier.height(20.dp))
                 CalorieSummaryCard(1247,2000,82,150,156,250,41,65)
                 Spacer(Modifier.height(24.dp))
