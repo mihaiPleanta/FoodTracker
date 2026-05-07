@@ -17,9 +17,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.*
 import com.example.foodtracker.ui.*
-import com.example.foodtracker.ui.StatsScreen
-import com.example.foodtracker.ui.ProfileScreen
-import com.example.foodtracker.ui.SettingsScreen
 import com.example.foodtracker.ui.theme.FoodTrackerTheme
 import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.viewmodel.FoodViewModel
