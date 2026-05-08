@@ -1,0 +1,156 @@
+package com.example.foodtracker.ui
+
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowBackIosNew
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.foodtracker.ui.theme.GlassColors
+import com.example.foodtracker.viewmodel.AuthUiState
+import com.example.foodtracker.viewmodel.AuthViewModel
+
+@Composable
+fun RegisterScreen(
+    authViewModel: AuthViewModel,
+    onNavigateLogin: () -> Unit,
+    onNavigateOnboarding: () -> Unit
+) {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var localError by remember { mutableStateOf<String?>(null) }
+
+    val uiState by authViewModel.uiState.collectAsState()
+    val isLoading = uiState is AuthUiState.Loading
+    val firebaseError = (uiState as? AuthUiState.Error)?.message
+    val errorMessage = localError ?: firebaseError
+
+    LaunchedEffect(uiState) {
+        if (uiState is AuthUiState.NavigateOnboarding) onNavigateOnboarding()
+    }
+
+    Box(Modifier.fillMaxSize().background(GlassColors.backgroundDark)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(Modifier.height(20.dp))
+
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(40.dp).clip(CircleShape)
+                        .background(GlassColors.cardBackground)
+                        .border(1.dp, GlassColors.cardBorder, CircleShape)
+                        .clickable { onNavigateLogin() },
+                    Alignment.Center
+                ) {
+                    Icon(Icons.Rounded.ArrowBackIosNew, contentDescription = "Înapoi",
+                        tint = GlassColors.textSecondary, modifier = Modifier.size(16.dp))
+                }
+            }
+
+            Spacer(Modifier.height(40.dp))
+
+            Text("Cont nou", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold,
+                color = GlassColors.textPrimary)
+            Text("Completează datele de mai jos", fontSize = 13.sp,
+                color = GlassColors.textSecondary)
+
+            Spacer(Modifier.height(32.dp))
+
+            AuthTextField(
+                value = email,
+                onValueChange = { email = it; localError = null; authViewModel.resetState() },
+                placeholder = "Email",
+                keyboardType = KeyboardType.Email
+            )
+            Spacer(Modifier.height(12.dp))
+            AuthTextField(
+                value = password,
+                onValueChange = { password = it; localError = null; authViewModel.resetState() },
+                placeholder = "Parolă",
+                keyboardType = KeyboardType.Password,
+                isPassword = true,
+                passwordVisible = passwordVisible,
+                onTogglePasswordVisibility = { passwordVisible = !passwordVisible }
+            )
+            Spacer(Modifier.height(12.dp))
+            AuthTextField(
+                value = confirmPassword,
+                onValueChange = { confirmPassword = it; localError = null },
+                placeholder = "Confirmă parola",
+                keyboardType = KeyboardType.Password,
+                isPassword = true,
+                passwordVisible = passwordVisible
+            )
+
+            AnimatedVisibility(
+                visible = errorMessage != null,
+                enter = fadeIn(tween(200)), exit = fadeOut(tween(200))
+            ) {
+                Text(
+                    text = errorMessage ?: "",
+                    color = Color(0xFFFF4444),
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 6.dp).fillMaxWidth()
+                )
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            AuthPrimaryButton(
+                text = "Creează cont",
+                enabled = email.isNotBlank() && password.isNotBlank() && confirmPassword.isNotBlank(),
+                isLoading = isLoading,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    when {
+                        password.length < 6 ->
+                            localError = "Parola trebuie să aibă minim 6 caractere"
+                        password != confirmPassword ->
+                            localError = "Parolele nu coincid"
+                        else ->
+                            authViewModel.registerWithEmail(email, password)
+                    }
+                }
+            )
+
+            Spacer(Modifier.height(24.dp))
+
+            Row {
+                Text("Ai deja cont? ", fontSize = 13.sp, color = GlassColors.textSecondary)
+                Text(
+                    "Conectează-te",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = GlassColors.accentGreen,
+                    modifier = Modifier.clickable { onNavigateLogin() }
+                )
+            }
+
+            Spacer(Modifier.height(40.dp))
+        }
+    }
+}
