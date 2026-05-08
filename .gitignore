@@ -33,3 +33,6 @@ google-services.json
 # Android Profiling
 *.hprof
 .worktrees/
+
+# Firebase service account (secret)
+backend/serviceAccountKey.json
