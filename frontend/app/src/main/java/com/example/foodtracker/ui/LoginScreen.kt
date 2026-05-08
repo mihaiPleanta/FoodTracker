@@ -1,0 +1,173 @@
+package com.example.foodtracker.ui
+
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.foodtracker.ui.theme.GlassColors
+import com.example.foodtracker.ui.theme.glassCard
+import com.example.foodtracker.viewmodel.AuthUiState
+import com.example.foodtracker.viewmodel.AuthViewModel
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+
+@Composable
+fun LoginScreen(
+    authViewModel: AuthViewModel,
+    onNavigateRegister: () -> Unit,
+    onNavigateHome: () -> Unit,
+    onNavigateOnboarding: () -> Unit
+) {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+
+    val uiState by authViewModel.uiState.collectAsState()
+    val isLoading = uiState is AuthUiState.Loading
+    val errorMessage = (uiState as? AuthUiState.Error)?.message
+
+    val context = LocalContext.current
+    val googleSignInClient = remember {
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(context.getString(com.example.foodtracker.R.string.default_web_client_id))
+            .requestEmail()
+            .build()
+        GoogleSignIn.getClient(context, gso)
+    }
+
+    val googleLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            try {
+                val account = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+                    .getResult(ApiException::class.java)
+                account.idToken?.let { authViewModel.signInWithGoogle(it) }
+            } catch (_: ApiException) { /* user cancelled */ }
+        }
+    }
+
+    LaunchedEffect(uiState) {
+        when (uiState) {
+            is AuthUiState.NavigateHome       -> onNavigateHome()
+            is AuthUiState.NavigateOnboarding -> onNavigateOnboarding()
+            else                              -> Unit
+        }
+    }
+
+    Box(Modifier.fillMaxSize().background(GlassColors.backgroundDark)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(Modifier.height(72.dp))
+
+            Text("🥗", fontSize = 56.sp)
+            Spacer(Modifier.height(12.dp))
+            Text("FoodTracker", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold,
+                color = GlassColors.textPrimary)
+            Text("Conectează-te pentru a continua", fontSize = 13.sp,
+                color = GlassColors.textSecondary)
+
+            Spacer(Modifier.height(40.dp))
+
+            AuthTextField(
+                value = email,
+                onValueChange = { email = it; authViewModel.resetState() },
+                placeholder = "Email",
+                keyboardType = KeyboardType.Email
+            )
+            Spacer(Modifier.height(12.dp))
+            AuthTextField(
+                value = password,
+                onValueChange = { password = it; authViewModel.resetState() },
+                placeholder = "Parolă",
+                keyboardType = KeyboardType.Password,
+                isPassword = true,
+                passwordVisible = passwordVisible,
+                onTogglePasswordVisibility = { passwordVisible = !passwordVisible }
+            )
+
+            AnimatedVisibility(
+                visible = errorMessage != null,
+                enter = fadeIn(tween(200)), exit = fadeOut(tween(200))
+            ) {
+                Text(
+                    text = errorMessage ?: "",
+                    color = Color(0xFFFF4444),
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 6.dp).fillMaxWidth()
+                )
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            AuthPrimaryButton(
+                text = "Conectează-te",
+                enabled = email.isNotBlank() && password.isNotBlank(),
+                isLoading = isLoading,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { authViewModel.loginWithEmail(email, password) }
+            )
+
+            Spacer(Modifier.height(20.dp))
+
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center) {
+                Box(Modifier.weight(1f).height(1.dp).background(GlassColors.cardBorder))
+                Text("  sau  ", fontSize = 12.sp, color = GlassColors.textTertiary)
+                Box(Modifier.weight(1f).height(1.dp).background(GlassColors.cardBorder))
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            Box(
+                Modifier.fillMaxWidth().height(52.dp).glassCard(16)
+                    .clickable {
+                        googleSignInClient.signOut()
+                        googleLauncher.launch(googleSignInClient.signInIntent)
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Continuă cu Google", fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold, color = GlassColors.textPrimary)
+            }
+
+            Spacer(Modifier.height(32.dp))
+
+            Row {
+                Text("Nu ai cont? ", fontSize = 13.sp, color = GlassColors.textSecondary)
+                Text(
+                    "Înregistrează-te",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = GlassColors.accentGreen,
+                    modifier = Modifier.clickable { onNavigateRegister() }
+                )
+            }
+
+            Spacer(Modifier.height(40.dp))
+        }
+    }
+}
