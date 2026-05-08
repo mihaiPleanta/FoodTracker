@@ -19,6 +19,7 @@ import androidx.navigation.compose.*
 import com.example.foodtracker.ui.*
 import com.example.foodtracker.ui.theme.FoodTrackerTheme
 import com.example.foodtracker.ui.theme.GlassColors
+import com.example.foodtracker.viewmodel.AuthViewModel
 import com.example.foodtracker.viewmodel.FoodViewModel
 import java.net.URLDecoder
 import java.net.URLEncoder
@@ -31,10 +32,10 @@ class MainActivity : ComponentActivity() {
             FoodTrackerTheme {
                 val navController = rememberNavController()
                 val viewModel: FoodViewModel = viewModel()
+                val authViewModel: AuthViewModel = viewModel()
                 val backStack by navController.currentBackStackEntryAsState()
                 val currentRoute = backStack?.destination?.route
 
-                // Pop-up state lives in ViewModel so back-nav can reopen it
                 val showMealSelector by viewModel.showMealSelector.collectAsState()
 
                 val showBottomBar = currentRoute in listOf("home", "stats", "meals", "profile")
@@ -60,8 +61,65 @@ class MainActivity : ComponentActivity() {
                         ) {
                             NavHost(
                                 navController    = navController,
-                                startDestination = "home"
+                                startDestination = "splash"
                             ) {
+                                composable("splash") {
+                                    SplashScreen(
+                                        authViewModel     = authViewModel,
+                                        onNavigateLogin   = {
+                                            navController.navigate("login") {
+                                                popUpTo("splash") { inclusive = true }
+                                            }
+                                        },
+                                        onNavigateHome    = {
+                                            navController.navigate("home") {
+                                                popUpTo("splash") { inclusive = true }
+                                            }
+                                        },
+                                        onNavigateOnboarding = {
+                                            navController.navigate("onboarding") {
+                                                popUpTo("splash") { inclusive = true }
+                                            }
+                                        }
+                                    )
+                                }
+                                composable("login") {
+                                    LoginScreen(
+                                        authViewModel        = authViewModel,
+                                        onNavigateRegister   = { navController.navigate("register") },
+                                        onNavigateHome       = {
+                                            navController.navigate("home") {
+                                                popUpTo("login") { inclusive = true }
+                                            }
+                                        },
+                                        onNavigateOnboarding = {
+                                            navController.navigate("onboarding") {
+                                                popUpTo("login") { inclusive = true }
+                                            }
+                                        }
+                                    )
+                                }
+                                composable("register") {
+                                    RegisterScreen(
+                                        authViewModel        = authViewModel,
+                                        onNavigateLogin      = { navController.popBackStack() },
+                                        onNavigateOnboarding = {
+                                            navController.navigate("onboarding") {
+                                                popUpTo("login") { inclusive = true }
+                                            }
+                                        }
+                                    )
+                                }
+                                composable("onboarding") {
+                                    OnboardingScreen(
+                                        authViewModel  = authViewModel,
+                                        onNavigateHome = {
+                                            navController.navigate("home") {
+                                                popUpTo("onboarding") { inclusive = true }
+                                            }
+                                        }
+                                    )
+                                }
                                 composable("home") {
                                     HomeScreen(navController, viewModel)
                                 }
@@ -77,7 +135,6 @@ class MainActivity : ComponentActivity() {
                                 composable("settings") {
                                     SettingsScreen(navController, viewModel)
                                 }
-                                // ── Meal detail ───────────────────────────────
                                 composable("meal/{mealName}/{mealIcon}/{accentColor}") { entry ->
                                     val mealName    = entry.arguments?.getString("mealName") ?: ""
                                     val mealIcon    = URLDecoder.decode(entry.arguments?.getString("mealIcon") ?: "", "UTF-8")
@@ -95,7 +152,6 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // ── Meal selector overlay (on top of everything) ──────────
                     AnimatedVisibility(
                         visible = showMealSelector,
                         enter   = fadeIn(tween(200)),
