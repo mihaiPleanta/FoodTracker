@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from auth import verify_token
-from models import TdeeRequest, TdeeResponse
+from schemas import TdeeRequest, TdeeResponse
 
 router = APIRouter()
 

@@ -1,5 +1,3 @@
-import pytest
-
 AUTH_HEADER = {"Authorization": "Bearer fake-test-token"}
 
 _VALID_PROFILE = {
@@ -11,14 +9,6 @@ _VALID_PROFILE = {
     "target_weight_kg": 75.0,
     "activity_level": "MODERATE",
 }
-
-
-@pytest.fixture(autouse=True)
-def clear_profiles():
-    from routers.profile import profiles
-    profiles.clear()
-    yield
-    profiles.clear()
 
 
 def test_get_profile_returns_404_when_none(client):
@@ -38,6 +28,14 @@ def test_get_profile_after_save(client):
     response = client.get("/profile", headers=AUTH_HEADER)
     assert response.status_code == 200
     assert response.json()["activity_level"] == "MODERATE"
+
+
+def test_save_profile_upsert_updates_existing(client):
+    client.post("/profile", json=_VALID_PROFILE, headers=AUTH_HEADER)
+    updated = {**_VALID_PROFILE, "current_weight_kg": 76.5}
+    response = client.post("/profile", json=updated, headers=AUTH_HEADER)
+    assert response.status_code == 200
+    assert response.json()["current_weight_kg"] == 76.5
 
 
 def test_profile_requires_auth(client):
