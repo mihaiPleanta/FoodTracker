@@ -169,9 +169,13 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
         ) {
             Spacer(Modifier.height(20.dp))
 
+            val profile by viewModel.userProfile.collectAsState()
+            val initial = profile.name.trim().firstOrNull()?.uppercase() ?: "?"
+
             HomeHeader(
                 title = headerTitle,
                 subtitle = headerSubtitle,
+                initial = initial,
                 onSettingsClick = { navController.navigate("settings") },
                 modifier = Modifier.padding(horizontal = 20.dp)
             )
@@ -246,7 +250,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
 // ── Header ────────────────────────────────────────────────────────────────────
 
 @Composable
-fun HomeHeader(title: String, subtitle: String, onSettingsClick: () -> Unit, modifier: Modifier = Modifier) {
+fun HomeHeader(title: String, subtitle: String, initial: String, onSettingsClick: () -> Unit, modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
         Column {
             Text(subtitle, fontSize = 13.sp, color = GlassColors.textSecondary)
@@ -279,7 +283,7 @@ fun HomeHeader(title: String, subtitle: String, onSettingsClick: () -> Unit, mod
                     )),
                 Alignment.Center
             ) {
-                Text("M", color = Color.Black, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(initial, color = Color.Black, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -765,7 +769,7 @@ fun HomeScreenPreview() {
                     .verticalScroll(rememberScrollState())
             ) {
                 Spacer(Modifier.height(12.dp))
-                HomeHeader("Today", "4 March 2026", onSettingsClick = {})
+                HomeHeader("Today", "4 March 2026", initial = "M", onSettingsClick = {})
                 Spacer(Modifier.height(20.dp))
                 CalorieSummaryCard(1247,2000,82,150,156,250,41,65)
                 Spacer(Modifier.height(24.dp))

@@ -7,6 +7,9 @@ import com.example.foodtracker.api.RetrofitInstance
 import com.example.foodtracker.model.ActivityLevel
 import com.example.foodtracker.model.Gender
 import com.example.foodtracker.model.ProfileDto
+import com.example.foodtracker.model.UserProfile
+import com.example.foodtracker.model.toProfileDto
+import com.example.foodtracker.model.toUserProfile
 import com.example.foodtracker.util.mapFirebaseError
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
@@ -51,6 +54,9 @@ class AuthViewModel : ViewModel() {
     private val _onboardingData = MutableStateFlow(OnboardingData())
     val onboardingData: StateFlow<OnboardingData> = _onboardingData.asStateFlow()
 
+    private val _loadedProfile = MutableStateFlow<UserProfile?>(null)
+    val loadedProfile: StateFlow<UserProfile?> = _loadedProfile.asStateFlow()
+
     /** Called by SplashScreen on startup. */
     fun checkAuthState() {
         viewModelScope.launch {
@@ -62,8 +68,10 @@ class AuthViewModel : ViewModel() {
             _uiState.value = AuthUiState.Loading
             _uiState.value = try {
                 val response = profileApi.getProfile()
-                if (response.isSuccessful) AuthUiState.NavigateHome
-                else AuthUiState.NavigateOnboarding
+                if (response.isSuccessful) {
+                    response.body()?.let { _loadedProfile.value = it.toUserProfile() }
+                    AuthUiState.NavigateHome
+                } else AuthUiState.NavigateOnboarding
             } catch (_: Exception) {
                 AuthUiState.NavigateOnboarding
             }
@@ -159,6 +167,7 @@ class AuthViewModel : ViewModel() {
             try {
                 val dto = ProfileDto(d.name, age, d.gender.name, heightCm, currentKg, targetKg, d.activityLevel.name)
                 profileApi.saveProfile(dto)
+                _loadedProfile.value = dto.toUserProfile()
                 _uiState.value = AuthUiState.NavigateHome
             } catch (e: Exception) {
                 _uiState.value = AuthUiState.Error(mapFirebaseError(e))
@@ -166,10 +175,21 @@ class AuthViewModel : ViewModel() {
         }
     }
 
+    /** Persists profile edits from ProfileScreen. Fire-and-forget. */
+    fun saveProfileEdit(profile: UserProfile) {
+        _loadedProfile.value = profile
+        viewModelScope.launch {
+            runCatching { profileApi.saveProfile(profile.toProfileDto()) }
+        }
+    }
+
     private suspend fun resolvePostAuth() {
         _uiState.value = try {
             val response = profileApi.getProfile()
-            if (response.isSuccessful) AuthUiState.NavigateHome else AuthUiState.NavigateOnboarding
+            if (response.isSuccessful) {
+                response.body()?.let { _loadedProfile.value = it.toUserProfile() }
+                AuthUiState.NavigateHome
+            } else AuthUiState.NavigateOnboarding
         } catch (_: Exception) {
             AuthUiState.NavigateOnboarding
         }

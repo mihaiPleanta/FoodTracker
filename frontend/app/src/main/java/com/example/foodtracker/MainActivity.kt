@@ -38,6 +38,11 @@ class MainActivity : ComponentActivity() {
 
                 val showMealSelector by viewModel.showMealSelector.collectAsState()
 
+                val loadedProfile by authViewModel.loadedProfile.collectAsState()
+                LaunchedEffect(loadedProfile) {
+                    loadedProfile?.let { viewModel.updateUserProfile(it) }
+                }
+
                 val showBottomBar = currentRoute in listOf("home", "stats", "meals", "profile")
 
                 Box(Modifier.fillMaxSize().background(GlassColors.backgroundDark)) {
@@ -130,7 +135,7 @@ class MainActivity : ComponentActivity() {
                                     PlaceholderScreen("Meals")
                                 }
                                 composable("profile") {
-                                    ProfileScreen(viewModel)
+                                    ProfileScreen(viewModel, authViewModel)
                                 }
                                 composable("settings") {
                                     SettingsScreen(navController, viewModel)

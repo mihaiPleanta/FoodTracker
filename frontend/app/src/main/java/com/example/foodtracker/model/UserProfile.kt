@@ -13,3 +13,24 @@ data class UserProfile(
     val targetWeightKg: Float = 75.0f,
     val activityLevel: ActivityLevel = ActivityLevel.MODERATE
 )
+
+fun UserProfile.toProfileDto() = ProfileDto(
+    name = name,
+    age = age,
+    gender = gender.name,
+    heightCm = heightCm,
+    currentWeightKg = currentWeightKg,
+    targetWeightKg = targetWeightKg,
+    activityLevel = activityLevel.name
+)
+
+fun ProfileDto.toUserProfile() = UserProfile(
+    name = name,
+    age = age,
+    gender = runCatching { Gender.valueOf(gender) }.getOrDefault(Gender.OTHER),
+    heightCm = heightCm,
+    currentWeightKg = currentWeightKg,
+    targetWeightKg = targetWeightKg,
+    activityLevel = runCatching { ActivityLevel.valueOf(activityLevel) }
+        .getOrDefault(ActivityLevel.MODERATE)
+)

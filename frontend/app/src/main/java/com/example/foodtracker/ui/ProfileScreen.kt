@@ -29,15 +29,23 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.Icon
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import com.example.foodtracker.model.ActivityLevel
 import com.example.foodtracker.model.Gender
 import com.example.foodtracker.model.UserProfile
 import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.ui.theme.glassCard
+import com.example.foodtracker.viewmodel.AuthViewModel
 import com.example.foodtracker.viewmodel.FoodViewModel
 
 @Composable
-fun ProfileScreen(viewModel: FoodViewModel) {
+fun ProfileScreen(viewModel: FoodViewModel, authViewModel: AuthViewModel) {
     val profile by viewModel.userProfile.collectAsState()
 
     var name          by remember(profile) { mutableStateOf(profile.name) }
@@ -137,19 +145,19 @@ fun ProfileScreen(viewModel: FoodViewModel) {
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
                 onClick = {
-                    viewModel.updateUserProfile(
-                        UserProfile(
-                            name            = name.trim().ifBlank { profile.name },
-                            age             = age.toIntOrNull() ?: profile.age,
-                            gender          = gender,
-                            heightCm        = heightCm.toIntOrNull() ?: profile.heightCm,
-                            currentWeightKg = currentWeight.replace(",", ".").toFloatOrNull()
-                                                ?: profile.currentWeightKg,
-                            targetWeightKg  = targetWeight.replace(",", ".").toFloatOrNull()
-                                                ?: profile.targetWeightKg,
-                            activityLevel   = activityLevel
-                        )
+                    val updated = UserProfile(
+                        name            = name.trim().ifBlank { profile.name },
+                        age             = age.toIntOrNull() ?: profile.age,
+                        gender          = gender,
+                        heightCm        = heightCm.toIntOrNull() ?: profile.heightCm,
+                        currentWeightKg = currentWeight.replace(",", ".").toFloatOrNull()
+                                            ?: profile.currentWeightKg,
+                        targetWeightKg  = targetWeight.replace(",", ".").toFloatOrNull()
+                                            ?: profile.targetWeightKg,
+                        activityLevel   = activityLevel
                     )
+                    viewModel.updateUserProfile(updated)
+                    authViewModel.saveProfileEdit(updated)
                 }
             )
 
@@ -396,9 +404,17 @@ fun ProfileActivityRow(selected: ActivityLevel, onSelect: (ActivityLevel) -> Uni
 fun ProfileSaveButton(modifier: Modifier = Modifier, onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
+    val haptic = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    var justSaved by remember { mutableStateOf(false) }
+
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.96f else 1f,
-        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessHigh),
+        targetValue = when {
+            justSaved -> 1.04f
+            isPressed -> 0.92f
+            else      -> 1f
+        },
+        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium),
         label = "saveScale"
     )
     Box(
@@ -411,14 +427,35 @@ fun ProfileSaveButton(modifier: Modifier = Modifier, onClick: () -> Unit) {
                     listOf(GlassColors.accentGreen, GlassColors.accentGreenDim)
                 )
             )
-            .clickable(interactionSource = interactionSource, indication = null) { onClick() },
+            .clickable(interactionSource = interactionSource, indication = null) {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onClick()
+                justSaved = true
+                scope.launch {
+                    delay(1200)
+                    justSaved = false
+                }
+            },
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            "Salvează profilul",
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.Black
-        )
+        if (justSaved) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = null,
+                    tint = Color.Black,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Salvat", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+            }
+        } else {
+            Text(
+                "Salvează profilul",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
+        }
     }
 }

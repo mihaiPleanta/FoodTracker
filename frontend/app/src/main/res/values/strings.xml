@@ -1,5 +1,5 @@
 <resources>
     <string name="app_name">FoodTracker</string>
     <!-- Replace with your Web Client ID from Firebase Console → Authentication → Sign-in method → Google -->
-    <string name="default_web_client_id">REPLACE_WITH_WEB_CLIENT_ID</string>
+    <string name="default_web_client_id">681739565121-64l09djqa9tkf1o89gnsl96t7dsnb6h2.apps.googleusercontent.com</string>
 </resources>
