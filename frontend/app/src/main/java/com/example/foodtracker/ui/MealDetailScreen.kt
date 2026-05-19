@@ -40,58 +40,14 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.foodtracker.ui.theme.FoodTrackerTheme
+import com.example.foodtracker.model.FoodItem
+import com.example.foodtracker.model.LoggedFood
 import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.viewmodel.FoodViewModel
-
-// ── Hardcoded food database (to be replaced with API later) ───────────────────
-
-data class FoodItem(
-    val name: String,
-    val per100g: Int,       // kcal per 100g
-    val protein100g: Float,
-    val carbs100g: Float,
-    val fat100g: Float,
-    val emoji: String = "🍽"
-)
-
-val foodDatabase = listOf(
-    FoodItem("Boiled Eggs",       155, 13f, 1.1f,  11f,  "🥚"),
-    FoodItem("Oatmeal",           68,  2.4f, 12f,  1.4f, "🥣"),
-    FoodItem("Banana",            89,  1.1f, 23f,  0.3f, "🍌"),
-    FoodItem("Greek Yogurt",      59,  10f,  3.6f, 0.4f, "🫙"),
-    FoodItem("Grilled Chicken",   165, 31f,  0f,   3.6f, "🍗"),
-    FoodItem("Brown Rice",        130, 2.7f, 28f,  1f,   "🍚"),
-    FoodItem("Salmon",            208, 20f,  0f,   13f,  "🐟"),
-    FoodItem("Avocado",           160, 2f,   9f,   15f,  "🥑"),
-    FoodItem("Whole Milk",        61,  3.2f, 4.8f, 3.3f, "🥛"),
-    FoodItem("Almonds",           579, 21f,  22f,  50f,  "🌰"),
-    FoodItem("Apple",             52,  0.3f, 14f,  0.2f, "🍎"),
-    FoodItem("Sweet Potato",      86,  1.6f, 20f,  0.1f, "🍠"),
-    FoodItem("Broccoli",          34,  2.8f, 7f,   0.4f, "🥦"),
-    FoodItem("Cheddar Cheese",    402, 25f,  1.3f, 33f,  "🧀"),
-    FoodItem("White Bread",       265, 9f,   49f,  3.2f, "🍞"),
-    FoodItem("Olive Oil",         884, 0f,   0f,   100f, "🫒"),
-    FoodItem("Tuna (canned)",     116, 26f,  0f,   1f,   "🥫"),
-    FoodItem("Cottage Cheese",    98,  11f,  3.4f, 4.3f, "🫙"),
-    FoodItem("Blueberries",       57,  0.7f, 14f,  0.3f, "🫐"),
-    FoodItem("Protein Bar",       370, 30f,  35f,  10f,  "🍫"),
-)
-
-data class LoggedFood(
-    val food: FoodItem,
-    val grams: Int
-) {
-    val calories: Int get() = (food.per100g * grams / 100f).toInt()
-    val protein:  Float get() = food.protein100g * grams / 100f
-    val carbs:    Float get() = food.carbs100g * grams / 100f
-    val fat:      Float get() = food.fat100g * grams / 100f
-}
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -122,10 +78,8 @@ fun MealDetailScreen(
     val focusRequester = remember { FocusRequester() }
     val focusManager   = LocalFocusManager.current
 
-    val filteredFoods = remember(searchQuery) {
-        if (searchQuery.isBlank()) foodDatabase
-        else foodDatabase.filter { it.name.contains(searchQuery, ignoreCase = true) }
-    }
+    // Placeholder — completat în Task 12 (state-aware search)
+    val filteredFoods: List<FoodItem> = emptyList()
 
     val totalCalories = loggedFoods.sumOf { it.calories }
     val totalProtein  = loggedFoods.sumOf { it.protein.toDouble() }.toFloat()
@@ -405,7 +359,7 @@ fun LoggedFoodRow(
                 .background(accentColor.copy(alpha = 0.10f)),
             contentAlignment = Alignment.Center
         ) {
-            Text(logged.food.emoji, fontSize = 18.sp)
+            Text("🍽️", fontSize = 18.sp)
         }
 
         Spacer(Modifier.width(12.dp))
@@ -528,8 +482,8 @@ fun SearchResultRow(food: FoodItem, onAdd: () -> Unit) {
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Emoji
-        Text(food.emoji, fontSize = 20.sp)
+        // Emoji (temporary — replaced in Task 12 by ProductThumbnail)
+        Text("🍽️", fontSize = 20.sp)
         Spacer(Modifier.width(12.dp))
 
         // Name + per 100g info
@@ -739,35 +693,6 @@ fun FooterMacroBar(
             color = GlassColors.textTertiary,
             textAlign = TextAlign.Center
         )
-    }
-}
-
-// ── Preview ───────────────────────────────────────────────────────────────────
-
-@Preview(showBackground = true, backgroundColor = 0xFF0D0D0D, widthDp = 390, heightDp = 844)
-@Composable
-fun MealDetailPreview() {
-    FoodTrackerTheme {
-        Box(Modifier.fillMaxSize().background(GlassColors.backgroundDark)) {
-            Column(Modifier.fillMaxSize()) {
-                MealDetailHeader("Breakfast", "🌅", Color(0xFFFFD600)) {}
-                SearchBar("", {}, {}, Color(0xFFFFD600), remember { FocusRequester() },
-                    Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp))
-                Box(Modifier.weight(1f)) {
-                    LoggedFoodsList(
-                        loggedFoods = listOf(
-                            LoggedFood(foodDatabase[0], 120),
-                            LoggedFood(foodDatabase[1], 200),
-                            LoggedFood(foodDatabase[2], 118),
-                            LoggedFood(foodDatabase[3], 150),
-                        ),
-                        accentColor = Color(0xFFFFD600),
-                        onRemove = {}
-                    )
-                }
-                MacroSummaryFooter(535, 55f, 30f, 38f, Color(0xFFFFD600))
-            }
-        }
     }
 }
 

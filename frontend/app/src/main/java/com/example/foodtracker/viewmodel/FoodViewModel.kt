@@ -6,9 +6,8 @@ import com.example.foodtracker.model.AppSettings
 import com.example.foodtracker.model.Food
 import com.example.foodtracker.model.MealType
 import com.example.foodtracker.model.UserProfile
-import com.example.foodtracker.ui.FoodItem
-import com.example.foodtracker.ui.LoggedFood
-import com.example.foodtracker.ui.foodDatabase
+import com.example.foodtracker.model.FoodItem
+import com.example.foodtracker.model.LoggedFood
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -63,50 +62,10 @@ class FoodViewModel : ViewModel() {
 
     private fun todayKey(): String = dateKey(Date())
 
-    private fun seedHistory(): Map<String, DayMeals> {
-        val today = Calendar.getInstance()
-        val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
-        val twoDaysAgo = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -2) }
-
-        return mapOf(
-            dateKey(today.time) to DayMeals(
-                breakfast = listOf(
-                    LoggedFood(foodDatabase[0], 120),
-                    LoggedFood(foodDatabase[1], 200),
-                    LoggedFood(foodDatabase[2], 118),
-                    LoggedFood(foodDatabase[3], 150)
-                ),
-                lunch = listOf(
-                    LoggedFood(foodDatabase[4], 200),
-                    LoggedFood(foodDatabase[5], 150),
-                    LoggedFood(foodDatabase[10], 100)
-                )
-            ),
-            dateKey(yesterday.time) to DayMeals(
-                breakfast = listOf(
-                    LoggedFood(foodDatabase[0], 100),
-                    LoggedFood(foodDatabase[10], 180)
-                ),
-                lunch = listOf(
-                    LoggedFood(foodDatabase[4], 180),
-                    LoggedFood(foodDatabase[12], 140)
-                ),
-                dinner = listOf(
-                    LoggedFood(foodDatabase[6], 160),
-                    LoggedFood(foodDatabase[11], 200)
-                )
-            ),
-            dateKey(twoDaysAgo.time) to DayMeals(
-                breakfast = listOf(LoggedFood(foodDatabase[3], 180)),
-                snacks = listOf(LoggedFood(foodDatabase[9], 30), LoggedFood(foodDatabase[10], 150))
-            )
-        )
-    }
-
     private val _selectedHomeDate = MutableStateFlow(Date())
     val selectedHomeDate: StateFlow<Date> = _selectedHomeDate.asStateFlow()
 
-    private val _foodsByDate = MutableStateFlow(seedHistory())
+    private val _foodsByDate = MutableStateFlow<Map<String, DayMeals>>(emptyMap())
 
     // Hydration: liters by day key, used by Home quick-add water card.
     private val _hydrationByDate = MutableStateFlow(
