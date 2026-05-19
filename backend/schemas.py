@@ -30,9 +30,6 @@ class TdeeResponse(BaseModel):
     calorie_goal: int
 
 
-# Adăugat la finalul backend/schemas.py
-
-
 class FoodItemDto(BaseModel):
     barcode: str
     name: str
