@@ -189,6 +189,40 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
                 )
             }
 
+            Spacer(Modifier.height(14.dp))
+
+            // ── Despre ────────────────────────────────────────────────────────
+            SettingsSectionTitle("DESPRE")
+            Spacer(Modifier.height(8.dp))
+            val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+            Column(
+                Modifier
+                    .padding(horizontal = 20.dp)
+                    .fillMaxWidth()
+                    .glassCard(16)
+                    .clickable { uriHandler.openUri("https://world.openfoodfacts.org") }
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+            ) {
+                Text(
+                    "Date despre produse",
+                    fontSize = 13.sp,
+                    color = GlassColors.textSecondary,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Open Food Facts (ODbL)",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = GlassColors.textPrimary,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "world.openfoodfacts.org",
+                    fontSize = 12.sp,
+                    color = GlassColors.accentGreen,
+                )
+            }
+
             Spacer(Modifier.height(100.dp))
         }
     }
