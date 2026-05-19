@@ -73,3 +73,86 @@ def test_normalize_returns_none_when_nutriments_empty():
 def test_normalize_returns_none_when_no_barcode():
     product = _complete_product(code=None)
     assert OpenFoodFactsClient()._normalize(product) is None
+
+
+import httpx
+import pytest
+
+from services.open_food_facts import OpenFoodFactsClient, USER_AGENT
+
+
+def _make_mock_http(handler) -> httpx.AsyncClient:
+    transport = httpx.MockTransport(handler)
+    return httpx.AsyncClient(transport=transport, headers={"User-Agent": USER_AGENT})
+
+
+@pytest.mark.asyncio
+async def test_search_filters_out_incomplete_products():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/cgi/search.pl"
+        assert request.url.params["search_terms"] == "cola"
+        assert request.url.params["lc"] == "ro"
+        return httpx.Response(200, json={
+            "products": [
+                _complete_product(code="111", product_name="Complete"),
+                _complete_product(code="222", nutriments={}),  # incomplete
+            ],
+            "count": 2,
+        })
+
+    client = OpenFoodFactsClient(http_client=_make_mock_http(handler))
+    items = await client.search("cola", page_size=20)
+    assert len(items) == 1
+    assert items[0].barcode == "111"
+
+
+@pytest.mark.asyncio
+async def test_search_sends_user_agent_header():
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["ua"] = request.headers.get("user-agent")
+        return httpx.Response(200, json={"products": [], "count": 0})
+
+    client = OpenFoodFactsClient(http_client=_make_mock_http(handler))
+    await client.search("x", page_size=5)
+    assert captured["ua"] == USER_AGENT
+
+
+@pytest.mark.asyncio
+async def test_get_by_barcode_returns_dto():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/v2/product/5449000000996"
+        return httpx.Response(200, json={
+            "status": 1,
+            "code": "5449000000996",
+            "product": _complete_product(code="5449000000996"),
+        })
+
+    client = OpenFoodFactsClient(http_client=_make_mock_http(handler))
+    dto = await client.get_by_barcode("5449000000996")
+    assert dto is not None
+    assert dto.barcode == "5449000000996"
+
+
+@pytest.mark.asyncio
+async def test_get_by_barcode_returns_none_when_not_found():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"status": 0, "status_verbose": "product not found"})
+
+    client = OpenFoodFactsClient(http_client=_make_mock_http(handler))
+    dto = await client.get_by_barcode("000")
+    assert dto is None
+
+
+@pytest.mark.asyncio
+async def test_get_by_barcode_returns_none_when_nutrition_incomplete():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={
+            "status": 1,
+            "code": "111",
+            "product": _complete_product(code="111", nutriments={}),
+        })
+
+    client = OpenFoodFactsClient(http_client=_make_mock_http(handler))
+    assert await client.get_by_barcode("111") is None
