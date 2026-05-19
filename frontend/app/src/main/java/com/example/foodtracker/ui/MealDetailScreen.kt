@@ -20,8 +20,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -42,12 +44,14 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.NavController
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 import com.example.foodtracker.model.FoodItem
 import com.example.foodtracker.model.LoggedFood
 import com.example.foodtracker.ui.theme.GlassColors
+import com.example.foodtracker.util.CategoryEmojiMapper
 import com.example.foodtracker.viewmodel.FoodViewModel
+import kotlinx.coroutines.launch
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -59,76 +63,99 @@ fun MealDetailScreen(
     navController: NavController,
     viewModel: FoodViewModel = viewModel()
 ) {
-    // Read from shared ViewModel — reactive to changes
     val loggedFoods by viewModel.getFoodsFlow(mealName).collectAsState()
+    val searchState by viewModel.searchState.collectAsState()
 
-    // Keep back behavior consistent: always return to Home from this screen.
     val goBackToHome = {
         navController.navigate("home") {
             popUpTo("home") { inclusive = false }
             launchSingleTop = true
         }
     }
-
     BackHandler(onBack = goBackToHome)
 
-    var searchQuery  by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf("") }
     var searchActive by remember { mutableStateOf(false) }
 
     val focusRequester = remember { FocusRequester() }
-    val focusManager   = LocalFocusManager.current
+    val focusManager = LocalFocusManager.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
-    // Placeholder — completat în Task 12 (state-aware search)
-    val filteredFoods: List<FoodItem> = emptyList()
+    LaunchedEffect(searchQuery) {
+        viewModel.searchFoods(searchQuery)
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { viewModel.clearSearch() }
+    }
 
     val totalCalories = loggedFoods.sumOf { it.calories }
     val totalProtein  = loggedFoods.sumOf { it.protein.toDouble() }.toFloat()
     val totalCarbs    = loggedFoods.sumOf { it.carbs.toDouble() }.toFloat()
     val totalFat      = loggedFoods.sumOf { it.fat.toDouble() }.toFloat()
 
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(GlassColors.backgroundDark)
-    ) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-        ) {
+    Box(Modifier.fillMaxSize().background(GlassColors.backgroundDark)) {
+        Column(Modifier.fillMaxSize().statusBarsPadding()) {
             MealDetailHeader(
                 mealName    = mealName,
                 mealIcon    = mealIcon,
                 accentColor = accentColor,
-                onBack      = goBackToHome
+                onBack      = goBackToHome,
             )
 
-            SearchBar(
-                query          = searchQuery,
-                onQueryChange  = { searchQuery = it; if (!searchActive) searchActive = true },
-                onClear        = { searchQuery = ""; searchActive = false; focusManager.clearFocus() },
-                accentColor    = accentColor,
-                focusRequester = focusRequester,
-                modifier       = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp)
-            )
+            Row(
+                Modifier
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                SearchBar(
+                    query          = searchQuery,
+                    onQueryChange  = { searchQuery = it; if (!searchActive) searchActive = true },
+                    onClear        = { searchQuery = ""; searchActive = false; focusManager.clearFocus() },
+                    accentColor    = accentColor,
+                    focusRequester = focusRequester,
+                    modifier       = Modifier.weight(1f),
+                )
+
+                BarcodeScanButton(
+                    accentColor = accentColor,
+                    onClick = {
+                        coroutineScope.launch {
+                            val activity = context as? android.app.Activity ?: return@launch
+                            val code = try {
+                                com.example.foodtracker.util.BarcodeScanner.scan(activity)
+                            } catch (_: Throwable) { null }
+                            if (code != null) {
+                                searchActive = true
+                                viewModel.lookupBarcode(code)
+                            }
+                        }
+                    },
+                )
+            }
 
             Box(Modifier.weight(1f)) {
-                if (searchActive && searchQuery.isNotBlank()) {
-                    SearchResultsList(
-                        foods       = filteredFoods,
+                if (searchActive && (searchQuery.isNotBlank() || searchState !is FoodViewModel.SearchUiState.Idle)) {
+                    SearchResultsView(
+                        state       = searchState,
                         accentColor = accentColor,
                         onAdd       = { food ->
                             viewModel.addFoodToMeal(mealName, LoggedFood(food, 100))
                             searchQuery  = ""
                             searchActive = false
+                            viewModel.clearSearch()
                             focusManager.clearFocus()
-                        }
+                        },
+                        onRetry     = { viewModel.searchFoods(searchQuery) },
                     )
                 } else {
                     LoggedFoodsList(
                         loggedFoods = loggedFoods,
                         accentColor = accentColor,
-                        onRemove    = { index -> viewModel.removeFoodFromMeal(mealName, index) }
+                        onRemove    = { index -> viewModel.removeFoodFromMeal(mealName, index) },
                     )
                 }
             }
@@ -138,7 +165,7 @@ fun MealDetailScreen(
                 totalProtein  = totalProtein,
                 totalCarbs    = totalCarbs,
                 totalFat      = totalFat,
-                accentColor   = accentColor
+                accentColor   = accentColor,
             )
         }
     }
@@ -284,6 +311,28 @@ fun SearchBar(
     }
 }
 
+// ── Barcode scan button ───────────────────────────────────────────────────────
+
+@Composable
+fun BarcodeScanButton(accentColor: Color, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(50.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(GlassColors.cardBackground)
+            .border(1.dp, GlassColors.cardBorder, RoundedCornerShape(16.dp))
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Default.QrCodeScanner,
+            contentDescription = "Scanează barcode",
+            tint = accentColor,
+            modifier = Modifier.size(22.dp),
+        )
+    }
+}
+
 // ── Logged foods list ─────────────────────────────────────────────────────────
 
 @Composable
@@ -351,16 +400,7 @@ fun LoggedFoodRow(
             .padding(horizontal = 14.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Food emoji
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(accentColor.copy(alpha = 0.10f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("🍽️", fontSize = 18.sp)
-        }
+        ProductThumbnail(food = logged.food, size = 40.dp)
 
         Spacer(Modifier.width(12.dp))
 
@@ -444,23 +484,75 @@ fun MiniMacroTag(text: String, color: Color) {
     }
 }
 
-// ── Search results list ───────────────────────────────────────────────────────
+// ── Search results (state-aware) ──────────────────────────────────────────────
 
 @Composable
-fun SearchResultsList(
-    foods: List<FoodItem>,
+fun SearchResultsView(
+    state: FoodViewModel.SearchUiState,
     accentColor: Color,
-    onAdd: (FoodItem) -> Unit
+    onAdd: (FoodItem) -> Unit,
+    onRetry: () -> Unit,
 ) {
-    LazyColumn(
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        itemsIndexed(foods, key = { _, item -> item.name }) { _, food ->
-            SearchResultRow(food = food, onAdd = { onAdd(food) })
+    when (state) {
+        FoodViewModel.SearchUiState.Idle -> {
+            Box(Modifier.fillMaxSize(), Alignment.Center) {
+                Text(
+                    "Tastează cel puțin 2 caractere",
+                    color = GlassColors.textTertiary,
+                    fontSize = 14.sp,
+                )
+            }
+        }
+        FoodViewModel.SearchUiState.Loading -> {
+            Box(Modifier.fillMaxSize(), Alignment.Center) {
+                CircularProgressIndicator(color = accentColor)
+            }
+        }
+        FoodViewModel.SearchUiState.Empty -> {
+            Box(Modifier.fillMaxSize(), Alignment.Center) {
+                Text(
+                    "Niciun produs găsit",
+                    color = GlassColors.textSecondary,
+                    fontSize = 14.sp,
+                )
+            }
+        }
+        is FoodViewModel.SearchUiState.Error -> {
+            Box(Modifier.fillMaxSize(), Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(state.message, color = Color(0xFFFF6B6B), fontSize = 14.sp)
+                    Spacer(Modifier.height(10.dp))
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(accentColor.copy(alpha = 0.18f))
+                            .clickable { onRetry() }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    ) {
+                        Text(
+                            "Reîncearcă",
+                            color = accentColor,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+            }
+        }
+        is FoodViewModel.SearchUiState.Results -> {
+            LazyColumn(
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                itemsIndexed(state.items, key = { _, item -> item.barcode.ifEmpty { item.name } }) { _, food ->
+                    SearchResultRow(food = food, onAdd = { onAdd(food) })
+                }
+            }
         }
     }
 }
+
+// ── Search result row ─────────────────────────────────────────────────────────
 
 @Composable
 fun SearchResultRow(food: FoodItem, onAdd: () -> Unit) {
@@ -469,7 +561,7 @@ fun SearchResultRow(food: FoodItem, onAdd: () -> Unit) {
     val scale by animateFloatAsState(
         if (isPressed) 0.97f else 1f,
         spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessHigh),
-        label = "rowScale"
+        label = "rowScale",
     )
 
     Row(
@@ -480,49 +572,93 @@ fun SearchResultRow(food: FoodItem, onAdd: () -> Unit) {
             .background(GlassColors.cardBackground)
             .border(1.dp, GlassColors.cardBorder, RoundedCornerShape(14.dp))
             .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Emoji (temporary — replaced in Task 12 by ProductThumbnail)
-        Text("🍽️", fontSize = 20.sp)
+        ProductThumbnail(food = food, size = 36.dp)
         Spacer(Modifier.width(12.dp))
 
-        // Name + per 100g info
         Column(Modifier.weight(1f)) {
             Text(
                 text = food.name,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = GlassColors.textPrimary
+                color = GlassColors.textPrimary,
+                maxLines = 1,
             )
+            val subtitlePrefix = if (food.brand.isNullOrBlank()) "" else "${food.brand} · "
             Text(
-                text = "per 100g  ·  ${food.per100g} kcal  ·  P${food.protein100g.toInt()} C${food.carbs100g.toInt()} F${food.fat100g.toInt()}",
+                text = "${subtitlePrefix}per 100g · ${food.per100g} kcal · P${food.protein100g.toInt()} C${food.carbs100g.toInt()} F${food.fat100g.toInt()}",
                 fontSize = 11.sp,
-                color = GlassColors.textTertiary
+                color = GlassColors.textTertiary,
+                maxLines = 1,
             )
         }
 
         Spacer(Modifier.width(10.dp))
 
-        // Add button
         Box(
             modifier = Modifier
                 .size(32.dp)
                 .clip(CircleShape)
                 .background(
-                    Brush.linearGradient(
-                        listOf(GlassColors.accentGreen, GlassColors.accentGreenDim)
-                    )
+                    Brush.linearGradient(listOf(GlassColors.accentGreen, GlassColors.accentGreenDim))
                 )
                 .clickable(interactionSource = interactionSource, indication = null) { onAdd() },
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = Icons.Default.Add,
-                contentDescription = "Add",
+                contentDescription = "Adaugă",
                 tint = Color.Black,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(18.dp),
             )
         }
+    }
+}
+
+// ── Product thumbnail (AsyncImage with emoji fallback) ────────────────────────
+
+@Composable
+fun ProductThumbnail(food: FoodItem, size: androidx.compose.ui.unit.Dp) {
+    val emojiFallback = CategoryEmojiMapper.emojiFor(food.categories)
+    if (food.imageUrl.isNullOrBlank()) {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(GlassColors.cardBackground),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(emojiFallback, fontSize = (size.value * 0.55f).sp)
+        }
+    } else {
+        coil.compose.SubcomposeAsyncImage(
+            model = food.imageUrl,
+            contentDescription = food.name,
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape),
+            loading = {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(GlassColors.cardBackground),
+                    Alignment.Center,
+                ) {
+                    Text(emojiFallback, fontSize = (size.value * 0.55f).sp)
+                }
+            },
+            error = {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(GlassColors.cardBackground),
+                    Alignment.Center,
+                ) {
+                    Text(emojiFallback, fontSize = (size.value * 0.55f).sp)
+                }
+            },
+        )
     }
 }
 
@@ -695,5 +831,3 @@ fun FooterMacroBar(
         )
     }
 }
-
-
