@@ -102,3 +102,30 @@ def test_search_requires_auth(client, fake_off):
 def test_barcode_requires_auth(client, fake_off):
     response = client.get("/foods/barcode/5449000000996")
     assert response.status_code == 422
+
+
+def test_search_translates_off_rate_limit_to_503(client, fake_off):
+    import httpx
+
+    async def raise_429(*args, **kwargs):
+        request = httpx.Request("GET", "https://world.openfoodfacts.org/")
+        response = httpx.Response(429, request=request)
+        raise httpx.HTTPStatusError("rate limited", request=request, response=response)
+
+    fake_off.search = raise_429
+    response = client.get("/foods/search", params={"q": "lapte"}, headers=AUTH_HEADER)
+    assert response.status_code == 503
+    assert "busy" in response.json()["detail"].lower()
+
+
+def test_barcode_translates_off_rate_limit_to_503(client, fake_off):
+    import httpx
+
+    async def raise_429(*args, **kwargs):
+        request = httpx.Request("GET", "https://world.openfoodfacts.org/")
+        response = httpx.Response(429, request=request)
+        raise httpx.HTTPStatusError("rate limited", request=request, response=response)
+
+    fake_off.get_by_barcode = raise_429
+    response = client.get("/foods/barcode/5449000000996", headers=AUTH_HEADER)
+    assert response.status_code == 503

@@ -1,5 +1,6 @@
 import re
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 
 from auth import verify_token
@@ -11,6 +12,18 @@ router = APIRouter(prefix="/foods", tags=["foods"])
 _BARCODE_RE = re.compile(r"^\d{8,13}$")
 
 
+def _translate_off_error(exc: httpx.HTTPStatusError) -> HTTPException:
+    if exc.response.status_code == 429:
+        return HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Food database busy, try again",
+        )
+    return HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail="Food database returned an error",
+    )
+
+
 @router.get("/search", response_model=SearchResponseDto)
 async def search_foods(
     q: str = Query(..., min_length=2, max_length=50),
@@ -18,7 +31,10 @@ async def search_foods(
     off: OpenFoodFactsClient = Depends(get_off_client),
     token: dict = Depends(verify_token),
 ) -> SearchResponseDto:
-    items = await off.search(q, page_size)
+    try:
+        items = await off.search(q, page_size)
+    except httpx.HTTPStatusError as exc:
+        raise _translate_off_error(exc) from exc
     return SearchResponseDto(items=items, count=len(items))
 
 
@@ -30,7 +46,10 @@ async def get_food_by_barcode(
 ) -> FoodItemDto:
     if not _BARCODE_RE.match(barcode):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid barcode format")
-    item = await off.get_by_barcode(barcode)
+    try:
+        item = await off.get_by_barcode(barcode)
+    except httpx.HTTPStatusError as exc:
+        raise _translate_off_error(exc) from exc
     if item is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
