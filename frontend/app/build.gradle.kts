@@ -87,6 +87,12 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
+    // Async image loading for OFF thumbnails
+    implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Barcode scanning via Google Play Services (no camera permission needed)
+    implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
+
     // Unit / instrumentation tests
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
