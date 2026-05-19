@@ -3,8 +3,10 @@ import firebase_admin
 from firebase_admin import credentials
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from routers.tdee import router as tdee_router
 from routers.profile import router as profile_router
+from routers.foods import router as foods_router
 
 if os.getenv("TESTING") != "1":
     _cred_path = os.getenv("FIREBASE_SERVICE_ACCOUNT", "serviceAccountKey.json")
@@ -14,13 +16,4 @@ app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(tdee_router)
 app.include_router(profile_router)
-
-foods = [{"name": "Chicken breast", "calories": 165}, {"name": "Rice", "calories": 130}]
-
-@app.get("/foods")
-def get_foods(): return foods
-
-@app.post("/foods")
-def add_food(food: dict):
-    foods.append(food)
-    return food
+app.include_router(foods_router)
