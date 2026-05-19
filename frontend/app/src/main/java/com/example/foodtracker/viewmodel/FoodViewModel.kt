@@ -2,18 +2,26 @@ package com.example.foodtracker.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.foodtracker.api.FoodApi
+import com.example.foodtracker.api.RetrofitInstance
 import com.example.foodtracker.model.AppSettings
 import com.example.foodtracker.model.Food
-import com.example.foodtracker.model.MealType
-import com.example.foodtracker.model.UserProfile
 import com.example.foodtracker.model.FoodItem
 import com.example.foodtracker.model.LoggedFood
+import com.example.foodtracker.model.MealType
+import com.example.foodtracker.model.UserProfile
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -36,6 +44,81 @@ class FoodViewModel : ViewModel() {
     // ── Legacy food list (keep for compatibility) ─────────────────────────────
     private val _foods = MutableStateFlow<List<Food>>(emptyList())
     val foods: StateFlow<List<Food>> = _foods
+
+    // ── Search state ──────────────────────────────────────────────────────────
+    sealed class SearchUiState {
+        data object Idle : SearchUiState()
+        data object Loading : SearchUiState()
+        data class Results(val items: List<FoodItem>) : SearchUiState()
+        data object Empty : SearchUiState()
+        data class Error(val message: String) : SearchUiState()
+    }
+
+    private val foodApi: FoodApi = RetrofitInstance.retrofit.create(FoodApi::class.java)
+
+    private val _searchState = MutableStateFlow<SearchUiState>(SearchUiState.Idle)
+    val searchState: StateFlow<SearchUiState> = _searchState.asStateFlow()
+
+    private val _searchQuery = MutableStateFlow("")
+
+    @OptIn(FlowPreview::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private fun observeSearchQueries() {
+        viewModelScope.launch {
+            _searchQuery
+                .debounce(350)
+                .mapLatest { query ->
+                    if (query.length < 2) {
+                        SearchUiState.Idle
+                    } else {
+                        _searchState.value = SearchUiState.Loading
+                        try {
+                            val response = foodApi.searchFoods(query)
+                            val items = response.items.map { it.toDomain() }
+                            if (items.isEmpty()) SearchUiState.Empty
+                            else SearchUiState.Results(items)
+                        } catch (e: java.io.IOException) {
+                            SearchUiState.Error("Verifică conexiunea la internet")
+                        } catch (e: retrofit2.HttpException) {
+                            if (e.code() == 503) SearchUiState.Error("Baza de date e ocupată, încearcă din nou")
+                            else SearchUiState.Error("Eroare neașteptată (${e.code()})")
+                        } catch (e: Throwable) {
+                            SearchUiState.Error("Eroare neașteptată")
+                        }
+                    }
+                }
+                .collect { state -> _searchState.value = state }
+        }
+    }
+
+    init {
+        observeSearchQueries()
+    }
+
+    fun searchFoods(query: String) {
+        _searchQuery.value = query
+    }
+
+    fun clearSearch() {
+        _searchQuery.value = ""
+        _searchState.value = SearchUiState.Idle
+    }
+
+    fun lookupBarcode(barcode: String) {
+        viewModelScope.launch {
+            _searchState.value = SearchUiState.Loading
+            _searchState.value = try {
+                val dto = foodApi.getFoodByBarcode(barcode)
+                SearchUiState.Results(listOf(dto.toDomain()))
+            } catch (e: retrofit2.HttpException) {
+                if (e.code() == 404) SearchUiState.Empty
+                else SearchUiState.Error("Eroare la căutarea produsului (${e.code()})")
+            } catch (e: java.io.IOException) {
+                SearchUiState.Error("Verifică conexiunea la internet")
+            } catch (e: Throwable) {
+                SearchUiState.Error("Eroare neașteptată")
+            }
+        }
+    }
 
     // ── Meal selector pop-up state ────────────────────────────────────────────
     private val _showMealSelector = MutableStateFlow(false)
