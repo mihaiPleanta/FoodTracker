@@ -5,10 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.foodtracker.api.FoodApi
 import com.example.foodtracker.api.RetrofitInstance
 import com.example.foodtracker.model.AppSettings
-import com.example.foodtracker.model.Food
 import com.example.foodtracker.model.FoodItem
 import com.example.foodtracker.model.LoggedFood
-import com.example.foodtracker.model.MealType
 import com.example.foodtracker.model.UserProfile
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,10 +38,6 @@ data class WeightCheckIn(
 )
 
 class FoodViewModel : ViewModel() {
-
-    // ── Legacy food list (keep for compatibility) ─────────────────────────────
-    private val _foods = MutableStateFlow<List<Food>>(emptyList())
-    val foods: StateFlow<List<Food>> = _foods
 
     // ── Search state ──────────────────────────────────────────────────────────
     sealed class SearchUiState {
@@ -262,6 +256,4 @@ class FoodViewModel : ViewModel() {
     fun getTotalCarbs()    = listOf("Breakfast","Lunch","Dinner","Snacks").sumOf { getMealCarbs(it).toDouble() }.toInt()
     fun getTotalFat()      = listOf("Breakfast","Lunch","Dinner","Snacks").sumOf { getMealFat(it).toDouble() }.toInt()
 
-    fun addFood(food: Food) { _foods.value = _foods.value + food }
-    fun getFoodsByMeal(mealType: MealType) = _foods.value.filter { it.mealType == mealType }
 }
