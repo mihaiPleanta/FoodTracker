@@ -25,6 +25,10 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
@@ -50,6 +54,7 @@ import com.example.foodtracker.model.FoodItem
 import com.example.foodtracker.model.LoggedFood
 import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.util.CategoryEmojiMapper
+import com.example.foodtracker.util.scaleNutrition
 import com.example.foodtracker.viewmodel.FoodViewModel
 import kotlinx.coroutines.launch
 
@@ -81,6 +86,9 @@ fun MealDetailScreen(
     val focusManager = LocalFocusManager.current
     val context = androidx.compose.ui.platform.LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+
+    var sheetTarget by remember { mutableStateOf<FoodItem?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(searchQuery) {
         viewModel.searchFoods(searchQuery)
@@ -142,13 +150,7 @@ fun MealDetailScreen(
                     SearchResultsView(
                         state       = searchState,
                         accentColor = accentColor,
-                        onAdd       = { food ->
-                            viewModel.addFoodToMeal(mealName, LoggedFood(food, 100))
-                            searchQuery  = ""
-                            searchActive = false
-                            viewModel.clearSearch()
-                            focusManager.clearFocus()
-                        },
+                        onAdd       = { food -> sheetTarget = food },
                         onRetry     = { viewModel.searchFoods(searchQuery) },
                     )
                 } else {
@@ -166,6 +168,38 @@ fun MealDetailScreen(
                 totalCarbs    = totalCarbs,
                 totalFat      = totalFat,
                 accentColor   = accentColor,
+            )
+        }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding(),
+        )
+
+        sheetTarget?.let { food ->
+            AddFoodSheet(
+                target = food,
+                accentColor = accentColor,
+                confirmLabel = "Adaugă în $mealName",
+                onDismiss = { sheetTarget = null },
+                onConfirm = { confirmedFood, grams ->
+                    val newLogged = LoggedFood(confirmedFood, grams)
+                    val newIndex = viewModel.addFoodToMealReturningIndex(mealName, newLogged)
+                    sheetTarget = null
+                    val scaled = scaleNutrition(confirmedFood, grams)
+                    coroutineScope.launch {
+                        val result = snackbarHostState.showSnackbar(
+                            message = "Adăugat: ${confirmedFood.name} ${grams}g · ${scaled.kcal} kcal",
+                            actionLabel = "Anulează",
+                            duration = SnackbarDuration.Short,
+                        )
+                        if (result == SnackbarResult.ActionPerformed) {
+                            viewModel.removeFoodFromMeal(mealName, newIndex)
+                        }
+                    }
+                },
             )
         }
     }
