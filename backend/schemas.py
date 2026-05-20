@@ -1,6 +1,7 @@
-from typing import List, Optional
+from datetime import date as _date, datetime as _datetime
+from typing import Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProfileRequest(BaseModel):
@@ -45,3 +46,58 @@ class FoodItemDto(BaseModel):
 class SearchResponseDto(BaseModel):
     items: List[FoodItemDto]
     count: int
+
+
+_MEAL_VALUES = Literal["BREAKFAST", "LUNCH", "DINNER", "SNACKS"]
+
+
+class FoodLogCreate(BaseModel):
+    log_date: _date
+    meal: _MEAL_VALUES
+    grams: int = Field(gt=0)
+    barcode: str
+    name: str
+    brand: Optional[str] = None
+    image_url: Optional[str] = None
+    categories: List[str] = []
+    kcal_100g: float = Field(ge=0)
+    protein_100g: float = Field(ge=0)
+    carbs_100g: float = Field(ge=0)
+    fat_100g: float = Field(ge=0)
+
+
+class FoodLogDto(FoodLogCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    created_at: _datetime
+
+
+class HydrationUpdate(BaseModel):
+    liters: float = Field(ge=0, le=10)
+
+
+class HydrationDto(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+    date: _date = Field(alias="log_date")
+    liters: float
+
+
+class WeightCheckInCreate(BaseModel):
+    date: _date
+    weight_kg: float = Field(gt=0, lt=500)
+
+
+class WeightCheckInDto(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+    date: _date = Field(alias="log_date")
+    weight_kg: float
+
+
+class WeightCheckInListDto(BaseModel):
+    items: List[WeightCheckInDto]
+
+
+class DayResponse(BaseModel):
+    foods_by_meal: Dict[str, List[FoodLogDto]]
+    hydration_liters: float
+    weight_check_in: Optional[WeightCheckInDto] = None
