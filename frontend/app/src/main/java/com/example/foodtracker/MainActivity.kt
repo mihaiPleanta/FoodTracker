@@ -14,6 +14,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.*
 import com.example.foodtracker.ui.*
@@ -167,7 +168,7 @@ class MainActivity : ComponentActivity() {
                             onMealSelected = { meal ->
                                 viewModel.closeMealSelector()
                                 val encodedIcon = URLEncoder.encode(meal.icon, "UTF-8")
-                                val colorHex    = meal.accentColor.value.toString(16).uppercase().takeLast(6)
+                                val colorHex    = String.format("%06X", meal.accentColor.toArgb() and 0xFFFFFF)
                                 navController.navigate("meal/${meal.name}/$encodedIcon/$colorHex")
                             }
                         )
