@@ -213,8 +213,20 @@ class FoodViewModel : ViewModel() {
     }
 
     fun addFoodToMeal(mealName: String, food: LoggedFood) {
+        addFoodToMealReturningIndex(mealName, food)
+    }
+
+    fun addFoodToMealReturningIndex(mealName: String, food: LoggedFood): Int {
         val key = dateKey(_selectedHomeDate.value)
         val day = _foodsByDate.value[key] ?: DayMeals()
+        val currentList = when (mealName) {
+            "Breakfast" -> day.breakfast
+            "Lunch"     -> day.lunch
+            "Dinner"    -> day.dinner
+            "Snacks"    -> day.snacks
+            else         -> day.breakfast
+        }
+        val insertedIndex = currentList.size
         val updatedDay = when (mealName) {
             "Breakfast" -> day.copy(breakfast = day.breakfast + food)
             "Lunch"     -> day.copy(lunch = day.lunch + food)
@@ -223,6 +235,7 @@ class FoodViewModel : ViewModel() {
             else         -> day.copy(breakfast = day.breakfast + food)
         }
         _foodsByDate.value = _foodsByDate.value + (key to updatedDay)
+        return insertedIndex
     }
 
     fun removeFoodFromMeal(mealName: String, index: Int) {
