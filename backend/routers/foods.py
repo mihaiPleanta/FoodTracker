@@ -13,7 +13,9 @@ _BARCODE_RE = re.compile(r"^\d{8,13}$")
 
 
 def _translate_off_error(exc: httpx.HTTPStatusError) -> HTTPException:
-    if exc.response.status_code == 429:
+    code = exc.response.status_code
+    # 429 (rate limit) and OFF's transient 5xx → tell the user the DB is busy.
+    if code == 429 or code >= 500:
         return HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Food database busy, try again",
@@ -35,6 +37,11 @@ async def search_foods(
         items = await off.search(q, page_size)
     except httpx.HTTPStatusError as exc:
         raise _translate_off_error(exc) from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Food database busy, try again",
+        ) from exc
     return SearchResponseDto(items=items, count=len(items))
 
 
@@ -50,6 +57,11 @@ async def get_food_by_barcode(
         item = await off.get_by_barcode(barcode)
     except httpx.HTTPStatusError as exc:
         raise _translate_off_error(exc) from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Food database busy, try again",
+        ) from exc
     if item is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
