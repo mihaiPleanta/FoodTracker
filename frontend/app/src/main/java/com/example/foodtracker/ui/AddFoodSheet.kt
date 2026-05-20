@@ -58,7 +58,7 @@ fun AddFoodSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = GlassColors.cardBackground,
+        containerColor = Color(0xFF242424),
         dragHandle = null,
     ) {
         Column(
@@ -111,10 +111,10 @@ private fun AddFoodSheetGrabber() {
     ) {
         Box(
             Modifier
-                .width(36.dp)
-                .height(4.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(GlassColors.cardBorder),
+                .width(40.dp)
+                .height(5.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(Color(0xFF555555)),
         )
     }
 }
@@ -151,23 +151,23 @@ private fun AddFoodSheetGramsField(
     isInvalid: Boolean,
 ) {
     val borderColor = when {
-        isInvalid -> Color(0xFFFF6B6B).copy(alpha = 0.55f)
-        else -> accentColor.copy(alpha = 0.55f)
+        isInvalid -> Color(0xFFFF6B6B)
+        else -> accentColor
     }
     Column {
         Text(
             text = "CANTITATE",
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
-            color = GlassColors.textTertiary,
+            color = GlassColors.textSecondary,
             modifier = Modifier.padding(bottom = 8.dp),
         )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(14.dp))
-                .background(GlassColors.backgroundDark)
-                .border(1.5.dp, borderColor, RoundedCornerShape(14.dp))
+                .background(Color(0xFF2E2E2E))
+                .border(2.dp, borderColor, RoundedCornerShape(14.dp))
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
@@ -219,21 +219,21 @@ private fun AddFoodSheetChips(
                 modifier = Modifier
                     .clip(RoundedCornerShape(14.dp))
                     .background(
-                        if (isActive) accentColor.copy(alpha = 0.14f) else GlassColors.cardBackground
+                        if (isActive) accentColor.copy(alpha = 0.22f) else Color(0xFF333333)
                     )
                     .border(
-                        1.dp,
-                        if (isActive) accentColor.copy(alpha = 0.40f) else GlassColors.cardBorder,
+                        1.5.dp,
+                        if (isActive) accentColor else Color(0xFF454545),
                         RoundedCornerShape(14.dp),
                     )
                     .clickable { onChipTap(value) }
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
             ) {
                 Text(
                     text = "${value}g",
-                    fontSize = 12.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (isActive) accentColor else GlassColors.textSecondary,
+                    color = if (isActive) accentColor else GlassColors.textPrimary,
                 )
             }
         }
@@ -251,8 +251,9 @@ private fun AddFoodSheetPreview(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(GlassColors.cardBackgroundAlt)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .background(Color(0xFF2E2E2E))
+            .border(1.dp, accentColor.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 14.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -287,14 +288,14 @@ private fun AddFoodSheetAddButton(
     onClick: () -> Unit,
 ) {
     val gradient = if (enabled) {
-        Brush.horizontalGradient(listOf(accentColor, accentColor.copy(alpha = 0.85f)))
+        Brush.horizontalGradient(listOf(accentColor, accentColor))
     } else {
-        Brush.horizontalGradient(listOf(GlassColors.cardBorder, GlassColors.cardBorder))
+        Brush.horizontalGradient(listOf(Color(0xFF3A3A3A), Color(0xFF3A3A3A)))
     }
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(52.dp)
+            .height(54.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(gradient)
             .then(if (enabled) Modifier.clickable { onClick() } else Modifier),
@@ -304,7 +305,7 @@ private fun AddFoodSheetAddButton(
             text = label,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
-            color = if (enabled) Color.Black else GlassColors.textTertiary,
+            color = if (enabled) Color.Black else GlassColors.textSecondary,
         )
     }
 }
