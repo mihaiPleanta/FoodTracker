@@ -97,5 +97,5 @@ class WeightCheckIn(Base):
 
     __table_args__ = (
         CheckConstraint("weight_kg > 0 AND weight_kg < 500", name="ck_weight_range"),
-        Index("idx_weight_check_ins_uid_date_desc", "uid", "log_date"),
+        Index("idx_weight_check_ins_uid_date", "uid", "log_date"),
     )
