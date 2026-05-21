@@ -63,6 +63,14 @@ def test_older_check_in_does_not_update_profile(client):
     assert r.status_code == 200
     profile = client.get("/profile", headers=AUTH_HEADER).json()
     assert profile["current_weight_kg"] == 77.5
+    items = client.get(
+        "/weight-check-ins?from=2026-05-09&to=2026-05-20",
+        headers=AUTH_HEADER,
+    ).json()["items"]
+    assert {it["date"]: it["weight_kg"] for it in items} == {
+        "2026-05-10": 80.0,
+        "2026-05-20": 77.5,
+    }
 
 
 def test_get_weight_check_ins_range_returns_sorted_asc(client):
