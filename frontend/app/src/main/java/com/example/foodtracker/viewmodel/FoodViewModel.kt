@@ -364,22 +364,45 @@ class FoodViewModel : ViewModel() {
 
     fun removeFoodFromMeal(mealName: String, index: Int) {
         val key = dateKey(_selectedHomeDate.value)
+        val day = _foodsByDate.value[key] ?: return
+        val list = mealList(day, mealName)
+        if (index !in list.indices) return
+        val target = list[index]
+        val id = target.id ?: return  // still pending POST — UI should disable DELETE
+
+        // Optimistic remove
+        val newList = list.toMutableList().also { it.removeAt(index) }
+        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
+
+        viewModelScope.launch {
+            val response = try {
+                logsApi.deleteFoodLog(id)
+            } catch (e: java.io.IOException) {
+                restoreFood(key, mealName, index, target)
+                _toastEvents.tryEmit("Verifică conexiunea la internet")
+                return@launch
+            } catch (e: retrofit2.HttpException) {
+                restoreFood(key, mealName, index, target)
+                _toastEvents.tryEmit("Eroare la ștergere (${e.code()})")
+                return@launch
+            } catch (e: Throwable) {
+                restoreFood(key, mealName, index, target)
+                _toastEvents.tryEmit("Eroare la ștergere")
+                return@launch
+            }
+            if (!response.isSuccessful) {
+                restoreFood(key, mealName, index, target)
+                _toastEvents.tryEmit("Eroare la ștergere (${response.code()})")
+            }
+        }
+    }
+
+    private fun restoreFood(key: String, mealName: String, index: Int, food: LoggedFood) {
         val day = _foodsByDate.value[key] ?: DayMeals()
-
-        fun List<LoggedFood>.removeAtSafe(targetIndex: Int): List<LoggedFood> {
-            if (targetIndex !in indices) return this
-            return toMutableList().also { it.removeAt(targetIndex) }
-        }
-
-        val updatedDay = when (mealName) {
-            "Breakfast" -> day.copy(breakfast = day.breakfast.removeAtSafe(index))
-            "Lunch"     -> day.copy(lunch = day.lunch.removeAtSafe(index))
-            "Dinner"    -> day.copy(dinner = day.dinner.removeAtSafe(index))
-            "Snacks"    -> day.copy(snacks = day.snacks.removeAtSafe(index))
-            else         -> day.copy(breakfast = day.breakfast.removeAtSafe(index))
-        }
-
-        _foodsByDate.value = _foodsByDate.value + (key to updatedDay)
+        val list = mealList(day, mealName).toMutableList()
+        val insertAt = index.coerceIn(0, list.size)
+        list.add(insertAt, food)
+        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, list))
     }
 
     // ── Computed totals ───────────────────────────────────────────────────────
