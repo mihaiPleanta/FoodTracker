@@ -21,4 +21,6 @@ object RetrofitInstance {
 
     // Backward-compatible — FoodApi continues to work
     val api: FoodApi by lazy { retrofit.create(FoodApi::class.java) }
+
+    val logsApi: LogsApi by lazy { retrofit.create(LogsApi::class.java) }
 }
