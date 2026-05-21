@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -84,6 +85,17 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
     val calendarDays = remember { generateCalendarDays() }
     val todayIndex = calendarDays.indexOfFirst { it.isToday }
     val selectedDate by viewModel.selectedHomeDate.collectAsState()
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    var showWeightSheet by remember { mutableStateOf(false) }
+    val loadingDay by viewModel.loadingDay.collectAsState()
+    val userProfile by viewModel.userProfile.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.toastEvents.collect { msg ->
+            snackbarHostState.showSnackbar(msg)
+        }
+    }
 
     LaunchedEffect(Unit) {
         // Keep the same startup behavior as before, but route date ownership through ViewModel.
@@ -167,10 +179,13 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
                 .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
         ) {
+            if (loadingDay) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+
             Spacer(Modifier.height(20.dp))
 
-            val profile by viewModel.userProfile.collectAsState()
-            val initial = profile.name.trim().firstOrNull()?.uppercase() ?: "?"
+            val initial = userProfile.name.trim().firstOrNull()?.uppercase() ?: "?"
 
             HomeHeader(
                 title = headerTitle,
@@ -212,7 +227,8 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
                 )
                 WeightMiniWidget(
                     weightHistory = weightHistory,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onCheckInClick = { showWeightSheet = true },
                 )
             }
 
@@ -243,6 +259,22 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
             }
 
             Spacer(Modifier.height(100.dp))
+        }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
+
+        if (showWeightSheet) {
+            WeightCheckInSheet(
+                initialWeightKg = userProfile.currentWeightKg,
+                onDismiss = { showWeightSheet = false },
+                onSave = { kg ->
+                    viewModel.addWeightCheckIn(kg)
+                    showWeightSheet = false
+                },
+            )
         }
     }
 }
@@ -684,7 +716,8 @@ fun HydrationMiniWidget(
 @Composable
 fun WeightMiniWidget(
     weightHistory: List<WeightCheckIn>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onCheckInClick: () -> Unit = {},
 ) {
     val latestWeight = weightHistory.lastOrNull()?.weightKg
     val delta7Days = if (weightHistory.size >= 2) {
@@ -696,12 +729,29 @@ fun WeightMiniWidget(
             .glassCard(16)
             .padding(14.dp)
     ) {
-        Text(
-            "Weight",
-            fontSize = 12.sp,
-            color = GlassColors.textSecondary,
-            fontWeight = FontWeight.Medium
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "Weight",
+                fontSize = 12.sp,
+                color = GlassColors.textSecondary,
+                fontWeight = FontWeight.Medium
+            )
+            IconButton(
+                onClick = onCheckInClick,
+                modifier = Modifier.size(24.dp),
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = "Check-in greutate",
+                    tint = GlassColors.textPrimary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
         Spacer(Modifier.height(6.dp))
         Text(
             latestWeight?.let { "${"%.1f".format(Locale.ENGLISH, it)} kg" } ?: "No check-in",

@@ -3,15 +3,22 @@ package com.example.foodtracker.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.foodtracker.api.FoodApi
+import com.example.foodtracker.api.LogsApi
 import com.example.foodtracker.api.RetrofitInstance
 import com.example.foodtracker.model.AppSettings
 import com.example.foodtracker.model.FoodItem
+import com.example.foodtracker.model.FoodLogCreateDto
+import com.example.foodtracker.model.HydrationUpdateDto
 import com.example.foodtracker.model.LoggedFood
 import com.example.foodtracker.model.UserProfile
+import com.example.foodtracker.model.WeightCheckInCreateDto
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
@@ -24,6 +31,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 
 private data class DayMeals(
     val breakfast: List<LoggedFood> = emptyList(),
@@ -49,6 +57,7 @@ class FoodViewModel : ViewModel() {
     }
 
     private val foodApi: FoodApi = RetrofitInstance.retrofit.create(FoodApi::class.java)
+    private val logsApi: LogsApi = RetrofitInstance.retrofit.create(LogsApi::class.java)
 
     private val _searchState = MutableStateFlow<SearchUiState>(SearchUiState.Idle)
     val searchState: StateFlow<SearchUiState> = _searchState.asStateFlow()
@@ -86,6 +95,7 @@ class FoodViewModel : ViewModel() {
 
     init {
         observeSearchQueries()
+        viewModelScope.launch { loadDay(Date()) }
     }
 
     fun searchFoods(query: String) {
@@ -139,35 +149,28 @@ class FoodViewModel : ViewModel() {
 
     private fun todayKey(): String = dateKey(Date())
 
+    private val _loadingDay = MutableStateFlow(false)
+    val loadingDay: StateFlow<Boolean> = _loadingDay.asStateFlow()
+
+    private val _loadedDates = mutableSetOf<String>()
+
+    private val _toastEvents = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    val toastEvents: SharedFlow<String> = _toastEvents.asSharedFlow()
+
     private val _selectedHomeDate = MutableStateFlow(Date())
     val selectedHomeDate: StateFlow<Date> = _selectedHomeDate.asStateFlow()
 
     private val _foodsByDate = MutableStateFlow<Map<String, DayMeals>>(emptyMap())
 
     // Hydration: liters by day key, used by Home quick-add water card.
-    private val _hydrationByDate = MutableStateFlow(
-        mapOf(
-            todayKey() to 0.8f
-        )
-    )
+    private val _hydrationByDate = MutableStateFlow<Map<String, Float>>(emptyMap())
     val hydrationGoalLiters = 2.5f
 
     val hydrationTodayLiters: StateFlow<Float> = combine(_selectedHomeDate, _hydrationByDate) { date, all ->
         all[dateKey(date)] ?: 0f
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), _hydrationByDate.value[todayKey()] ?: 0f)
 
-    // Weight check-ins: local seed for the mini trend card.
-    private fun seedWeightHistory(): List<WeightCheckIn> {
-        val now = Calendar.getInstance()
-        val points = listOf(78.7f, 78.5f, 78.6f, 78.4f, 78.3f, 78.2f, 78.1f)
-        return points.mapIndexed { index, kg ->
-            val c = now.clone() as Calendar
-            c.add(Calendar.DAY_OF_YEAR, index - (points.size - 1))
-            WeightCheckIn(date = c.time, weightKg = kg)
-        }
-    }
-
-    private val _weightHistory = MutableStateFlow(seedWeightHistory())
+    private val _weightHistory = MutableStateFlow<List<WeightCheckIn>>(emptyList())
     val weightHistory: StateFlow<List<WeightCheckIn>> = _weightHistory.asStateFlow()
 
     fun incrementHydration(amountLiters: Float = 0.25f) {
@@ -175,6 +178,121 @@ class FoodViewModel : ViewModel() {
         val current = _hydrationByDate.value[key] ?: 0f
         val updated = (current + amountLiters).coerceAtMost(8f)
         _hydrationByDate.value = _hydrationByDate.value + (key to updated)
+
+        viewModelScope.launch {
+            try {
+                logsApi.putHydration(key, HydrationUpdateDto(liters = updated))
+            } catch (e: java.io.IOException) {
+                _hydrationByDate.value = _hydrationByDate.value + (key to current)
+                _toastEvents.tryEmit("Verifică conexiunea la internet")
+            } catch (e: retrofit2.HttpException) {
+                _hydrationByDate.value = _hydrationByDate.value + (key to current)
+                _toastEvents.tryEmit("Eroare la salvare hidratare (${e.code()})")
+            } catch (e: Throwable) {
+                _hydrationByDate.value = _hydrationByDate.value + (key to current)
+                _toastEvents.tryEmit("Eroare la salvare hidratare")
+            }
+        }
+    }
+
+    private fun mealKeyToBackend(meal: String): String = when (meal) {
+        "Breakfast" -> "BREAKFAST"
+        "Lunch"     -> "LUNCH"
+        "Dinner"    -> "DINNER"
+        "Snacks"    -> "SNACKS"
+        else        -> "BREAKFAST"
+    }
+
+    private fun sameDay(a: Date, b: Date): Boolean = dateKey(a) == dateKey(b)
+
+    private suspend fun loadDay(date: Date) {
+        val key = dateKey(date)
+        if (key in _loadedDates) return
+        _loadingDay.value = true
+        try {
+            val day = logsApi.getDay(key)
+            val meals = DayMeals(
+                breakfast = day.foodsByMeal["breakfast"].orEmpty().map { it.toLogged() },
+                lunch     = day.foodsByMeal["lunch"].orEmpty().map { it.toLogged() },
+                dinner    = day.foodsByMeal["dinner"].orEmpty().map { it.toLogged() },
+                snacks    = day.foodsByMeal["snacks"].orEmpty().map { it.toLogged() },
+            )
+            _foodsByDate.value = _foodsByDate.value + (key to meals)
+            _hydrationByDate.value = _hydrationByDate.value + (key to day.hydrationLiters)
+            day.weightCheckIn?.let { wc ->
+                val parsed = dateFormatter.parse(wc.date) ?: return@let
+                val existing = _weightHistory.value.filterNot { sameDay(it.date, parsed) }
+                _weightHistory.value = (existing + WeightCheckIn(parsed, wc.weightKg))
+                    .sortedBy { it.date }
+            }
+            _loadedDates += key
+        } catch (e: java.io.IOException) {
+            _toastEvents.tryEmit("Verifică conexiunea la internet")
+        } catch (e: retrofit2.HttpException) {
+            _toastEvents.tryEmit("Eroare la încărcarea zilei (${e.code()})")
+        } catch (e: Throwable) {
+            _toastEvents.tryEmit("Eroare la încărcarea zilei")
+        } finally {
+            _loadingDay.value = false
+        }
+    }
+
+    fun loadWeightHistory(daysBack: Int = 30) {
+        viewModelScope.launch {
+            val cal = Calendar.getInstance()
+            val today = dateFormatter.format(cal.time)
+            cal.add(Calendar.DAY_OF_YEAR, -daysBack)
+            val from = dateFormatter.format(cal.time)
+            try {
+                val response = logsApi.getWeightCheckIns(from = from, to = today)
+                _weightHistory.value = response.items.mapNotNull { dto ->
+                    val parsed = dateFormatter.parse(dto.date) ?: return@mapNotNull null
+                    WeightCheckIn(parsed, dto.weightKg)
+                }
+            } catch (e: java.io.IOException) {
+                _toastEvents.tryEmit("Verifică conexiunea la internet")
+            } catch (e: retrofit2.HttpException) {
+                _toastEvents.tryEmit("Eroare la istoricul greutății (${e.code()})")
+            } catch (e: Throwable) {
+                _toastEvents.tryEmit("Eroare la istoricul greutății")
+            }
+        }
+    }
+
+    fun addWeightCheckIn(weightKg: Float) {
+        val date = _selectedHomeDate.value
+        val dateStr = dateFormatter.format(date)
+        val previousHistory = _weightHistory.value
+        val previousProfileWeight = _userProfile.value.currentWeightKg
+
+        // Optimistic: replace or append today's point
+        val withoutToday = previousHistory.filterNot { sameDay(it.date, date) }
+        val newHistory = (withoutToday + WeightCheckIn(date, weightKg)).sortedBy { it.date }
+        _weightHistory.value = newHistory
+
+        // If the selected day is now the most recent, sync local profile
+        val isMostRecent = newHistory.lastOrNull()?.let { sameDay(it.date, date) } == true
+        if (isMostRecent) {
+            _userProfile.value = _userProfile.value.copy(currentWeightKg = weightKg)
+        }
+
+        viewModelScope.launch {
+            try {
+                logsApi.postWeightCheckIn(WeightCheckInCreateDto(date = dateStr, weightKg = weightKg))
+            } catch (e: java.io.IOException) {
+                _weightHistory.value = previousHistory
+                _userProfile.value = _userProfile.value.copy(currentWeightKg = previousProfileWeight)
+                _toastEvents.tryEmit("Verifică conexiunea la internet")
+            } catch (e: retrofit2.HttpException) {
+                _weightHistory.value = previousHistory
+                _userProfile.value = _userProfile.value.copy(currentWeightKg = previousProfileWeight)
+                _toastEvents.tryEmit("Eroare la check-in greutate (${e.code()})")
+            } catch (e: Throwable) {
+                _weightHistory.value = previousHistory
+                _userProfile.value = _userProfile.value.copy(currentWeightKg = previousProfileWeight)
+                _toastEvents.tryEmit("Eroare la check-in greutate")
+            }
+        }
     }
 
     fun setSelectedHomeDate(date: Date) {
@@ -186,6 +304,7 @@ class FoodViewModel : ViewModel() {
             _hydrationByDate.value = _hydrationByDate.value + (key to 0f)
         }
         _selectedHomeDate.value = date
+        viewModelScope.launch { loadDay(date) }
     }
 
     val breakfastFoods: StateFlow<List<LoggedFood>> = combine(_selectedHomeDate, _foodsByDate) { date, all ->
@@ -217,45 +336,124 @@ class FoodViewModel : ViewModel() {
     }
 
     fun addFoodToMealReturningIndex(mealName: String, food: LoggedFood): Int {
+        val tempId = UUID.randomUUID().toString()
+        val optimistic = food.copy(id = null, clientTempId = tempId)
         val key = dateKey(_selectedHomeDate.value)
         val day = _foodsByDate.value[key] ?: DayMeals()
-        val currentList = when (mealName) {
-            "Breakfast" -> day.breakfast
-            "Lunch"     -> day.lunch
-            "Dinner"    -> day.dinner
-            "Snacks"    -> day.snacks
-            else         -> day.breakfast
-        }
+        val currentList = mealList(day, mealName)
         val insertedIndex = currentList.size
-        val updatedDay = when (mealName) {
-            "Breakfast" -> day.copy(breakfast = day.breakfast + food)
-            "Lunch"     -> day.copy(lunch = day.lunch + food)
-            "Dinner"    -> day.copy(dinner = day.dinner + food)
-            "Snacks"    -> day.copy(snacks = day.snacks + food)
-            else         -> day.copy(breakfast = day.breakfast + food)
+        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, currentList + optimistic))
+
+        viewModelScope.launch {
+            try {
+                val response = logsApi.createFoodLog(
+                    FoodLogCreateDto(
+                        logDate = key,
+                        meal = mealKeyToBackend(mealName),
+                        grams = optimistic.grams,
+                        barcode = optimistic.food.barcode,
+                        name = optimistic.food.name,
+                        brand = optimistic.food.brand,
+                        imageUrl = optimistic.food.imageUrl,
+                        categories = optimistic.food.categories,
+                        kcal100g = optimistic.food.per100g.toFloat(),
+                        protein100g = optimistic.food.protein100g,
+                        carbs100g = optimistic.food.carbs100g,
+                        fat100g = optimistic.food.fat100g,
+                    )
+                )
+                replaceByTempId(key, mealName, tempId) { it.copy(id = response.id, clientTempId = null) }
+            } catch (e: java.io.IOException) {
+                removeByTempId(key, mealName, tempId)
+                _toastEvents.tryEmit("Verifică conexiunea la internet")
+            } catch (e: retrofit2.HttpException) {
+                removeByTempId(key, mealName, tempId)
+                _toastEvents.tryEmit("Eroare la salvare (${e.code()})")
+            } catch (e: Throwable) {
+                removeByTempId(key, mealName, tempId)
+                _toastEvents.tryEmit("Eroare la salvare")
+            }
         }
-        _foodsByDate.value = _foodsByDate.value + (key to updatedDay)
         return insertedIndex
+    }
+
+    private fun mealList(day: DayMeals, mealName: String): List<LoggedFood> = when (mealName) {
+        "Breakfast" -> day.breakfast
+        "Lunch"     -> day.lunch
+        "Dinner"    -> day.dinner
+        "Snacks"    -> day.snacks
+        else        -> day.breakfast
+    }
+
+    private fun updateMealList(day: DayMeals, mealName: String, newList: List<LoggedFood>): DayMeals =
+        when (mealName) {
+            "Breakfast" -> day.copy(breakfast = newList)
+            "Lunch"     -> day.copy(lunch = newList)
+            "Dinner"    -> day.copy(dinner = newList)
+            "Snacks"    -> day.copy(snacks = newList)
+            else        -> day.copy(breakfast = newList)
+        }
+
+    private fun replaceByTempId(
+        key: String,
+        mealName: String,
+        tempId: String,
+        transform: (LoggedFood) -> LoggedFood,
+    ) {
+        val day = _foodsByDate.value[key] ?: return
+        val list = mealList(day, mealName)
+        val newList = list.map { if (it.clientTempId == tempId) transform(it) else it }
+        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
+    }
+
+    private fun removeByTempId(key: String, mealName: String, tempId: String) {
+        val day = _foodsByDate.value[key] ?: return
+        val list = mealList(day, mealName)
+        val newList = list.filterNot { it.clientTempId == tempId }
+        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
     }
 
     fun removeFoodFromMeal(mealName: String, index: Int) {
         val key = dateKey(_selectedHomeDate.value)
+        val day = _foodsByDate.value[key] ?: return
+        val list = mealList(day, mealName)
+        if (index !in list.indices) return
+        val target = list[index]
+        val id = target.id ?: return  // still pending POST — UI should disable DELETE
+
+        // Optimistic remove
+        val newList = list.toMutableList().also { it.removeAt(index) }
+        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
+
+        viewModelScope.launch {
+            val response = try {
+                logsApi.deleteFoodLog(id)
+            } catch (e: java.io.IOException) {
+                restoreFood(key, mealName, index, target)
+                _toastEvents.tryEmit("Verifică conexiunea la internet")
+                return@launch
+            } catch (e: retrofit2.HttpException) {
+                restoreFood(key, mealName, index, target)
+                _toastEvents.tryEmit("Eroare la ștergere (${e.code()})")
+                return@launch
+            } catch (e: Throwable) {
+                restoreFood(key, mealName, index, target)
+                _toastEvents.tryEmit("Eroare la ștergere")
+                return@launch
+            }
+            if (!response.isSuccessful) {
+                restoreFood(key, mealName, index, target)
+                _toastEvents.tryEmit("Eroare la ștergere (${response.code()})")
+            }
+        }
+    }
+
+    private fun restoreFood(key: String, mealName: String, index: Int, food: LoggedFood) {
         val day = _foodsByDate.value[key] ?: DayMeals()
-
-        fun List<LoggedFood>.removeAtSafe(targetIndex: Int): List<LoggedFood> {
-            if (targetIndex !in indices) return this
-            return toMutableList().also { it.removeAt(targetIndex) }
-        }
-
-        val updatedDay = when (mealName) {
-            "Breakfast" -> day.copy(breakfast = day.breakfast.removeAtSafe(index))
-            "Lunch"     -> day.copy(lunch = day.lunch.removeAtSafe(index))
-            "Dinner"    -> day.copy(dinner = day.dinner.removeAtSafe(index))
-            "Snacks"    -> day.copy(snacks = day.snacks.removeAtSafe(index))
-            else         -> day.copy(breakfast = day.breakfast.removeAtSafe(index))
-        }
-
-        _foodsByDate.value = _foodsByDate.value + (key to updatedDay)
+        val list = mealList(day, mealName).toMutableList()
+        val insertAt = index.coerceIn(0, list.size)
+        list.add(insertAt, food)
+        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, list))
     }
 
     // ── Computed totals ───────────────────────────────────────────────────────
