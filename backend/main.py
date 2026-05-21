@@ -9,6 +9,7 @@ from routers.profile import router as profile_router
 from routers.foods import router as foods_router
 from routers.food_logs import router as food_logs_router
 from routers.hydration import router as hydration_router
+from routers.weight import router as weight_router
 
 if os.getenv("TESTING") != "1":
     _cred_path = os.getenv("FIREBASE_SERVICE_ACCOUNT", "serviceAccountKey.json")
@@ -21,3 +22,4 @@ app.include_router(profile_router)
 app.include_router(foods_router)
 app.include_router(food_logs_router)
 app.include_router(hydration_router)
+app.include_router(weight_router)
