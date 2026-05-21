@@ -285,25 +285,81 @@ class FoodViewModel : ViewModel() {
     }
 
     fun addFoodToMealReturningIndex(mealName: String, food: LoggedFood): Int {
+        val tempId = UUID.randomUUID().toString()
+        val optimistic = food.copy(id = null, clientTempId = tempId)
         val key = dateKey(_selectedHomeDate.value)
         val day = _foodsByDate.value[key] ?: DayMeals()
-        val currentList = when (mealName) {
-            "Breakfast" -> day.breakfast
-            "Lunch"     -> day.lunch
-            "Dinner"    -> day.dinner
-            "Snacks"    -> day.snacks
-            else         -> day.breakfast
-        }
+        val currentList = mealList(day, mealName)
         val insertedIndex = currentList.size
-        val updatedDay = when (mealName) {
-            "Breakfast" -> day.copy(breakfast = day.breakfast + food)
-            "Lunch"     -> day.copy(lunch = day.lunch + food)
-            "Dinner"    -> day.copy(dinner = day.dinner + food)
-            "Snacks"    -> day.copy(snacks = day.snacks + food)
-            else         -> day.copy(breakfast = day.breakfast + food)
+        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, currentList + optimistic))
+
+        viewModelScope.launch {
+            try {
+                val response = logsApi.createFoodLog(
+                    FoodLogCreateDto(
+                        logDate = key,
+                        meal = mealKeyToBackend(mealName),
+                        grams = optimistic.grams,
+                        barcode = optimistic.food.barcode,
+                        name = optimistic.food.name,
+                        brand = optimistic.food.brand,
+                        imageUrl = optimistic.food.imageUrl,
+                        categories = optimistic.food.categories,
+                        kcal100g = optimistic.food.per100g.toFloat(),
+                        protein100g = optimistic.food.protein100g,
+                        carbs100g = optimistic.food.carbs100g,
+                        fat100g = optimistic.food.fat100g,
+                    )
+                )
+                replaceByTempId(key, mealName, tempId) { it.copy(id = response.id, clientTempId = null) }
+            } catch (e: java.io.IOException) {
+                removeByTempId(key, mealName, tempId)
+                _toastEvents.tryEmit("Verifică conexiunea la internet")
+            } catch (e: retrofit2.HttpException) {
+                removeByTempId(key, mealName, tempId)
+                _toastEvents.tryEmit("Eroare la salvare (${e.code()})")
+            } catch (e: Throwable) {
+                removeByTempId(key, mealName, tempId)
+                _toastEvents.tryEmit("Eroare la salvare")
+            }
         }
-        _foodsByDate.value = _foodsByDate.value + (key to updatedDay)
         return insertedIndex
+    }
+
+    private fun mealList(day: DayMeals, mealName: String): List<LoggedFood> = when (mealName) {
+        "Breakfast" -> day.breakfast
+        "Lunch"     -> day.lunch
+        "Dinner"    -> day.dinner
+        "Snacks"    -> day.snacks
+        else        -> day.breakfast
+    }
+
+    private fun updateMealList(day: DayMeals, mealName: String, newList: List<LoggedFood>): DayMeals =
+        when (mealName) {
+            "Breakfast" -> day.copy(breakfast = newList)
+            "Lunch"     -> day.copy(lunch = newList)
+            "Dinner"    -> day.copy(dinner = newList)
+            "Snacks"    -> day.copy(snacks = newList)
+            else        -> day.copy(breakfast = newList)
+        }
+
+    private fun replaceByTempId(
+        key: String,
+        mealName: String,
+        tempId: String,
+        transform: (LoggedFood) -> LoggedFood,
+    ) {
+        val day = _foodsByDate.value[key] ?: return
+        val list = mealList(day, mealName)
+        val newList = list.map { if (it.clientTempId == tempId) transform(it) else it }
+        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
+    }
+
+    private fun removeByTempId(key: String, mealName: String, tempId: String) {
+        val day = _foodsByDate.value[key] ?: return
+        val list = mealList(day, mealName)
+        val newList = list.filterNot { it.clientTempId == tempId }
+        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
     }
 
     fun removeFoodFromMeal(mealName: String, index: Int) {
