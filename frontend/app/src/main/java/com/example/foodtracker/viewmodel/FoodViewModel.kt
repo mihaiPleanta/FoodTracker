@@ -95,7 +95,6 @@ class FoodViewModel : ViewModel() {
 
     init {
         observeSearchQueries()
-        viewModelScope.launch { loadDay(Date()) }
     }
 
     fun searchFoods(query: String) {
@@ -467,4 +466,7 @@ class FoodViewModel : ViewModel() {
     fun getTotalCarbs()    = listOf("Breakfast","Lunch","Dinner","Snacks").sumOf { getMealCarbs(it).toDouble() }.toInt()
     fun getTotalFat()      = listOf("Breakfast","Lunch","Dinner","Snacks").sumOf { getMealFat(it).toDouble() }.toInt()
 
+    init {
+        viewModelScope.launch { loadDay(Date()) }
+    }
 }
