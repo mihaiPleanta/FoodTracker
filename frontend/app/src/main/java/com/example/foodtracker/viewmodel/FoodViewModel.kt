@@ -178,6 +178,21 @@ class FoodViewModel : ViewModel() {
         val current = _hydrationByDate.value[key] ?: 0f
         val updated = (current + amountLiters).coerceAtMost(8f)
         _hydrationByDate.value = _hydrationByDate.value + (key to updated)
+
+        viewModelScope.launch {
+            try {
+                logsApi.putHydration(key, HydrationUpdateDto(liters = updated))
+            } catch (e: java.io.IOException) {
+                _hydrationByDate.value = _hydrationByDate.value + (key to current)
+                _toastEvents.tryEmit("Verifică conexiunea la internet")
+            } catch (e: retrofit2.HttpException) {
+                _hydrationByDate.value = _hydrationByDate.value + (key to current)
+                _toastEvents.tryEmit("Eroare la salvare hidratare (${e.code()})")
+            } catch (e: Throwable) {
+                _hydrationByDate.value = _hydrationByDate.value + (key to current)
+                _toastEvents.tryEmit("Eroare la salvare hidratare")
+            }
+        }
     }
 
     private fun mealKeyToBackend(meal: String): String = when (meal) {
@@ -240,6 +255,42 @@ class FoodViewModel : ViewModel() {
                 _toastEvents.tryEmit("Eroare la istoricul greutății (${e.code()})")
             } catch (e: Throwable) {
                 _toastEvents.tryEmit("Eroare la istoricul greutății")
+            }
+        }
+    }
+
+    fun addWeightCheckIn(weightKg: Float) {
+        val date = _selectedHomeDate.value
+        val dateStr = dateFormatter.format(date)
+        val previousHistory = _weightHistory.value
+        val previousProfileWeight = _userProfile.value.currentWeightKg
+
+        // Optimistic: replace or append today's point
+        val withoutToday = previousHistory.filterNot { sameDay(it.date, date) }
+        val newHistory = (withoutToday + WeightCheckIn(date, weightKg)).sortedBy { it.date }
+        _weightHistory.value = newHistory
+
+        // If the selected day is now the most recent, sync local profile
+        val isMostRecent = newHistory.lastOrNull()?.let { sameDay(it.date, date) } == true
+        if (isMostRecent) {
+            _userProfile.value = _userProfile.value.copy(currentWeightKg = weightKg)
+        }
+
+        viewModelScope.launch {
+            try {
+                logsApi.postWeightCheckIn(WeightCheckInCreateDto(date = dateStr, weightKg = weightKg))
+            } catch (e: java.io.IOException) {
+                _weightHistory.value = previousHistory
+                _userProfile.value = _userProfile.value.copy(currentWeightKg = previousProfileWeight)
+                _toastEvents.tryEmit("Verifică conexiunea la internet")
+            } catch (e: retrofit2.HttpException) {
+                _weightHistory.value = previousHistory
+                _userProfile.value = _userProfile.value.copy(currentWeightKg = previousProfileWeight)
+                _toastEvents.tryEmit("Eroare la check-in greutate (${e.code()})")
+            } catch (e: Throwable) {
+                _weightHistory.value = previousHistory
+                _userProfile.value = _userProfile.value.copy(currentWeightKg = previousProfileWeight)
+                _toastEvents.tryEmit("Eroare la check-in greutate")
             }
         }
     }
