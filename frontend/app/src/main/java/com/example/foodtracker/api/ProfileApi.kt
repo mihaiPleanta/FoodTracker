@@ -1,5 +1,6 @@
 package com.example.foodtracker.api
 
+import com.example.foodtracker.model.GoalsDto
 import com.example.foodtracker.model.ProfileDto
 import com.example.foodtracker.model.TdeeResponseDto
 import retrofit2.Response
@@ -16,4 +17,7 @@ interface ProfileApi {
 
     @POST("calculate-tdee")
     suspend fun calculateTdee(@Body profile: ProfileDto): Response<TdeeResponseDto>
+
+    @GET("goals")
+    suspend fun getGoals(): Response<GoalsDto>
 }
