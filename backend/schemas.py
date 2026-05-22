@@ -101,3 +101,11 @@ class DayResponse(BaseModel):
     foods_by_meal: Dict[str, List[FoodLogDto]]
     hydration_liters: float
     weight_check_in: Optional[WeightCheckInDto] = None
+
+
+class GoalsResponse(BaseModel):
+    calorie_goal: int
+    protein_goal_g: int
+    carbs_goal_g: int
+    fat_goal_g: int
+    mode: Literal["DEFICIT", "MAINTENANCE", "SURPLUS"]
