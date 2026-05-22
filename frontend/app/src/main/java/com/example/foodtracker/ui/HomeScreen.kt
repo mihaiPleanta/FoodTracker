@@ -34,6 +34,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.foodtracker.model.NutritionGoals
 import com.example.foodtracker.ui.theme.FoodTrackerTheme
 import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.ui.theme.accentCard
@@ -51,13 +52,6 @@ data class CalendarDay(
     val dayOfMonth: Int,
     val dayOfWeekShort: String,
     val isToday: Boolean
-)
-
-data class NutritionGoals(
-    val calorieGoal: Int = 2000,
-    val proteinGoal: Int = 150,
-    val carbsGoal: Int = 250,
-    val fatGoal: Int = 65
 )
 
 data class MealEntry(
