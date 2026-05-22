@@ -4,12 +4,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.foodtracker.api.FoodApi
 import com.example.foodtracker.api.LogsApi
+import com.example.foodtracker.api.ProfileApi
 import com.example.foodtracker.api.RetrofitInstance
 import com.example.foodtracker.model.AppSettings
 import com.example.foodtracker.model.FoodItem
 import com.example.foodtracker.model.FoodLogCreateDto
 import com.example.foodtracker.model.HydrationUpdateDto
 import com.example.foodtracker.model.LoggedFood
+import com.example.foodtracker.model.NutritionGoals
 import com.example.foodtracker.model.UserProfile
 import com.example.foodtracker.model.WeightCheckInCreateDto
 import kotlinx.coroutines.FlowPreview
@@ -58,6 +60,7 @@ class FoodViewModel : ViewModel() {
 
     private val foodApi: FoodApi = RetrofitInstance.retrofit.create(FoodApi::class.java)
     private val logsApi: LogsApi = RetrofitInstance.retrofit.create(LogsApi::class.java)
+    private val profileApi: ProfileApi = RetrofitInstance.retrofit.create(ProfileApi::class.java)
 
     private val _searchState = MutableStateFlow<SearchUiState>(SearchUiState.Idle)
     val searchState: StateFlow<SearchUiState> = _searchState.asStateFlow()
@@ -140,6 +143,24 @@ class FoodViewModel : ViewModel() {
     private val _appSettings = MutableStateFlow(AppSettings())
     val appSettings: StateFlow<AppSettings> = _appSettings.asStateFlow()
     fun updateAppSettings(settings: AppSettings) { _appSettings.value = settings }
+
+    // ── Nutrition goals (calorie + macros derivate din profil) ────────────────────
+    private val _nutritionGoals = MutableStateFlow<NutritionGoals?>(null)
+    val nutritionGoals: StateFlow<NutritionGoals?> = _nutritionGoals.asStateFlow()
+
+    fun loadGoals() {
+        viewModelScope.launch {
+            try {
+                val response = profileApi.getGoals()
+                if (response.isSuccessful) {
+                    _nutritionGoals.value = response.body()?.toDomain()
+                }
+                // non-2xx (inclusiv 404 fără profil) → rămâne null, UI folosește defaults
+            } catch (_: Exception) {
+                // network error → rămâne null, UI folosește defaults
+            }
+        }
+    }
 
     // ── Date-driven food history ───────────────────────────────────────────────
     private val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.US)
@@ -468,5 +489,6 @@ class FoodViewModel : ViewModel() {
 
     init {
         viewModelScope.launch { loadDay(Date()) }
+        loadGoals()
     }
 }
