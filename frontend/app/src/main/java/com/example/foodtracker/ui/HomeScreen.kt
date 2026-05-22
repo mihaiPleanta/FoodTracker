@@ -34,6 +34,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.foodtracker.model.GoalsMode
 import com.example.foodtracker.model.NutritionGoals
 import com.example.foodtracker.ui.theme.FoodTrackerTheme
 import com.example.foodtracker.ui.theme.GlassColors
@@ -71,6 +72,12 @@ data class MealSection(
     val entries: List<MealEntry>,
     val accentColor: Color
 )
+
+private fun goalsModeLabel(mode: GoalsMode): String = when (mode) {
+    GoalsMode.DEFICIT     -> "Deficit 500 kcal/zi"
+    GoalsMode.SURPLUS     -> "Surplus 300 kcal/zi"
+    GoalsMode.MAINTENANCE -> "Menținere"
+}
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -202,6 +209,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
                 consumedProtein = consumedProtein,   proteinGoal = goals.proteinGoal,
                 consumedCarbs = consumedCarbs,       carbsGoal = goals.carbsGoal,
                 consumedFat = consumedFat,           fatGoal = goals.fatGoal,
+                goalsMode = goals.mode,
                 modifier = Modifier.padding(horizontal = 20.dp)
             )
 
@@ -382,6 +390,7 @@ fun CalorieSummaryCard(
     consumedProtein: Int,  proteinGoal: Int,
     consumedCarbs: Int,    carbsGoal: Int,
     consumedFat: Int,      fatGoal: Int,
+    goalsMode: GoalsMode,
     modifier: Modifier = Modifier
 ) {
     val progress = if (calorieGoal > 0) (consumedCalories.toFloat() / calorieGoal).coerceIn(0f,1f) else 0f
@@ -410,6 +419,13 @@ fun CalorieSummaryCard(
                     }
                 }
             }
+
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = goalsModeLabel(goalsMode),
+                fontSize = 11.sp,
+                color = GlassColors.textSecondary,
+            )
 
             Spacer(Modifier.height(24.dp))
 
@@ -815,7 +831,7 @@ fun HomeScreenPreview() {
                 Spacer(Modifier.height(12.dp))
                 HomeHeader("Today", "4 March 2026", initial = "M", onSettingsClick = {})
                 Spacer(Modifier.height(20.dp))
-                CalorieSummaryCard(1247,2000,82,150,156,250,41,65)
+                CalorieSummaryCard(1247,2000,82,150,156,250,41,65, GoalsMode.MAINTENANCE)
                 Spacer(Modifier.height(24.dp))
                 listOf(
                     MealSection("Breakfast","🌅","600–650",535,55,30,38,
