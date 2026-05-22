@@ -106,7 +106,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
         SimpleDateFormat("d MMMM yyyy", Locale.ENGLISH).format(selectedDate)
     }
 
-    val goals = remember { NutritionGoals() }
+    val goals = viewModel.nutritionGoals.collectAsState().value ?: NutritionGoals()
 
     // ── Live data from ViewModel ──────────────────────────────────────────────
     val breakfastFoods by viewModel.breakfastFoods.collectAsState()

@@ -71,7 +71,7 @@ fun StatsScreen(
     }
     var showWeightSheet by remember { mutableStateOf(false) }
 
-    val goals = remember { NutritionGoals() }
+    val goals = viewModel.nutritionGoals.collectAsState().value ?: NutritionGoals()
 
     val totalCalories = remember(breakfastFoods, lunchFoods, dinnerFoods, snacksFoods) {
         (breakfastFoods + lunchFoods + dinnerFoods + snacksFoods).sumOf { it.calories }
