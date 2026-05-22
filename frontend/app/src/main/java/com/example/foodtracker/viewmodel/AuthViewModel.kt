@@ -13,8 +13,11 @@ import com.example.foodtracker.model.toUserProfile
 import com.example.foodtracker.util.mapFirebaseError
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -56,6 +59,9 @@ class AuthViewModel : ViewModel() {
 
     private val _loadedProfile = MutableStateFlow<UserProfile?>(null)
     val loadedProfile: StateFlow<UserProfile?> = _loadedProfile.asStateFlow()
+
+    private val _profileUpdates = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val profileUpdates: SharedFlow<Unit> = _profileUpdates.asSharedFlow()
 
     /** Called by SplashScreen on startup. */
     fun checkAuthState() {
@@ -180,6 +186,7 @@ class AuthViewModel : ViewModel() {
         _loadedProfile.value = profile
         viewModelScope.launch {
             runCatching { profileApi.saveProfile(profile.toProfileDto()) }
+                .onSuccess { _profileUpdates.tryEmit(Unit) }
         }
     }
 

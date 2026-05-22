@@ -44,6 +44,12 @@ class MainActivity : ComponentActivity() {
                     loadedProfile?.let { viewModel.updateUserProfile(it) }
                 }
 
+                LaunchedEffect(Unit) {
+                    authViewModel.profileUpdates.collect {
+                        viewModel.loadGoals()
+                    }
+                }
+
                 val showBottomBar = currentRoute in listOf("home", "stats", "meals", "profile")
 
                 Box(Modifier.fillMaxSize().background(GlassColors.backgroundDark)) {
