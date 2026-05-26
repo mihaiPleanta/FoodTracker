@@ -252,7 +252,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
                     meal = meal,
                     onQuickAdd = {
                         val encodedIcon = URLEncoder.encode(meal.icon, "UTF-8")
-                        val colorHex = meal.accentColor.value.toString(16).uppercase().takeLast(6)
+                        val colorHex = String.format("%06X", meal.accentColor.toArgb() and 0xFFFFFF)
                         navController.navigate("meal/${meal.name}/$encodedIcon/$colorHex")
                     },
                     modifier = Modifier.padding(horizontal = 20.dp)
