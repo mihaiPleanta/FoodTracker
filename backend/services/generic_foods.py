@@ -53,10 +53,10 @@ def _load_dataset(path: Path = _DATA_PATH) -> list[GenericFood]:
             name_ro=row["name_ro"],
             aliases=list(row.get("aliases", [])),
             categories=list(row.get("categories", [])),
-            kcal_100g=row["kcal_100g"],
-            protein_100g=row["protein_100g"],
-            carbs_100g=row["carbs_100g"],
-            fat_100g=row["fat_100g"],
+            kcal_100g=float(row["kcal_100g"]),
+            protein_100g=float(row["protein_100g"]),
+            carbs_100g=float(row["carbs_100g"]),
+            fat_100g=float(row["fat_100g"]),
         )
         for row in raw
     ]

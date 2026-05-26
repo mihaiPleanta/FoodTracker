@@ -54,6 +54,25 @@ def test_multiple_matches_returned_without_limit():
     assert names == {"Orez alb fiert", "Orez brun fiert"}
 
 
+def test_token_subset_query_is_included():
+    # "piept crud": both tokens are in "Piept de pui crud" → bucket 4 (== threshold), kept.
+    res = _client().search("piept crud", 20)
+    assert any(r.name == "Piept de pui crud" for r in res)
+
+
+def test_token_overlap_query_is_excluded():
+    # "orez bun": only "orez" overlaps the rice names → bucket 5 (> threshold), dropped.
+    assert _client().search("orez bun", 20) == []
+
+
+def test_macros_are_floats_after_loading_dataset():
+    # JSON integers (e.g. kcal 130) must be coerced to float in the loaded dataclass,
+    # not just in to_dto(), so direct field access is type-correct.
+    from services.generic_foods import _load_dataset
+    foods = _load_dataset()
+    assert all(isinstance(f.kcal_100g, float) for f in foods)
+
+
 def test_default_client_loads_bundled_dataset():
     # Smoke test against the real data file.
     from services.generic_foods import get_generic_client
