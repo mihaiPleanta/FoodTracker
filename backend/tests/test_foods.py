@@ -215,3 +215,33 @@ def test_off_duplicate_of_generic_is_removed(client, fake_off, fake_generic):
     body = response.json()
     assert [it["name"] for it in body["items"]] == ["Lapte", "Iaurt"]
     assert body["count"] == 2
+
+
+def test_off_network_error_with_generics_returns_generics_only(client, fake_off, fake_generic):
+    import httpx
+
+    fake_generic.search_result = [_dto(barcode="usda-chicken-breast-raw", name="Piept de pui crud")]
+
+    async def raise_network(*args, **kwargs):
+        raise httpx.ConnectError("no route")
+
+    fake_off.search = raise_network
+    response = client.get("/foods/search", params={"q": "piept de pui"}, headers=AUTH_HEADER)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["count"] == 1
+    assert body["items"][0]["name"] == "Piept de pui crud"
+
+
+def test_merged_results_capped_at_page_size_without_cutting_generics(client, fake_off, fake_generic):
+    fake_generic.search_result = [
+        _dto(barcode="usda-a", name="Gen A"),
+        _dto(barcode="usda-b", name="Gen B"),
+    ]
+    fake_off.search_result = [_dto(barcode=str(i), name=f"OFF {i}") for i in range(20)]
+    response = client.get("/foods/search", params={"q": "xx", "page_size": 20}, headers=AUTH_HEADER)
+    body = response.json()
+    # 2 generics + 20 OFF = 22 merged, capped to 20; generics stay first and are never cut.
+    assert body["count"] == 20
+    assert body["items"][0]["name"] == "Gen A"
+    assert body["items"][1]["name"] == "Gen B"

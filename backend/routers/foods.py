@@ -58,7 +58,9 @@ async def search_foods(
     generic_names = {g.name.strip().lower() for g in generics}
     off_items = [it for it in off_items if it.name.strip().lower() not in generic_names]
 
-    items = generics + off_items
+    # page_size caps the response, but matching generics are never trimmed — only the
+    # OFF tail is cut. (max(...) keeps every generic even if they alone exceed page_size.)
+    items = (generics + off_items)[: max(page_size, len(generics))]
     return SearchResponseDto(items=items, count=len(items))
 
 
