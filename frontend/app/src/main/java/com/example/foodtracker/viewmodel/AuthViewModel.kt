@@ -22,6 +22,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+sealed class ProfileSaveState {
+    object Idle : ProfileSaveState()
+    object Saving : ProfileSaveState()
+    object Success : ProfileSaveState()
+    data class Error(val message: String) : ProfileSaveState()
+}
+
 sealed class AuthUiState {
     object Idle : AuthUiState()
     object Loading : AuthUiState()
@@ -62,6 +69,11 @@ class AuthViewModel : ViewModel() {
 
     private val _profileUpdates = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val profileUpdates: SharedFlow<Unit> = _profileUpdates.asSharedFlow()
+
+    private val _profileSaveState = MutableStateFlow<ProfileSaveState>(ProfileSaveState.Idle)
+    val profileSaveState: StateFlow<ProfileSaveState> = _profileSaveState.asStateFlow()
+
+    fun clearProfileSaveState() { _profileSaveState.value = ProfileSaveState.Idle }
 
     /** Called by SplashScreen on startup. */
     fun checkAuthState() {
@@ -181,12 +193,19 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    /** Persists profile edits from ProfileScreen. Fire-and-forget. */
+    /** Persists profile edits from ProfileScreen with save state feedback. */
     fun saveProfileEdit(profile: UserProfile) {
         _loadedProfile.value = profile
+        _profileSaveState.value = ProfileSaveState.Saving
         viewModelScope.launch {
             runCatching { profileApi.saveProfile(profile.toProfileDto()) }
-                .onSuccess { _profileUpdates.tryEmit(Unit) }
+                .onSuccess {
+                    _profileUpdates.tryEmit(Unit)
+                    _profileSaveState.value = ProfileSaveState.Success
+                }
+                .onFailure {
+                    _profileSaveState.value = ProfileSaveState.Error("Nu s-a putut salva profilul")
+                }
         }
     }
 

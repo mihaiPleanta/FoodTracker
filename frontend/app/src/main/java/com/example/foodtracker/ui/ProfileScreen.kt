@@ -16,6 +16,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +41,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.Date
 import com.example.foodtracker.model.ActivityLevel
 import com.example.foodtracker.model.Gender
 import com.example.foodtracker.model.UserProfile
@@ -43,10 +49,12 @@ import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.ui.theme.glassCard
 import com.example.foodtracker.viewmodel.AuthViewModel
 import com.example.foodtracker.viewmodel.FoodViewModel
+import com.example.foodtracker.viewmodel.ProfileSaveState
 
 @Composable
 fun ProfileScreen(viewModel: FoodViewModel, authViewModel: AuthViewModel) {
     val profile by viewModel.userProfile.collectAsState()
+    val saveState by authViewModel.profileSaveState.collectAsState()
 
     var name          by remember(profile) { mutableStateOf(profile.name) }
     var age           by remember(profile) { mutableStateOf(profile.age.toString()) }
@@ -56,112 +64,153 @@ fun ProfileScreen(viewModel: FoodViewModel, authViewModel: AuthViewModel) {
     var targetWeight  by remember(profile) { mutableStateOf(profile.targetWeightKg.toString()) }
     var activityLevel by remember(profile) { mutableStateOf(profile.activityLevel) }
 
-    Box(Modifier.fillMaxSize().background(GlassColors.backgroundDark)) {
-        Column(
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(saveState) {
+        when (val state = saveState) {
+            is ProfileSaveState.Success -> {
+                delay(1200)
+                authViewModel.clearProfileSaveState()
+            }
+            is ProfileSaveState.Error -> {
+                snackbarHostState.showSnackbar(state.message)
+                authViewModel.clearProfileSaveState()
+            }
+            else -> {}
+        }
+    }
+
+    Scaffold(
+        containerColor = GlassColors.backgroundDark,
+        snackbarHost = {
+            SnackbarHost(snackbarHostState) { data ->
+                Snackbar(
+                    snackbarData = data,
+                    containerColor = Color(0xFF2A1A1A),
+                    contentColor = Color(0xFFFF6B6B)
+                )
+            }
+        }
+    ) { innerPadding ->
+        Box(
             Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
-                .verticalScroll(rememberScrollState())
+                .background(GlassColors.backgroundDark)
+                .padding(innerPadding)
         ) {
-            Spacer(Modifier.height(28.dp))
-
-            ProfileAvatarHeader(name = name, gender = gender, age = age)
-
-            Spacer(Modifier.height(28.dp))
-
-            // ── Informații personale ──────────────────────────────────────────
-            ProfileSectionLabel(
-                "INFORMAȚII PERSONALE",
-                Modifier.padding(horizontal = 20.dp)
-            )
-            Spacer(Modifier.height(8.dp))
             Column(
                 Modifier
-                    .padding(horizontal = 20.dp)
-                    .fillMaxWidth()
-                    .glassCard(16)
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .verticalScroll(rememberScrollState())
             ) {
-                ProfileTextField("Nume", name) { name = it }
-                ProfileRowDivider()
-                ProfileTextField(
-                    label = "Vârstă",
-                    value = age,
-                    suffix = "ani",
-                    keyboard = KeyboardType.Number,
-                    onValueChange = { age = it }
-                )
-                ProfileRowDivider()
-                ProfileGenderRow(selected = gender, onSelect = { gender = it })
-                ProfileRowDivider()
-                ProfileTextField(
-                    label = "Înălțime",
-                    value = heightCm,
-                    suffix = "cm",
-                    keyboard = KeyboardType.Number,
-                    onValueChange = { heightCm = it }
-                )
-            }
+                Spacer(Modifier.height(28.dp))
 
-            Spacer(Modifier.height(14.dp))
+                ProfileAvatarHeader(name = name, gender = gender, age = age)
 
-            // ── Obiective corp ────────────────────────────────────────────────
-            ProfileSectionLabel(
-                "OBIECTIVE CORP",
-                Modifier.padding(horizontal = 20.dp)
-            )
-            Spacer(Modifier.height(8.dp))
-            Column(
-                Modifier
-                    .padding(horizontal = 20.dp)
-                    .fillMaxWidth()
-                    .glassCard(16)
-            ) {
-                ProfileTextField(
-                    label = "Greutate curentă",
-                    value = currentWeight,
-                    suffix = "kg",
-                    keyboard = KeyboardType.Decimal,
-                    onValueChange = { currentWeight = it }
-                )
-                ProfileRowDivider()
-                ProfileTextField(
-                    label = "Greutate țintă",
-                    value = targetWeight,
-                    suffix = "kg",
-                    keyboard = KeyboardType.Decimal,
-                    onValueChange = { targetWeight = it }
-                )
-                ProfileRowDivider()
-                ProfileActivityRow(
-                    selected = activityLevel,
-                    onSelect = { activityLevel = it }
-                )
-            }
+                Spacer(Modifier.height(28.dp))
 
-            Spacer(Modifier.height(28.dp))
-
-            ProfileSaveButton(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-                onClick = {
-                    val updated = UserProfile(
-                        name            = name.trim().ifBlank { profile.name },
-                        age             = age.toIntOrNull() ?: profile.age,
-                        gender          = gender,
-                        heightCm        = heightCm.toIntOrNull() ?: profile.heightCm,
-                        currentWeightKg = currentWeight.replace(",", ".").toFloatOrNull()
-                                            ?: profile.currentWeightKg,
-                        targetWeightKg  = targetWeight.replace(",", ".").toFloatOrNull()
-                                            ?: profile.targetWeightKg,
-                        activityLevel   = activityLevel
+                ProfileSectionLabel(
+                    "INFORMAȚII PERSONALE",
+                    Modifier.padding(horizontal = 20.dp)
+                )
+                Spacer(Modifier.height(8.dp))
+                Column(
+                    Modifier
+                        .padding(horizontal = 20.dp)
+                        .fillMaxWidth()
+                        .glassCard(16)
+                ) {
+                    ProfileTextField("Nume", name) { name = it }
+                    ProfileRowDivider()
+                    ProfileTextField(
+                        label = "Vârstă",
+                        value = age,
+                        suffix = "ani",
+                        keyboard = KeyboardType.Number,
+                        onValueChange = { age = it }
                     )
-                    viewModel.updateUserProfile(updated)
-                    authViewModel.saveProfileEdit(updated)
+                    ProfileRowDivider()
+                    ProfileGenderRow(selected = gender, onSelect = { gender = it })
+                    ProfileRowDivider()
+                    ProfileTextField(
+                        label = "Înălțime",
+                        value = heightCm,
+                        suffix = "cm",
+                        keyboard = KeyboardType.Number,
+                        onValueChange = { heightCm = it }
+                    )
                 }
-            )
 
-            Spacer(Modifier.height(100.dp))
+                Spacer(Modifier.height(14.dp))
+
+                ProfileSectionLabel(
+                    "OBIECTIVE CORP",
+                    Modifier.padding(horizontal = 20.dp)
+                )
+                Spacer(Modifier.height(8.dp))
+                Column(
+                    Modifier
+                        .padding(horizontal = 20.dp)
+                        .fillMaxWidth()
+                        .glassCard(16)
+                ) {
+                    ProfileTextField(
+                        label = "Greutate curentă",
+                        value = currentWeight,
+                        suffix = "kg",
+                        keyboard = KeyboardType.Decimal,
+                        onValueChange = { currentWeight = it }
+                    )
+                    ProfileRowDivider()
+                    ProfileTextField(
+                        label = "Greutate țintă",
+                        value = targetWeight,
+                        suffix = "kg",
+                        keyboard = KeyboardType.Decimal,
+                        onValueChange = { targetWeight = it }
+                    )
+                    ProfileRowDivider()
+                    ProfileActivityRow(
+                        selected = activityLevel,
+                        onSelect = { activityLevel = it }
+                    )
+                }
+
+                Spacer(Modifier.height(28.dp))
+
+                ProfileSaveButton(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                    saveState = saveState,
+                    onClick = {
+                        val newWeight = currentWeight.replace(",", ".").toFloatOrNull()
+                            ?: profile.currentWeightKg
+                        val weightChanged = newWeight != profile.currentWeightKg
+
+                        val updated = UserProfile(
+                            name            = name.trim().ifBlank { profile.name },
+                            age             = age.toIntOrNull() ?: profile.age,
+                            gender          = gender,
+                            heightCm        = heightCm.toIntOrNull() ?: profile.heightCm,
+                            currentWeightKg = newWeight,
+                            targetWeightKg  = targetWeight.replace(",", ".").toFloatOrNull()
+                                                ?: profile.targetWeightKg,
+                            activityLevel   = activityLevel
+                        )
+                        viewModel.updateUserProfile(updated)
+                        authViewModel.saveProfileEdit(updated)
+
+                        if (weightChanged) {
+                            viewModel.addWeightCheckIn(newWeight, Date())
+                        }
+                    }
+                )
+
+                Spacer(Modifier.height(100.dp))
+            }
         }
     }
 }
@@ -401,22 +450,29 @@ fun ProfileActivityRow(selected: ActivityLevel, onSelect: (ActivityLevel) -> Uni
 }
 
 @Composable
-fun ProfileSaveButton(modifier: Modifier = Modifier, onClick: () -> Unit) {
+fun ProfileSaveButton(
+    modifier: Modifier = Modifier,
+    saveState: ProfileSaveState = ProfileSaveState.Idle,
+    onClick: () -> Unit
+) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val haptic = LocalHapticFeedback.current
-    val scope = rememberCoroutineScope()
-    var justSaved by remember { mutableStateOf(false) }
+
+    val isSaving = saveState is ProfileSaveState.Saving
+    val isSaved  = saveState is ProfileSaveState.Success
+    val isEnabled = !isSaving
 
     val scale by animateFloatAsState(
         targetValue = when {
-            justSaved -> 1.04f
-            isPressed -> 0.92f
-            else      -> 1f
+            isSaved  -> 1.04f
+            isPressed && isEnabled -> 0.92f
+            else     -> 1f
         },
         animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium),
         label = "saveScale"
     )
+
     Box(
         modifier = modifier
             .scale(scale)
@@ -427,19 +483,23 @@ fun ProfileSaveButton(modifier: Modifier = Modifier, onClick: () -> Unit) {
                     listOf(GlassColors.accentGreen, GlassColors.accentGreenDim)
                 )
             )
-            .clickable(interactionSource = interactionSource, indication = null) {
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = isEnabled
+            ) {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 onClick()
-                justSaved = true
-                scope.launch {
-                    delay(1200)
-                    justSaved = false
-                }
             },
         contentAlignment = Alignment.Center
     ) {
-        if (justSaved) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        when {
+            isSaving -> CircularProgressIndicator(
+                modifier = Modifier.size(22.dp),
+                color = Color.Black,
+                strokeWidth = 2.5.dp
+            )
+            isSaved -> Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.Default.Check,
                     contentDescription = null,
@@ -449,8 +509,7 @@ fun ProfileSaveButton(modifier: Modifier = Modifier, onClick: () -> Unit) {
                 Spacer(Modifier.width(8.dp))
                 Text("Salvat", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Black)
             }
-        } else {
-            Text(
+            else -> Text(
                 "Salvează profilul",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,

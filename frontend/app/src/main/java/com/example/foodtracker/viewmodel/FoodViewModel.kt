@@ -279,8 +279,7 @@ class FoodViewModel : ViewModel() {
         }
     }
 
-    fun addWeightCheckIn(weightKg: Float) {
-        val date = _selectedHomeDate.value
+    fun addWeightCheckIn(weightKg: Float, date: Date = _selectedHomeDate.value) {
         val dateStr = dateFormatter.format(date)
         val previousHistory = _weightHistory.value
         val previousProfileWeight = _userProfile.value.currentWeightKg
