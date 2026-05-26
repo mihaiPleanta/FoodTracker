@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 
 from auth import verify_token
 from schemas import FoodItemDto, SearchResponseDto
+from services.generic_foods import GenericFoodsClient, get_generic_client
 from services.open_food_facts import OpenFoodFactsClient, get_off_client
 
 router = APIRouter(prefix="/foods", tags=["foods"])
@@ -31,17 +32,33 @@ async def search_foods(
     q: str = Query(..., min_length=2, max_length=50),
     page_size: int = Query(20, ge=1, le=50),
     off: OpenFoodFactsClient = Depends(get_off_client),
+    generic: GenericFoodsClient = Depends(get_generic_client),
     token: dict = Depends(verify_token),
 ) -> SearchResponseDto:
+    # Generic foods come from a local in-memory dataset — always available.
+    generics = generic.search(q, page_size)
+
+    # Open Food Facts is live and may be down. If we already have generic matches,
+    # degrade gracefully and return just those instead of failing the whole search.
     try:
-        items = await off.search(q, page_size)
+        off_items = await off.search(q, page_size)
     except httpx.HTTPStatusError as exc:
-        raise _translate_off_error(exc) from exc
+        if not generics:
+            raise _translate_off_error(exc) from exc
+        off_items = []
     except httpx.RequestError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Food database busy, try again",
-        ) from exc
+        if not generics:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Food database busy, try again",
+            ) from exc
+        off_items = []
+
+    # Drop OFF products that duplicate a generic by name; generics always rank first.
+    generic_names = {g.name.strip().lower() for g in generics}
+    off_items = [it for it in off_items if it.name.strip().lower() not in generic_names]
+
+    items = generics + off_items
     return SearchResponseDto(items=items, count=len(items))
 
 

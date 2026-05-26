@@ -2,6 +2,7 @@ import pytest
 
 from main import app
 from schemas import FoodItemDto
+from services.generic_foods import get_generic_client
 from services.open_food_facts import get_off_client
 
 AUTH_HEADER = {"Authorization": "Bearer fake-test-token"}
@@ -39,8 +40,26 @@ class _FakeClient:
         return self.barcode_result
 
 
+class _FakeGenericClient:
+    def __init__(self):
+        self.search_calls: list[tuple[str, int]] = []
+        self.search_result: list[FoodItemDto] = []
+
+    def search(self, query: str, limit: int):
+        self.search_calls.append((query, limit))
+        return self.search_result
+
+
 @pytest.fixture
-def fake_off():
+def fake_generic():
+    fake = _FakeGenericClient()
+    app.dependency_overrides[get_generic_client] = lambda: fake
+    yield fake
+    app.dependency_overrides.pop(get_generic_client, None)
+
+
+@pytest.fixture
+def fake_off(fake_generic):  # depends on fake_generic so generics default to empty
     fake = _FakeClient()
     app.dependency_overrides[get_off_client] = lambda: fake
     yield fake
@@ -129,3 +148,70 @@ def test_barcode_translates_off_rate_limit_to_503(client, fake_off):
     fake_off.get_by_barcode = raise_429
     response = client.get("/foods/barcode/5449000000996", headers=AUTH_HEADER)
     assert response.status_code == 503
+
+
+def test_generics_rank_before_off(client, fake_off, fake_generic):
+    fake_generic.search_result = [_dto(barcode="usda-chicken-breast-raw", name="Piept de pui crud", brand=None, image_url=None)]
+    fake_off.search_result = [_dto(barcode="222", name="Piept de pui afumat")]
+    response = client.get("/foods/search", params={"q": "piept de pui"}, headers=AUTH_HEADER)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["count"] == 2
+    assert body["items"][0]["name"] == "Piept de pui crud"
+    assert body["items"][1]["name"] == "Piept de pui afumat"
+    assert fake_generic.search_calls == [("piept de pui", 20)]
+
+
+def test_off_failure_returns_generics_only(client, fake_off, fake_generic):
+    import httpx
+
+    fake_generic.search_result = [_dto(barcode="usda-chicken-breast-raw", name="Piept de pui crud")]
+
+    async def raise_503(*args, **kwargs):
+        request = httpx.Request("GET", "https://world.openfoodfacts.org/")
+        response = httpx.Response(503, request=request)
+        raise httpx.HTTPStatusError("down", request=request, response=response)
+
+    fake_off.search = raise_503
+    response = client.get("/foods/search", params={"q": "piept de pui"}, headers=AUTH_HEADER)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["count"] == 1
+    assert body["items"][0]["name"] == "Piept de pui crud"
+
+
+def test_off_failure_without_generics_still_503(client, fake_off, fake_generic):
+    import httpx
+
+    fake_generic.search_result = []
+
+    async def raise_503(*args, **kwargs):
+        request = httpx.Request("GET", "https://world.openfoodfacts.org/")
+        response = httpx.Response(503, request=request)
+        raise httpx.HTTPStatusError("down", request=request, response=response)
+
+    fake_off.search = raise_503
+    response = client.get("/foods/search", params={"q": "xyzzy"}, headers=AUTH_HEADER)
+    assert response.status_code == 503
+
+
+def test_off_network_error_without_generics_still_503(client, fake_off, fake_generic):
+    import httpx
+
+    fake_generic.search_result = []
+
+    async def raise_network(*args, **kwargs):
+        raise httpx.ConnectError("no route")
+
+    fake_off.search = raise_network
+    response = client.get("/foods/search", params={"q": "xyzzy"}, headers=AUTH_HEADER)
+    assert response.status_code == 503
+
+
+def test_off_duplicate_of_generic_is_removed(client, fake_off, fake_generic):
+    fake_generic.search_result = [_dto(barcode="usda-milk-1-5", name="Lapte")]
+    fake_off.search_result = [_dto(barcode="111", name="Lapte"), _dto(barcode="222", name="Iaurt")]
+    response = client.get("/foods/search", params={"q": "lapte"}, headers=AUTH_HEADER)
+    body = response.json()
+    assert [it["name"] for it in body["items"]] == ["Lapte", "Iaurt"]
+    assert body["count"] == 2
