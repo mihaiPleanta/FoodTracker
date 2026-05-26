@@ -223,6 +223,35 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
                 )
             }
 
+            Spacer(Modifier.height(10.dp))
+            Column(
+                Modifier
+                    .padding(horizontal = 20.dp)
+                    .fillMaxWidth()
+                    .glassCard(16)
+                    .clickable { uriHandler.openUri("https://fdc.nal.usda.gov") }
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+            ) {
+                Text(
+                    "Date nutriționale alimente generice",
+                    fontSize = 13.sp,
+                    color = GlassColors.textSecondary,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "USDA FoodData Central (domeniu public)",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = GlassColors.textPrimary,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "fdc.nal.usda.gov",
+                    fontSize = 12.sp,
+                    color = GlassColors.accentGreen,
+                )
+            }
+
             Spacer(Modifier.height(100.dp))
         }
     }
