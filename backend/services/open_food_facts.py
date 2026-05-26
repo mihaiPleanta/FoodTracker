@@ -5,6 +5,7 @@ import asyncio
 import httpx
 
 from schemas import FoodItemDto
+from services.text_match import relevance, stem  # noqa: F401  (stem re-exported for tests/back-compat)
 
 USER_AGENT = "FoodTracker-Licenta/0.1 (mihaipleanta@gmail.com)"
 SEARCH_URL = "https://world.openfoodfacts.org/cgi/search.pl"
@@ -49,7 +50,7 @@ class OpenFoodFactsClient:
         normalized = (self._normalize(p) for p in products if isinstance(p, dict))
         items = [item for item in normalized if item is not None]
         # OFF returns results by popularity. Re-rank so the closest text/category match wins.
-        items.sort(key=lambda it: _relevance(it.name, it.categories, query))
+        items.sort(key=lambda it: relevance(it.name, it.categories, query))
         return items
 
     async def get_by_barcode(self, barcode: str) -> FoodItemDto | None:
@@ -104,45 +105,6 @@ class OpenFoodFactsClient:
             fat_100g=float(nutriments["fat_100g"]),
             categories=categories,
         )
-
-
-def _stem(word: str) -> str:
-    """Naive plural / language-variant trimmer: banana / banane / bananes / banana's → 'banan'.
-    Stops at 4 chars to avoid over-stemming short words."""
-    w = word.lower().strip().rstrip("'s")
-    while len(w) > 4 and w[-1] in "aeios":
-        w = w[:-1]
-    return w
-
-
-def _relevance(name: str, categories: list[str], query: str) -> tuple[int, int]:
-    """Lower tuple wins.
-    Order: category match (strongest signal of category fit) > exact name > name prefix >
-    name substring > token-subset > token-overlap > other. Ties broken by shorter name."""
-    n = name.lower().strip()
-    q = query.lower().strip()
-    q_stem = _stem(q)
-    n_stem = _stem(n)
-    cat_stems = [_stem(c.replace("-", " ").split()[-1]) for c in categories if c]
-
-    n_tokens = set(n.split())
-    q_tokens = {t for t in q.split() if t}
-
-    if q_stem and q_stem in cat_stems:
-        bucket = 0  # the product is literally in the query's category (e.g., "bananas")
-    elif n == q:
-        bucket = 1
-    elif n_stem.startswith(q_stem) or n.startswith(q):
-        bucket = 2
-    elif q_stem in n_stem or q in n:
-        bucket = 3
-    elif q_tokens and q_tokens.issubset(n_tokens):
-        bucket = 4
-    elif n_tokens & q_tokens:
-        bucket = 5
-    else:
-        bucket = 6
-    return (bucket, len(name))
 
 
 _singleton: OpenFoodFactsClient | None = None
