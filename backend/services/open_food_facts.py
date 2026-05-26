@@ -5,7 +5,7 @@ import asyncio
 import httpx
 
 from schemas import FoodItemDto
-from services.text_match import relevance, stem  # noqa: F401  (stem re-exported for tests/back-compat)
+from services.text_match import relevance
 
 USER_AGENT = "FoodTracker-Licenta/0.1 (mihaipleanta@gmail.com)"
 SEARCH_URL = "https://world.openfoodfacts.org/cgi/search.pl"
