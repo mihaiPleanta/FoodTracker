@@ -90,6 +90,9 @@ dependencies {
     // Async image loading for OFF thumbnails
     implementation("io.coil-kt:coil-compose:2.7.0")
 
+    // Persistență locală pentru AppSettings
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
     // Barcode scanning via Google Play Services (no camera permission needed)
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
 
