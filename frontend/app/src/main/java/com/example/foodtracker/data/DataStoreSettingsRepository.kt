@@ -2,7 +2,11 @@ package com.example.foodtracker.data
 
 import android.content.Context
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.*
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.foodtracker.model.AppLanguage
 import com.example.foodtracker.model.AppSettings
@@ -14,7 +18,7 @@ import java.io.IOException
 // Extension property la nivel de fișier — singleton DataStore per proces.
 // MainActivity îl folosește pentru a obține un DataStore<Preferences> pe care
 // îl pasează la DataStoreSettingsRepository.
-val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(
+internal val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "app_settings"
 )
 
@@ -33,6 +37,7 @@ class DataStoreSettingsRepository(
             if (e is IOException) emit(emptyPreferences()) else throw e
         }
         .map { prefs ->
+            // Defaults must match AppSettings() — repeated here because DataStore has no native defaults.
             AppSettings(
                 notificationsEnabled = prefs[Keys.NOTIFICATIONS_ENABLED] ?: true,
                 isDarkTheme          = prefs[Keys.IS_DARK_THEME]         ?: true,

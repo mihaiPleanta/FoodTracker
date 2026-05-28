@@ -76,7 +76,7 @@ class DataStoreSettingsRepositoryTest {
     }
 
     @Test
-    fun update_propagatesToFlow() = runTest {
+    fun update_subsequentReadOnSameFlow_returnsNewValue() = runTest {
         // Read initial state (defaults)
         val initial = repo.settings.first()
         assertEquals(AppSettings(), initial)
