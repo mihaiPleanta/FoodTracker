@@ -7,8 +7,10 @@ import com.example.foodtracker.model.LoggedFood
 import com.example.foodtracker.viewmodel.FoodViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -18,7 +20,7 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class FoodViewModelTest {
 
-    private val testDispatcher = UnconfinedTestDispatcher()
+    private val testDispatcher = StandardTestDispatcher()
     private lateinit var viewModel: FoodViewModel
 
     @Before
@@ -40,10 +42,10 @@ class FoodViewModelTest {
     }
 
     @Test
-    fun updateAppSettings_propagatesThroughRepoToStateFlow() = kotlinx.coroutines.test.runTest {
+    fun updateAppSettings_propagatesThroughRepoToStateFlow() = runTest(testDispatcher) {
         val settings = AppSettings(notificationsEnabled = false, language = AppLanguage.ENGLISH)
         viewModel.updateAppSettings(settings)
-        // UnconfinedTestDispatcher runs the coroutine inline; assert directly.
+        advanceUntilIdle()    // drains repo.update + StateFlow propagation
         assertEquals(settings, viewModel.appSettings.value)
     }
 
