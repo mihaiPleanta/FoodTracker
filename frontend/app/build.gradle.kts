@@ -93,6 +93,9 @@ dependencies {
     // Persistență locală pentru AppSettings
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
+    // WorkManager pentru remindere mese (zilnic, 24h period)
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+
     // Barcode scanning via Google Play Services (no camera permission needed)
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
 
