@@ -1,5 +1,10 @@
 package com.example.foodtracker.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,18 +23,37 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import com.example.foodtracker.model.AppLanguage
 import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.ui.theme.glassCard
 import com.example.foodtracker.viewmodel.FoodViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
     val settings by viewModel.appSettings.collectAsState()
+    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            viewModel.updateAppSettings(settings.copy(notificationsEnabled = true))
+        } else {
+            scope.launch {
+                snackbarHostState.showSnackbar("Activează notificările din setările sistemului")
+            }
+        }
+    }
+
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -86,8 +110,17 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
                 SettingsToggleRow(
                     label = "Remindere mese",
                     checked = settings.notificationsEnabled,
-                    onCheckedChange = {
-                        viewModel.updateAppSettings(settings.copy(notificationsEnabled = it))
+                    onCheckedChange = { newValue ->
+                        if (newValue &&
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                            ContextCompat.checkSelfPermission(
+                                context, Manifest.permission.POST_NOTIFICATIONS
+                            ) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            viewModel.updateAppSettings(settings.copy(notificationsEnabled = newValue))
+                        }
                     }
                 )
             }
@@ -254,6 +287,13 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
 
             Spacer(Modifier.height(100.dp))
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 24.dp)
+        )
     }
 
     // ── Dialogs ───────────────────────────────────────────────────────────────
