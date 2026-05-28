@@ -6,6 +6,7 @@ import com.example.foodtracker.api.FoodApi
 import com.example.foodtracker.api.LogsApi
 import com.example.foodtracker.api.ProfileApi
 import com.example.foodtracker.api.RetrofitInstance
+import com.example.foodtracker.data.SettingsRepository
 import com.example.foodtracker.model.AppSettings
 import com.example.foodtracker.model.FoodItem
 import com.example.foodtracker.model.FoodLogCreateDto
@@ -48,7 +49,7 @@ data class WeightCheckIn(
 )
 
 class FoodViewModel(
-    private val settingsRepository: com.example.foodtracker.data.SettingsRepository
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     // ── Search state ──────────────────────────────────────────────────────────
