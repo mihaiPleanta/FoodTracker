@@ -21,6 +21,8 @@ import com.example.foodtracker.ui.*
 import com.example.foodtracker.ui.theme.FoodTrackerTheme
 import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.data.DataStoreSettingsRepository
+import com.example.foodtracker.data.MealLogTracker
+import com.example.foodtracker.data.mealLogTrackerDataStore
 import com.example.foodtracker.data.settingsDataStore
 import com.example.foodtracker.viewmodel.AuthViewModel
 import com.example.foodtracker.viewmodel.FoodViewModel
@@ -37,7 +39,8 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val foodViewModelFactory = remember {
                     FoodViewModelFactory(
-                        DataStoreSettingsRepository(applicationContext.settingsDataStore)
+                        settingsRepository = DataStoreSettingsRepository(applicationContext.settingsDataStore),
+                        mealLogTracker = MealLogTracker(applicationContext.mealLogTrackerDataStore),
                     )
                 }
                 val viewModel: FoodViewModel = viewModel(factory = foodViewModelFactory)

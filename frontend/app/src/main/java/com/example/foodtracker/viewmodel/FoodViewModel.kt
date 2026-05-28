@@ -6,6 +6,7 @@ import com.example.foodtracker.api.FoodApi
 import com.example.foodtracker.api.LogsApi
 import com.example.foodtracker.api.ProfileApi
 import com.example.foodtracker.api.RetrofitInstance
+import com.example.foodtracker.data.MealLogTracker
 import com.example.foodtracker.data.SettingsRepository
 import com.example.foodtracker.model.AppSettings
 import com.example.foodtracker.model.FoodItem
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.time.LocalDate
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -49,7 +51,8 @@ data class WeightCheckIn(
 )
 
 class FoodViewModel(
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val mealLogTracker: MealLogTracker,
 ) : ViewModel() {
 
     // ── Search state ──────────────────────────────────────────────────────────
@@ -394,6 +397,12 @@ class FoodViewModel(
                     )
                 )
                 replaceByTempId(key, mealName, tempId) { it.copy(id = response.id, clientTempId = null) }
+                // Hint local pentru worker-ul de remindere — sursa de adevăr rămâne backend-ul.
+                launch {
+                    runCatching {
+                        mealLogTracker.markLogged(LocalDate.parse(key), mealName)
+                    }
+                }
             } catch (e: java.io.IOException) {
                 removeByTempId(key, mealName, tempId)
                 _toastEvents.tryEmit("Verifică conexiunea la internet")

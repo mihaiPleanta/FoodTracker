@@ -1,6 +1,8 @@
 package com.example.foodtracker
 
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.example.foodtracker.data.FakeSettingsRepository
+import com.example.foodtracker.data.MealLogTracker
 import com.example.foodtracker.model.*
 import com.example.foodtracker.model.FoodItem
 import com.example.foodtracker.model.LoggedFood
@@ -15,7 +17,10 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import java.io.File
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FoodViewModelTest {
@@ -23,10 +28,19 @@ class FoodViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var viewModel: FoodViewModel
 
+    @get:Rule
+    val tempFolder = TemporaryFolder()
+
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        viewModel = FoodViewModel(FakeSettingsRepository())
+        val trackerStore = PreferenceDataStoreFactory.create(
+            produceFile = { File(tempFolder.newFolder("tracker"), "meal_log_tracker.preferences_pb") }
+        )
+        viewModel = FoodViewModel(
+            settingsRepository = FakeSettingsRepository(),
+            mealLogTracker = MealLogTracker(trackerStore),
+        )
     }
 
     @After
