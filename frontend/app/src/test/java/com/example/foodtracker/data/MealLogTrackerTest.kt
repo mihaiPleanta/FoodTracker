@@ -57,13 +57,19 @@ class MealLogTrackerTest {
 
     @Test
     fun markLogged_evictsEntriesOlderThanTwoDays() = runTest {
-        dataStore.edit { prefs ->
-            prefs[stringSetPreferencesKey("logged_meals")] = setOf("2026-05-25:Lunch")
-        }
+        // Seed via the public API to avoid coupling to the internal key name.
+        tracker.markLogged(LocalDate.of(2026, 5, 25), "Lunch")
         tracker.markLogged(LocalDate.of(2026, 5, 28), "Breakfast")
 
         assertFalse(tracker.wasLogged(LocalDate.of(2026, 5, 25), "Lunch"))
         assertTrue(tracker.wasLogged(LocalDate.of(2026, 5, 28), "Breakfast"))
+    }
+
+    @Test
+    fun markLogged_keepsEntryExactlyTwoDaysOld() = runTest {
+        tracker.markLogged(LocalDate.of(2026, 5, 26), "Lunch")
+        tracker.markLogged(LocalDate.of(2026, 5, 28), "Breakfast")
+        assertTrue(tracker.wasLogged(LocalDate.of(2026, 5, 26), "Lunch"))
     }
 
     @Test
