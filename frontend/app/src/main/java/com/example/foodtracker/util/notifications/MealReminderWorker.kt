@@ -3,7 +3,6 @@ package com.example.foodtracker.util.notifications
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.work.CoroutineWorker
@@ -29,10 +28,10 @@ class MealReminderWorker(
         val tracker = MealLogTracker(applicationContext.mealLogTrackerDataStore)
         if (tracker.wasLogged(LocalDate.now(), meal.key)) return Result.success()
 
-        // User may have revoked the permission after granting it — respect that silently.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            !NotificationManagerCompat.from(applicationContext).areNotificationsEnabled()
-        ) return Result.success()
+        // User may have revoked notifications via system settings — respect that on every API level.
+        if (!NotificationManagerCompat.from(applicationContext).areNotificationsEnabled()) {
+            return Result.success()
+        }
 
         val encodedIcon = URLEncoder.encode(meal.emoji, "UTF-8")
         val intent = Intent(applicationContext, MainActivity::class.java).apply {
@@ -52,7 +51,7 @@ class MealReminderWorker(
             applicationContext,
             NotificationChannels.MEAL_REMINDERS,
         )
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_meal_reminder)
             .setContentTitle("Timpul pentru ${meal.displayName}")
             .setContentText("Loghează ce ai mâncat ${meal.emoji}")
             .setContentIntent(pendingIntent)
