@@ -1,5 +1,6 @@
 package com.example.foodtracker
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -12,6 +13,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -24,16 +27,31 @@ import com.example.foodtracker.data.DataStoreSettingsRepository
 import com.example.foodtracker.data.MealLogTracker
 import com.example.foodtracker.data.mealLogTrackerDataStore
 import com.example.foodtracker.data.settingsDataStore
+import com.example.foodtracker.util.notifications.MealReminderScheduler
+import com.example.foodtracker.util.notifications.MealReminderWorker
+import com.example.foodtracker.util.notifications.NotificationChannels
 import com.example.foodtracker.viewmodel.AuthViewModel
 import com.example.foodtracker.viewmodel.FoodViewModel
 import com.example.foodtracker.viewmodel.FoodViewModelFactory
 import java.net.URLDecoder
 import java.net.URLEncoder
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 class MainActivity : ComponentActivity() {
+    private var pendingDeepLink by mutableStateOf<DeepLink?>(null)
+
+    data class DeepLink(
+        val mealName: String,
+        val mealIcon: String,
+        val accentHex: String,
+    )
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        NotificationChannels.ensureCreated(applicationContext)
+        pendingDeepLink = readDeepLinkFromIntent(intent)
         setContent {
             FoodTrackerTheme {
                 val navController = rememberNavController()
@@ -59,6 +77,32 @@ class MainActivity : ComponentActivity() {
                     authViewModel.profileUpdates.collect {
                         viewModel.loadGoals()
                     }
+                }
+
+                // Reschedule/cancel meal reminders whenever notificationsEnabled changes
+                // (also fires once on initial collect with the persisted value).
+                LaunchedEffect(Unit) {
+                    viewModel.appSettings
+                        .map { it.notificationsEnabled }
+                        .distinctUntilChanged()
+                        .collect { enabled ->
+                            if (enabled) {
+                                MealReminderScheduler.scheduleAll(applicationContext)
+                            } else {
+                                MealReminderScheduler.cancelAll(applicationContext)
+                            }
+                        }
+                }
+
+                // Consume notification deep-link — only after we reach a logged-in route.
+                // On cold start the NavHost begins at "splash"; we wait for "home"/"stats"/"profile".
+                LaunchedEffect(pendingDeepLink, currentRoute) {
+                    val dl = pendingDeepLink ?: return@LaunchedEffect
+                    if (currentRoute !in setOf("home", "stats", "profile")) return@LaunchedEffect
+                    navController.navigate("meal/${dl.mealName}/${dl.mealIcon}/${dl.accentHex}") {
+                        launchSingleTop = true
+                    }
+                    pendingDeepLink = null
                 }
 
                 val showBottomBar = currentRoute in listOf("home", "stats", "meals", "profile")
@@ -193,5 +237,19 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingDeepLink = readDeepLinkFromIntent(intent)
+    }
+
+    private fun readDeepLinkFromIntent(intent: Intent?): DeepLink? {
+        intent ?: return null
+        val name = intent.getStringExtra(MealReminderWorker.EXTRA_MEAL_NAME) ?: return null
+        val icon = intent.getStringExtra(MealReminderWorker.EXTRA_MEAL_ICON) ?: return null
+        val accent = intent.getStringExtra(MealReminderWorker.EXTRA_MEAL_ACCENT) ?: return null
+        return DeepLink(name, icon, accent)
     }
 }
