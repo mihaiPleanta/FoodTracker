@@ -1,5 +1,6 @@
 package com.example.foodtracker
 
+import com.example.foodtracker.data.FakeSettingsRepository
 import com.example.foodtracker.model.*
 import com.example.foodtracker.model.FoodItem
 import com.example.foodtracker.model.LoggedFood
@@ -23,7 +24,7 @@ class FoodViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        viewModel = FoodViewModel()
+        viewModel = FoodViewModel(FakeSettingsRepository())
     }
 
     @After
@@ -39,9 +40,10 @@ class FoodViewModelTest {
     }
 
     @Test
-    fun updateAppSettings_updatesValue() {
+    fun updateAppSettings_propagatesThroughRepoToStateFlow() = kotlinx.coroutines.test.runTest {
         val settings = AppSettings(notificationsEnabled = false, language = AppLanguage.ENGLISH)
         viewModel.updateAppSettings(settings)
+        // UnconfinedTestDispatcher runs the coroutine inline; assert directly.
         assertEquals(settings, viewModel.appSettings.value)
     }
 

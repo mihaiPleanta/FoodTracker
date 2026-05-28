@@ -47,7 +47,9 @@ data class WeightCheckIn(
     val weightKg: Float
 )
 
-class FoodViewModel : ViewModel() {
+class FoodViewModel(
+    private val settingsRepository: com.example.foodtracker.data.SettingsRepository
+) : ViewModel() {
 
     // ── Search state ──────────────────────────────────────────────────────────
     sealed class SearchUiState {
@@ -140,9 +142,18 @@ class FoodViewModel : ViewModel() {
     fun updateUserProfile(profile: UserProfile) { _userProfile.value = profile }
 
     // ── App settings ──────────────────────────────────────────────────────────────
-    private val _appSettings = MutableStateFlow(AppSettings())
-    val appSettings: StateFlow<AppSettings> = _appSettings.asStateFlow()
-    fun updateAppSettings(settings: AppSettings) { _appSettings.value = settings }
+    val appSettings: StateFlow<AppSettings> = settingsRepository.settings
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = AppSettings()
+        )
+
+    fun updateAppSettings(settings: AppSettings) {
+        viewModelScope.launch {
+            settingsRepository.update(settings)
+        }
+    }
 
     // ── Nutrition goals (calorie + macros derivate din profil) ────────────────────
     private val _nutritionGoals = MutableStateFlow<NutritionGoals?>(null)

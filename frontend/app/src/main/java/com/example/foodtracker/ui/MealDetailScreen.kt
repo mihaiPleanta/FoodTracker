@@ -48,7 +48,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.foodtracker.model.FoodItem
 import com.example.foodtracker.model.LoggedFood
@@ -66,7 +65,7 @@ fun MealDetailScreen(
     mealIcon: String,
     accentColor: Color,
     navController: NavController,
-    viewModel: FoodViewModel = viewModel()
+    viewModel: FoodViewModel
 ) {
     val loggedFoods by viewModel.getFoodsFlow(mealName).collectAsState()
     val searchState by viewModel.searchState.collectAsState()

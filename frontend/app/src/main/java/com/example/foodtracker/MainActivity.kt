@@ -20,8 +20,11 @@ import androidx.navigation.compose.*
 import com.example.foodtracker.ui.*
 import com.example.foodtracker.ui.theme.FoodTrackerTheme
 import com.example.foodtracker.ui.theme.GlassColors
+import com.example.foodtracker.data.DataStoreSettingsRepository
+import com.example.foodtracker.data.settingsDataStore
 import com.example.foodtracker.viewmodel.AuthViewModel
 import com.example.foodtracker.viewmodel.FoodViewModel
+import com.example.foodtracker.viewmodel.FoodViewModelFactory
 import java.net.URLDecoder
 import java.net.URLEncoder
 
@@ -32,7 +35,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             FoodTrackerTheme {
                 val navController = rememberNavController()
-                val viewModel: FoodViewModel = viewModel()
+                val foodViewModelFactory = remember {
+                    FoodViewModelFactory(
+                        DataStoreSettingsRepository(applicationContext.settingsDataStore)
+                    )
+                }
+                val viewModel: FoodViewModel = viewModel(factory = foodViewModelFactory)
                 val authViewModel: AuthViewModel = viewModel()
                 val backStack by navController.currentBackStackEntryAsState()
                 val currentRoute = backStack?.destination?.route
