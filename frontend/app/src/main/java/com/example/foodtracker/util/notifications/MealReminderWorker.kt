@@ -1,5 +1,6 @@
 package com.example.foodtracker.util.notifications
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -19,6 +20,7 @@ class MealReminderWorker(
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
 
+    @SuppressLint("MissingPermission")
     override suspend fun doWork(): Result {
         val mealName = inputData.getString(KEY_MEAL) ?: return Result.success()
         val meal = runCatching {
