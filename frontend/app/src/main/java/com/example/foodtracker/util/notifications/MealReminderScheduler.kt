@@ -8,6 +8,7 @@ import androidx.work.workDataOf
 import java.time.Duration
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.util.concurrent.TimeUnit
 
 object MealReminderScheduler {
 
@@ -34,8 +35,10 @@ object MealReminderScheduler {
         val now = LocalDateTime.now()
         Meal.values().forEach { meal ->
             val delayMillis = nextOccurrenceMillis(meal.targetHour, now)
-            val request = PeriodicWorkRequestBuilder<MealReminderWorker>(Duration.ofDays(1))
-                .setInitialDelay(Duration.ofMillis(delayMillis))
+            // Folosim overload-urile (long, TimeUnit) — variantele cu java.time.Duration
+            // din WorkManager cer API 26+ și nu sunt acoperite de desugaring.
+            val request = PeriodicWorkRequestBuilder<MealReminderWorker>(1, TimeUnit.DAYS)
+                .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
                 .setInputData(workDataOf(MealReminderWorker.KEY_MEAL to meal.name))
                 .addTag(TAG)
                 .build()

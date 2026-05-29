@@ -30,6 +30,8 @@ android {
     }
 
     compileOptions {
+        // java.time pe minSdk 24 cere core library desugaring (API 26+ altfel).
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
@@ -95,6 +97,9 @@ dependencies {
 
     // WorkManager pentru remindere mese (zilnic, 24h period)
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+
+    // Desugaring pentru java.time (LocalDate/Duration) pe minSdk 24
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 
     // Barcode scanning via Google Play Services (no camera permission needed)
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
