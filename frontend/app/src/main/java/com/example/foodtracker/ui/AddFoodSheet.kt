@@ -29,6 +29,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.stringResource
+import com.example.foodtracker.R
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
@@ -156,7 +158,7 @@ private fun AddFoodSheetGramsField(
     }
     Column {
         Text(
-            text = "CANTITATE",
+            text = stringResource(R.string.add_food_quantity),
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
             color = GlassColors.textSecondary,

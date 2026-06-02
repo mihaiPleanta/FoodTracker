@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -49,6 +50,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.foodtracker.R
 import com.example.foodtracker.model.FoodItem
 import com.example.foodtracker.model.LoggedFood
 import com.example.foodtracker.ui.theme.GlassColors
@@ -181,7 +183,7 @@ fun MealDetailScreen(
             AddFoodSheet(
                 target = food,
                 accentColor = accentColor,
-                confirmLabel = "Adaugă în $mealName",
+                confirmLabel = stringResource(R.string.meal_detail_add_to, mealName),
                 onDismiss = { sheetTarget = null },
                 onConfirm = { confirmedFood, grams ->
                     val newLogged = LoggedFood(confirmedFood, grams)
@@ -190,8 +192,8 @@ fun MealDetailScreen(
                     val scaled = scaleNutrition(confirmedFood, grams)
                     coroutineScope.launch {
                         val result = snackbarHostState.showSnackbar(
-                            message = "Adăugat: ${confirmedFood.name} ${grams}g · ${scaled.kcal} kcal",
-                            actionLabel = "Anulează",
+                            message = context.getString(R.string.meal_detail_added, confirmedFood.name, grams, scaled.kcal),
+                            actionLabel = context.getString(R.string.action_cancel),
                             duration = SnackbarDuration.Short,
                         )
                         if (result == SnackbarResult.ActionPerformed) {
@@ -231,7 +233,7 @@ fun MealDetailHeader(
         ) {
             Icon(
                 imageVector = Icons.Rounded.ArrowBackIosNew,
-                contentDescription = "Back",
+                contentDescription = stringResource(R.string.action_back),
                 tint = GlassColors.textSecondary,
                 modifier = Modifier.size(16.dp)
             )
@@ -261,7 +263,7 @@ fun MealDetailHeader(
                 color = GlassColors.textPrimary
             )
             Text(
-                text = "Tap + to add food",
+                text = stringResource(R.string.home_tap_to_add),
                 fontSize = 12.sp,
                 color = GlassColors.textTertiary
             )
@@ -322,7 +324,7 @@ fun SearchBar(
             decorationBox = { inner ->
                 if (query.isEmpty()) {
                     Text(
-                        "Search food…",
+                        stringResource(R.string.meal_detail_search_hint),
                         color    = GlassColors.textTertiary,
                         fontSize = 15.sp
                     )
@@ -334,7 +336,7 @@ fun SearchBar(
         if (query.isNotEmpty()) {
             Icon(
                 imageVector = Icons.Default.Close,
-                contentDescription = "Clear",
+                contentDescription = stringResource(R.string.meal_detail_clear),
                 tint = GlassColors.textTertiary,
                 modifier = Modifier
                     .size(18.dp)
@@ -359,7 +361,7 @@ fun BarcodeScanButton(accentColor: Color, onClick: () -> Unit) {
     ) {
         Icon(
             imageVector = Icons.Default.QrCodeScanner,
-            contentDescription = "Scanează barcode",
+            contentDescription = stringResource(R.string.meal_detail_scan),
             tint = accentColor,
             modifier = Modifier.size(22.dp),
         )
@@ -380,14 +382,14 @@ fun LoggedFoodsList(
                 Text("🍽", fontSize = 48.sp)
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "No food logged yet",
+                    stringResource(R.string.meal_detail_no_food),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = GlassColors.textSecondary
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Search above to add food",
+                    stringResource(R.string.meal_detail_search_above),
                     fontSize = 13.sp,
                     color = GlassColors.textTertiary
                 )
@@ -492,7 +494,7 @@ fun LoggedFoodRow(
         ) {
             Icon(
                 imageVector = Icons.Default.Close,
-                contentDescription = "Remove",
+                contentDescription = stringResource(R.string.meal_detail_remove),
                 tint = Color(0xFFFF6B6B),
                 modifier = Modifier.size(14.dp)
             )
@@ -530,7 +532,7 @@ fun SearchResultsView(
         FoodViewModel.SearchUiState.Idle -> {
             Box(Modifier.fillMaxSize(), Alignment.Center) {
                 Text(
-                    "Tastează cel puțin 2 caractere",
+                    stringResource(R.string.meal_detail_type_2_chars),
                     color = GlassColors.textTertiary,
                     fontSize = 14.sp,
                 )
@@ -563,7 +565,7 @@ fun SearchResultsView(
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                     ) {
                         Text(
-                            "Reîncearcă",
+                            stringResource(R.string.action_retry),
                             color = accentColor,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -641,7 +643,7 @@ fun SearchResultRow(food: FoodItem, onAdd: () -> Unit) {
         ) {
             Icon(
                 imageVector = Icons.Default.Add,
-                contentDescription = "Adaugă",
+                contentDescription = stringResource(R.string.action_add),
                 tint = Color.Black,
                 modifier = Modifier.size(18.dp),
             )
@@ -727,7 +729,7 @@ fun MacroSummaryFooter(
             Alignment.CenterVertically
         ) {
             Text(
-                "Total",
+                stringResource(R.string.meal_detail_total),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = GlassColors.textSecondary
@@ -757,7 +759,7 @@ fun MacroSummaryFooter(
             Arrangement.spacedBy(10.dp)
         ) {
             FooterMacroBar(
-                label   = "Protein",
+                label   = stringResource(R.string.macro_protein),
                 value   = totalProtein,
                 goal    = 150f,
                 color   = GlassColors.proteinColor,
@@ -765,7 +767,7 @@ fun MacroSummaryFooter(
                 modifier = Modifier.weight(1f)
             )
             FooterMacroBar(
-                label   = "Carbs",
+                label   = stringResource(R.string.macro_carbs),
                 value   = totalCarbs,
                 goal    = 250f,
                 color   = GlassColors.carbsColor,
@@ -773,7 +775,7 @@ fun MacroSummaryFooter(
                 modifier = Modifier.weight(1f)
             )
             FooterMacroBar(
-                label   = "Fat",
+                label   = stringResource(R.string.macro_fat),
                 value   = totalFat,
                 goal    = 65f,
                 color   = GlassColors.fatColor,
@@ -808,7 +810,7 @@ fun MacroSummaryFooter(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                "Save Meal",
+                stringResource(R.string.meal_detail_save_meal),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black
