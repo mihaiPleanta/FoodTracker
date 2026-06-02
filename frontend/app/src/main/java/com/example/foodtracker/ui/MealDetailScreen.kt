@@ -555,7 +555,12 @@ fun SearchResultsView(
         is FoodViewModel.SearchUiState.Error -> {
             Box(Modifier.fillMaxSize(), Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(state.message, color = Color(0xFFFF6B6B), fontSize = 14.sp)
+                    Text(
+                        if (state.arg != null) stringResource(state.messageRes, state.arg)
+                        else stringResource(state.messageRes),
+                        color = Color(0xFFFF6B6B),
+                        fontSize = 14.sp,
+                    )
                     Spacer(Modifier.height(10.dp))
                     Box(
                         Modifier

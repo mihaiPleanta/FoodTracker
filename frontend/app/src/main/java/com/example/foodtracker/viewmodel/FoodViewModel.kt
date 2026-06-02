@@ -1,7 +1,9 @@
 package com.example.foodtracker.viewmodel
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.foodtracker.R
 import com.example.foodtracker.api.FoodApi
 import com.example.foodtracker.api.LogsApi
 import com.example.foodtracker.api.ProfileApi
@@ -61,7 +63,7 @@ class FoodViewModel(
         data object Loading : SearchUiState()
         data class Results(val items: List<FoodItem>) : SearchUiState()
         data object Empty : SearchUiState()
-        data class Error(val message: String) : SearchUiState()
+        data class Error(@StringRes val messageRes: Int, val arg: Int? = null) : SearchUiState()
     }
 
     private val foodApi: FoodApi = RetrofitInstance.retrofit.create(FoodApi::class.java)
@@ -89,12 +91,11 @@ class FoodViewModel(
                             if (items.isEmpty()) SearchUiState.Empty
                             else SearchUiState.Results(items)
                         } catch (e: java.io.IOException) {
-                            SearchUiState.Error("Verifică conexiunea la internet")
+                            SearchUiState.Error(R.string.error_no_internet)
                         } catch (e: retrofit2.HttpException) {
-                            if (e.code() == 503) SearchUiState.Error("Baza de date e ocupată, încearcă din nou")
-                            else SearchUiState.Error("Eroare neașteptată (${e.code()})")
+                            SearchUiState.Error(R.string.error_unexpected_code, e.code())
                         } catch (e: Throwable) {
-                            SearchUiState.Error("Eroare neașteptată")
+                            SearchUiState.Error(R.string.error_generic)
                         }
                     }
                 }
@@ -123,11 +124,11 @@ class FoodViewModel(
                 SearchUiState.Results(listOf(dto.toDomain()))
             } catch (e: retrofit2.HttpException) {
                 if (e.code() == 404) SearchUiState.Empty
-                else SearchUiState.Error("Eroare la căutarea produsului (${e.code()})")
+                else SearchUiState.Error(R.string.error_unexpected_code, e.code())
             } catch (e: java.io.IOException) {
-                SearchUiState.Error("Verifică conexiunea la internet")
+                SearchUiState.Error(R.string.error_no_internet)
             } catch (e: Throwable) {
-                SearchUiState.Error("Eroare neașteptată")
+                SearchUiState.Error(R.string.error_generic)
             }
         }
     }
