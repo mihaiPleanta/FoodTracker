@@ -2,4 +2,212 @@
     <string name="app_name">FoodTracker</string>
     <!-- Replace with your Web Client ID from Firebase Console → Authentication → Sign-in method → Google -->
     <string name="default_web_client_id">681739565121-64l09djqa9tkf1o89gnsl96t7dsnb6h2.apps.googleusercontent.com</string>
+
+    <!-- Common -->
+    <string name="meal_breakfast">Mic dejun</string>
+    <string name="meal_lunch">Prânz</string>
+    <string name="meal_dinner">Cină</string>
+    <string name="meal_snacks">Gustare</string>
+    <string name="action_back">Înapoi</string>
+    <string name="action_cancel">Anulează</string>
+    <string name="action_save">Salvează</string>
+    <string name="action_continue">Continuă</string>
+    <string name="action_retry">Reîncearcă</string>
+    <string name="action_delete">Șterge</string>
+    <string name="action_add">Adaugă</string>
+    <string name="action_logout">Deconectare</string>
+    <string name="unit_years">ani</string>
+    <string name="macro_protein">Proteine</string>
+    <string name="macro_carbs">Carbohidrați</string>
+    <string name="macro_fat">Grăsimi</string>
+    <string name="macro_protein_short">Proteine</string>
+
+    <!-- Splash -->
+    <string name="app_tagline">Mănâncă inteligent</string>
+
+    <!-- Login -->
+    <string name="login_subtitle">Conectează-te pentru a continua</string>
+    <string name="login_email">Email</string>
+    <string name="login_password">Parolă</string>
+    <string name="login_button">Conectează-te</string>
+    <string name="login_google">Continuă cu Google</string>
+    <string name="login_no_account">Nu ai cont? </string>
+    <string name="login_register_link">Înregistrează-te</string>
+    <string name="field_show">Arată</string>
+    <string name="field_hide">Ascunde</string>
+
+    <!-- Register -->
+    <string name="register_title">Cont nou</string>
+    <string name="register_subtitle">Completează datele de mai jos</string>
+    <string name="register_confirm_password">Confirmă parola</string>
+    <string name="register_button">Creează cont</string>
+    <string name="register_password_too_short">Parola trebuie să aibă minim 6 caractere</string>
+    <string name="register_passwords_mismatch">Parolele nu coincid</string>
+    <string name="register_have_account">Ai deja cont? </string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_welcome">Bun venit! 👋</string>
+    <string name="onboarding_name_q">Cum te numești?</string>
+    <string name="onboarding_name_hint">Numele tău</string>
+    <string name="onboarding_details_title">Câteva detalii</string>
+    <string name="onboarding_details_subtitle">Despre tine</string>
+    <string name="onboarding_age">Vârstă</string>
+    <string name="onboarding_height">Înălțime (cm)</string>
+    <string name="onboarding_current_weight">Greutate curentă (kg)</string>
+    <string name="onboarding_goal_title">Obiectivul tău 🎯</string>
+    <string name="onboarding_goal_subtitle">Vom calcula necesarul caloric</string>
+    <string name="onboarding_target_weight">Greutate țintă (kg)</string>
+    <string name="onboarding_activity">Nivel activitate</string>
+    <string name="onboarding_calculate">Calculează obiectivul caloric</string>
+    <string name="onboarding_calculated">Obiectiv caloric calculat</string>
+    <string name="onboarding_start">Hai să începem</string>
+
+    <!-- Gender -->
+    <string name="gender_male">Masculin</string>
+    <string name="gender_female">Feminin</string>
+    <string name="gender_other">Altul</string>
+
+    <!-- Activity levels -->
+    <string name="activity_sedentary">Sedentar</string>
+    <string name="activity_light">Ușor</string>
+    <string name="activity_moderate">Moderat</string>
+    <string name="activity_active">Activ</string>
+    <string name="activity_very_active">F. activ</string>
+
+    <!-- Home -->
+    <string name="home_today">Astăzi</string>
+    <string name="home_see_all">Vezi tot</string>
+    <string name="home_recommended">Recomandat: %1$s kcal</string>
+    <string name="home_tap_to_add">Apasă + pentru a adăuga</string>
+    <string name="home_hydration">Hidratare</string>
+    <string name="home_weight">Greutate</string>
+    <string name="home_no_checkin">Niciun check-in</string>
+    <string name="home_trend_unavailable">Trend 7z indisponibil</string>
+    <string name="home_last_7_days">Ultimele 7 zile</string>
+    <string name="home_protein">Proteine</string>
+    <string name="home_carbs">Carbohidrați</string>
+    <string name="home_fat">Grăsimi</string>
+    <string name="goal_deficit">Deficit 500 kcal/zi</string>
+    <string name="goal_surplus">Surplus 300 kcal/zi</string>
+    <string name="goal_maintenance">Menținere</string>
+    <string name="weight_checkin">Check-in greutate</string>
+    <string name="weight_trend_up">Trend 7z: +%1$s kg</string>
+    <string name="weight_trend_down">Trend 7z: %1$s kg</string>
+    <string name="weight_trend_stable">Trend 7z: stabil</string>
+
+    <!-- Stats -->
+    <string name="stats_no_checkins">Nu ai niciun check-in de greutate.</string>
+    <string name="stats_add_first_checkin">Adaugă primul check-in</string>
+    <string name="stats_calories">Calorii</string>
+    <string name="stats_hydration">Hidratare</string>
+    <string name="stats_protein">Proteine</string>
+    <string name="stats_today">azi</string>
+    <string name="stats_macro_progress">Progres macro</string>
+    <string name="stats_carbs">Carbohidrați</string>
+    <string name="stats_fat">Grăsimi</string>
+    <string name="stats_meal_distribution">Distribuție pe mese</string>
+    <string name="stats_no_calories">Nicio calorie logată pentru această zi</string>
+    <string name="stats_weight_trend">Evoluție greutate</string>
+    <string name="stats_no_checkins_available">Niciun check-in disponibil</string>
+    <string name="stats_one_checkin">Un singur check-in disponibil</string>
+    <string name="stats_need_two_checkins">Adaugă cel puțin 2 check-in-uri de greutate pentru a afișa linia de trend.</string>
+
+    <!-- Meals (recipes) -->
+    <string name="meals_title">Rețete AI</string>
+    <string name="meals_subtitle">Generate din produsele tale frecvente</string>
+    <string name="meals_generate_button">Generează rețetă</string>
+    <string name="meals_cooking">Se gătește o rețetă…</string>
+    <string name="meals_added_to_journal">Adăugat în jurnal</string>
+    <string name="meals_my_recipes">Rețetele mele</string>
+    <string name="meals_none_saved">Nicio rețetă salvată pentru această masă.</string>
+    <string name="meals_ingredients">Ingrediente</string>
+    <string name="meals_steps">Preparare</string>
+    <string name="meals_add_to_journal">Adaugă în jurnal</string>
+    <string name="meals_close">Închide</string>
+    <string name="meals_regenerate">Regenerează</string>
+
+    <!-- Meal detail -->
+    <string name="meal_detail_add_to">Adaugă în %1$s</string>
+    <string name="meal_detail_added">Adăugat: %1$s %2$dg · %3$d kcal</string>
+    <string name="meal_detail_search_hint">Caută aliment…</string>
+    <string name="meal_detail_clear">Șterge</string>
+    <string name="meal_detail_scan">Scanează barcode</string>
+    <string name="meal_detail_no_food">Niciun aliment logat încă</string>
+    <string name="meal_detail_search_above">Caută mai sus pentru a adăuga aliment</string>
+    <string name="meal_detail_remove">Elimină</string>
+    <string name="meal_detail_type_2_chars">Tastează cel puțin 2 caractere</string>
+    <string name="meal_detail_no_results">Niciun produs găsit</string>
+    <string name="meal_detail_total">Total</string>
+    <string name="meal_detail_save_meal">Salvează masa</string>
+
+    <!-- Add food sheet -->
+    <string name="add_food_quantity">CANTITATE</string>
+
+    <!-- Add meal screen -->
+    <string name="add_meal_title">Adaugă aliment</string>
+    <string name="add_meal_choose">Alege o masă în care să loghezi</string>
+    <string name="add_meal_select">Selectează masa</string>
+    <string name="add_meal_no_food">Niciun aliment logat încă</string>
+    <string name="add_meal_hide_items">Ascunde produsele ▲</string>
+    <string name="add_meal_show_items">Arată %1$d produse ▼</string>
+
+    <!-- Profile -->
+    <string name="profile_personal_info">INFORMAȚII PERSONALE</string>
+    <string name="profile_name">Nume</string>
+    <string name="profile_age">Vârstă</string>
+    <string name="profile_body_goals">OBIECTIVE CORP</string>
+    <string name="profile_current_weight">Greutate curentă</string>
+    <string name="profile_target_weight">Greutate țintă</string>
+    <string name="profile_title">Profil</string>
+    <string name="profile_gender">Gen</string>
+    <string name="profile_activity">Nivel activitate</string>
+    <string name="profile_saved">Salvat</string>
+    <string name="profile_save_button">Salvează profilul</string>
+    <string name="profile_height">Înălțime</string>
+
+    <!-- Settings -->
+    <string name="settings_enable_notifications_system">Activează notificările din setările sistemului</string>
+    <string name="settings_title">Setări</string>
+    <string name="settings_notifications">NOTIFICĂRI</string>
+    <string name="settings_meal_reminders">Remindere mese</string>
+    <string name="settings_appearance">ASPECT</string>
+    <string name="settings_theme_dark">Temă întunecată</string>
+    <string name="settings_language">LIMBĂ</string>
+    <string name="settings_account">CONT</string>
+    <string name="settings_delete_account">Șterge cont</string>
+    <string name="settings_about">DESPRE</string>
+    <string name="settings_off_data">Date despre produse</string>
+    <string name="settings_off_source">Open Food Facts (ODbL)</string>
+    <string name="settings_usda_data">Date nutriționale alimente generice</string>
+    <string name="settings_usda_source">USDA FoodData Central (domeniu public)</string>
+    <string name="settings_logout_confirm">Ești sigur că vrei să te deconectezi?</string>
+    <string name="settings_delete_confirm">Această acțiune este ireversibilă. Ești sigur?</string>
+
+    <!-- Scaffold -->
+    <string name="scaffold_add_food">Adaugă aliment</string>
+    <string name="scaffold_select_meal">Alege o masă în care să loghezi</string>
+
+    <!-- Weight check-in sheet -->
+    <string name="weight_sheet_title">Check-in greutate</string>
+    <string name="weight_sheet_range">Introdu o greutate între 30 și 300 kg</string>
+
+    <!-- Placeholder -->
+    <string name="coming_soon">În curând</string>
+
+    <!-- Notifications -->
+    <string name="notif_meal_time">Timpul pentru %1$s</string>
+    <string name="notif_meal_body">Loghează ce ai mâncat %1$s</string>
+
+    <!-- Errors -->
+    <string name="error_no_internet">Verifică conexiunea la internet</string>
+    <string name="error_recipe_insufficient">Loghează mai multe alimente ca să generăm rețete</string>
+    <string name="error_ai_unavailable">Serviciul AI nu e disponibil, încearcă din nou</string>
+    <string name="error_ai_invalid">Răspuns AI invalid, încearcă din nou</string>
+    <string name="error_unexpected_code">Eroare neașteptată (%1$d)</string>
+    <string name="error_email_in_use">Acest email este deja folosit</string>
+    <string name="error_bad_credentials">Email sau parolă incorectă</string>
+    <string name="error_invalid_email">Email invalid</string>
+    <string name="error_weak_password">Parola trebuie să aibă minim 6 caractere</string>
+    <string name="error_generic">A apărut o eroare. Încearcă din nou.</string>
+    <string name="error_profile_save">Nu s-a putut salva profilul</string>
 </resources>
