@@ -113,8 +113,11 @@ async def test_generate_recipe_happy_path():
 
     assert recipe.title == "Omletă cu brânză"
     assert recipe.kcal_per_serving == 320
+    # The prompt anchors on a single one of the user's frequent foods, so exactly
+    # one of the logged names appears as the "ingredient-vedetă".
     user_msg = fake.calls[0][-1]["content"]
-    assert "Pui" in user_msg and "Orez" in user_msg and "Mar" in user_msg
+    assert "Ingredient-vedetă" in user_msg
+    assert sum(name in user_msg for name in ("Pui", "Orez", "Mar")) == 1
 
 
 async def test_generate_recipe_insufficient_data_raises():
