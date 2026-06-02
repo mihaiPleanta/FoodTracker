@@ -31,6 +31,7 @@ import com.example.foodtracker.data.settingsDataStore
 import com.example.foodtracker.util.notifications.MealReminderScheduler
 import com.example.foodtracker.util.notifications.MealReminderWorker
 import com.example.foodtracker.util.notifications.NotificationChannels
+import com.example.foodtracker.util.AppLocale
 import com.example.foodtracker.viewmodel.AuthViewModel
 import com.example.foodtracker.viewmodel.FoodViewModel
 import com.example.foodtracker.viewmodel.FoodViewModelFactory
@@ -72,6 +73,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
             FoodTrackerTheme(isDark = appSettings.isDarkTheme) {
+                AppLocale(language = appSettings.language) {
                 val navController = rememberNavController()
                 val backStack by navController.currentBackStackEntryAsState()
                 val currentRoute = backStack?.destination?.route
@@ -245,6 +247,7 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                 }
+                } // end AppLocale
             }
         }
     }
