@@ -6,12 +6,17 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -19,6 +24,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.foodtracker.model.RecipeDto
 import com.example.foodtracker.model.SavedRecipeDto
@@ -41,6 +48,8 @@ fun MealsScreen(viewModel: RecipeViewModel = viewModel()) {
     val saved by viewModel.savedRecipes.collectAsState()
     val selectedMeal by viewModel.selectedMealType.collectAsState()
     val accent = mealChips.first { it.type == selectedMeal }.accent
+    val savedForMeal = saved.filter { it.mealType == selectedMeal }
+    var openedRecipe by remember { mutableStateOf<SavedRecipeDto?>(null) }
 
     LazyColumn(
         modifier = Modifier
@@ -160,9 +169,9 @@ fun MealsScreen(viewModel: RecipeViewModel = viewModel()) {
                 color = GlassColors.textPrimary,
             )
             Spacer(Modifier.height(12.dp))
-            if (saved.isEmpty()) {
+            if (savedForMeal.isEmpty()) {
                 Text(
-                    "Nicio rețetă salvată încă.",
+                    "Nicio rețetă salvată pentru această masă.",
                     color = GlassColors.textTertiary,
                     fontSize = 13.sp,
                 )
@@ -170,9 +179,82 @@ fun MealsScreen(viewModel: RecipeViewModel = viewModel()) {
             }
         }
 
-        items(saved, key = { it.id }) { item ->
-            SavedRecipeCard(item = item, onDelete = { viewModel.delete(item.id) })
+        items(savedForMeal, key = { it.id }) { item ->
+            SavedRecipeCard(
+                item = item,
+                onClick = { openedRecipe = item },
+                onDelete = { viewModel.delete(item.id) },
+            )
             Spacer(Modifier.height(10.dp))
+        }
+    }
+
+    openedRecipe?.let { opened ->
+        val openedAccent = mealChips.first { it.type == opened.mealType }.accent
+        SavedRecipeDialog(
+            item = opened,
+            accent = openedAccent,
+            onDismiss = { openedRecipe = null },
+        )
+    }
+}
+
+@Composable
+private fun SavedRecipeDialog(
+    item: SavedRecipeDto,
+    accent: Color,
+    onDismiss: () -> Unit,
+) {
+    val recipe = item.recipe
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(GlassColors.cardBackground)
+                .border(1.dp, GlassColors.cardBorder, RoundedCornerShape(20.dp))
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
+        ) {
+            Text(recipe.title, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, color = GlassColors.textPrimary)
+            Spacer(Modifier.height(4.dp))
+            Text(recipe.description, fontSize = 13.sp, color = GlassColors.textSecondary)
+            Spacer(Modifier.height(16.dp))
+
+            Text("Ingrediente", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = accent)
+            Spacer(Modifier.height(6.dp))
+            recipe.ingredients.forEach { ing ->
+                Text("• ${ing.name} — ${ing.quantity}", fontSize = 13.sp, color = GlassColors.textPrimary)
+                Spacer(Modifier.height(2.dp))
+            }
+            Spacer(Modifier.height(16.dp))
+
+            Text("Preparare", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = accent)
+            Spacer(Modifier.height(6.dp))
+            recipe.steps.forEachIndexed { i, step ->
+                Text("${i + 1}. $step", fontSize = 13.sp, color = GlassColors.textPrimary)
+                Spacer(Modifier.height(6.dp))
+            }
+            Spacer(Modifier.height(10.dp))
+
+            Text(
+                "${recipe.kcalPerServing} kcal · P ${recipe.proteinG}g · C ${recipe.carbsG}g · G ${recipe.fatG}g / porție",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = GlassColors.textSecondary,
+            )
+            Spacer(Modifier.height(18.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(accent)
+                    .clickable { onDismiss() }
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) { Text("Închide", fontWeight = FontWeight.Bold, color = Color.Black, fontSize = 14.sp) }
         }
     }
 }
@@ -244,13 +326,14 @@ private fun RecipeCard(
 }
 
 @Composable
-private fun SavedRecipeCard(item: SavedRecipeDto, onDelete: () -> Unit) {
+private fun SavedRecipeCard(item: SavedRecipeDto, onClick: () -> Unit, onDelete: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(GlassColors.cardBackground)
             .border(1.dp, GlassColors.cardBorder, RoundedCornerShape(16.dp))
+            .clickable { onClick() }
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

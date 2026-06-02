@@ -39,7 +39,11 @@ class RecipeViewModel : ViewModel() {
     }
 
     fun setMealType(mealType: String) {
+        if (mealType == _selectedMealType.value) return
         _selectedMealType.value = mealType
+        // A generated recipe belongs to the meal it was generated for; switching
+        // meals should clear it so the card doesn't linger across meal types.
+        _recipeState.value = RecipeUiState.Idle
     }
 
     fun generate() {
