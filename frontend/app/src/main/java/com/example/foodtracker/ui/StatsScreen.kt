@@ -116,7 +116,7 @@ fun StatsScreen(
             Spacer(Modifier.height(24.dp))
 
             Text(
-                text = "Stats",
+                text = stringResource(R.string.stats_title),
                 fontSize = 30.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = GlassColors.textPrimary
@@ -428,9 +428,9 @@ private fun WeightTrendCard(weightHistory: List<WeightCheckIn>) {
             text = when {
                 lastWeight == null -> stringResource(R.string.stats_no_checkins_available)
                 delta == null -> stringResource(R.string.stats_one_checkin)
-                delta > 0f -> "7d change: +${"%.1f".format(Locale.ENGLISH, delta)} kg"
-                delta < 0f -> "7d change: ${"%.1f".format(Locale.ENGLISH, delta)} kg"
-                else -> "7d change: stable"
+                delta > 0f -> stringResource(R.string.stats_change_up, "%.1f".format(Locale.ENGLISH, delta))
+                delta < 0f -> stringResource(R.string.stats_change_down, "%.1f".format(Locale.ENGLISH, delta))
+                else -> stringResource(R.string.stats_change_stable)
             },
             fontSize = 12.sp,
             color = if ((delta ?: 0f) <= 0f) GlassColors.accentGreen else GlassColors.accentOrange,

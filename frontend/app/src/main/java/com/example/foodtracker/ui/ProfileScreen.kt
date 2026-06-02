@@ -49,6 +49,8 @@ import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.ui.theme.glassCard
 import com.example.foodtracker.viewmodel.AuthViewModel
 import com.example.foodtracker.viewmodel.FoodViewModel
+import androidx.compose.ui.res.stringResource
+import com.example.foodtracker.R
 import com.example.foodtracker.viewmodel.ProfileSaveState
 
 @Composable
@@ -112,7 +114,7 @@ fun ProfileScreen(viewModel: FoodViewModel, authViewModel: AuthViewModel) {
                 Spacer(Modifier.height(28.dp))
 
                 ProfileSectionLabel(
-                    "INFORMAȚII PERSONALE",
+                    stringResource(R.string.profile_personal_info),
                     Modifier.padding(horizontal = 20.dp)
                 )
                 Spacer(Modifier.height(8.dp))
@@ -122,12 +124,12 @@ fun ProfileScreen(viewModel: FoodViewModel, authViewModel: AuthViewModel) {
                         .fillMaxWidth()
                         .glassCard(16)
                 ) {
-                    ProfileTextField("Nume", name) { name = it }
+                    ProfileTextField(stringResource(R.string.profile_name), name) { name = it }
                     ProfileRowDivider()
                     ProfileTextField(
-                        label = "Vârstă",
+                        label = stringResource(R.string.profile_age),
                         value = age,
-                        suffix = "ani",
+                        suffix = stringResource(R.string.unit_years),
                         keyboard = KeyboardType.Number,
                         onValueChange = { age = it }
                     )
@@ -135,7 +137,7 @@ fun ProfileScreen(viewModel: FoodViewModel, authViewModel: AuthViewModel) {
                     ProfileGenderRow(selected = gender, onSelect = { gender = it })
                     ProfileRowDivider()
                     ProfileTextField(
-                        label = "Înălțime",
+                        label = stringResource(R.string.profile_height),
                         value = heightCm,
                         suffix = "cm",
                         keyboard = KeyboardType.Number,
@@ -146,7 +148,7 @@ fun ProfileScreen(viewModel: FoodViewModel, authViewModel: AuthViewModel) {
                 Spacer(Modifier.height(14.dp))
 
                 ProfileSectionLabel(
-                    "OBIECTIVE CORP",
+                    stringResource(R.string.profile_body_goals),
                     Modifier.padding(horizontal = 20.dp)
                 )
                 Spacer(Modifier.height(8.dp))
@@ -157,7 +159,7 @@ fun ProfileScreen(viewModel: FoodViewModel, authViewModel: AuthViewModel) {
                         .glassCard(16)
                 ) {
                     ProfileTextField(
-                        label = "Greutate curentă",
+                        label = stringResource(R.string.profile_current_weight),
                         value = currentWeight,
                         suffix = "kg",
                         keyboard = KeyboardType.Decimal,
@@ -165,7 +167,7 @@ fun ProfileScreen(viewModel: FoodViewModel, authViewModel: AuthViewModel) {
                     )
                     ProfileRowDivider()
                     ProfileTextField(
-                        label = "Greutate țintă",
+                        label = stringResource(R.string.profile_target_weight),
                         value = targetWeight,
                         suffix = "kg",
                         keyboard = KeyboardType.Decimal,
@@ -227,10 +229,12 @@ fun ProfileAvatarHeader(name: String, gender: Gender, age: String) {
         .ifBlank { "?" }
 
     val genderLabel = when (gender) {
-        Gender.MALE   -> "Masculin"
-        Gender.FEMALE -> "Feminin"
-        Gender.OTHER  -> "Altul"
+        Gender.MALE   -> stringResource(R.string.gender_male)
+        Gender.FEMALE -> stringResource(R.string.gender_female)
+        Gender.OTHER  -> stringResource(R.string.gender_other)
     }
+    val profileTitle = stringResource(R.string.profile_title)
+    val unitYears = stringResource(R.string.unit_years)
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -259,14 +263,14 @@ fun ProfileAvatarHeader(name: String, gender: Gender, age: String) {
         }
         Spacer(Modifier.height(14.dp))
         Text(
-            text = name.trim().ifBlank { "Profil" },
+            text = name.trim().ifBlank { profileTitle },
             fontSize = 22.sp,
             fontWeight = FontWeight.ExtraBold,
             color = GlassColors.textPrimary
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "${age.toIntOrNull() ?: "–"} ani · $genderLabel",
+            text = "${age.toIntOrNull() ?: "–"} $unitYears · $genderLabel",
             fontSize = 13.sp,
             color = GlassColors.textSecondary
         )
@@ -354,7 +358,7 @@ fun ProfileGenderRow(selected: Gender, onSelect: (Gender) -> Unit) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            "Gen",
+            stringResource(R.string.profile_gender),
             fontSize = 14.sp,
             color = GlassColors.textSecondary,
             modifier = Modifier.weight(1f)
@@ -365,7 +369,7 @@ fun ProfileGenderRow(selected: Gender, onSelect: (Gender) -> Unit) {
                 val label = when (g) {
                     Gender.MALE   -> "M"
                     Gender.FEMALE -> "F"
-                    Gender.OTHER  -> "Altul"
+                    Gender.OTHER  -> stringResource(R.string.gender_other)
                 }
                 Box(
                     modifier = Modifier
@@ -398,11 +402,11 @@ fun ProfileGenderRow(selected: Gender, onSelect: (Gender) -> Unit) {
 @Composable
 fun ProfileActivityRow(selected: ActivityLevel, onSelect: (ActivityLevel) -> Unit) {
     val labels = mapOf(
-        ActivityLevel.SEDENTARY   to "Sedentar",
-        ActivityLevel.LIGHT       to "Ușor",
-        ActivityLevel.MODERATE    to "Moderat",
-        ActivityLevel.ACTIVE      to "Activ",
-        ActivityLevel.VERY_ACTIVE to "F. activ"
+        ActivityLevel.SEDENTARY   to stringResource(R.string.activity_sedentary),
+        ActivityLevel.LIGHT       to stringResource(R.string.activity_light),
+        ActivityLevel.MODERATE    to stringResource(R.string.activity_moderate),
+        ActivityLevel.ACTIVE      to stringResource(R.string.activity_active),
+        ActivityLevel.VERY_ACTIVE to stringResource(R.string.activity_very_active)
     )
     Column(
         modifier = Modifier
@@ -410,7 +414,7 @@ fun ProfileActivityRow(selected: ActivityLevel, onSelect: (ActivityLevel) -> Uni
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Text(
-            "Nivel activitate",
+            stringResource(R.string.profile_activity),
             fontSize = 14.sp,
             color = GlassColors.textSecondary
         )
@@ -507,10 +511,10 @@ fun ProfileSaveButton(
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("Salvat", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                Text(stringResource(R.string.profile_saved), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Black)
             }
             else -> Text(
-                "Salvează profilul",
+                stringResource(R.string.profile_save_button),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black

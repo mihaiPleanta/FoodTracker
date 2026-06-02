@@ -14,6 +14,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.example.foodtracker.R
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,7 +43,7 @@ fun WeightCheckInSheet(
             modifier = Modifier.fillMaxWidth().padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("Check-in greutate")
+            Text(stringResource(R.string.weight_sheet_title))
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
@@ -51,14 +53,14 @@ fun WeightCheckInSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
             if (!isValid && text.isNotBlank()) {
-                Text("Introdu o greutate între 30 și 300 kg")
+                Text(stringResource(R.string.weight_sheet_range))
             }
             Button(
                 onClick = { parsed?.let { onSave(it) } },
                 enabled = isValid,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Salvează")
+                Text(stringResource(R.string.action_save))
             }
             Spacer(modifier = Modifier.height(8.dp))
         }

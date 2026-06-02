@@ -32,6 +32,8 @@ import androidx.navigation.NavController
 import com.example.foodtracker.model.AppLanguage
 import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.ui.theme.glassCard
+import androidx.compose.ui.res.stringResource
+import com.example.foodtracker.R
 import com.example.foodtracker.viewmodel.FoodViewModel
 import kotlinx.coroutines.launch
 
@@ -41,6 +43,7 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val enableNotifMsg = stringResource(R.string.settings_enable_notifications_system)
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -49,7 +52,7 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
             viewModel.updateAppSettings(settings.copy(notificationsEnabled = true))
         } else {
             scope.launch {
-                snackbarHostState.showSnackbar("Activează notificările din setările sistemului")
+                snackbarHostState.showSnackbar(enableNotifMsg)
             }
         }
     }
@@ -82,14 +85,14 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
                 ) {
                     Icon(
                         Icons.Rounded.ArrowBackIosNew,
-                        contentDescription = "Înapoi",
+                        contentDescription = stringResource(R.string.action_back),
                         tint = GlassColors.textSecondary,
                         modifier = Modifier.size(16.dp)
                     )
                 }
                 Spacer(Modifier.width(14.dp))
                 Text(
-                    "Setări",
+                    stringResource(R.string.settings_title),
                     fontSize = 22.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = GlassColors.textPrimary
@@ -99,7 +102,7 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
             Spacer(Modifier.height(4.dp))
 
             // ── Notificări ────────────────────────────────────────────────────
-            SettingsSectionTitle("NOTIFICĂRI")
+            SettingsSectionTitle(stringResource(R.string.settings_notifications))
             Spacer(Modifier.height(8.dp))
             Column(
                 Modifier
@@ -108,7 +111,7 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
                     .glassCard(16)
             ) {
                 SettingsToggleRow(
-                    label = "Remindere mese",
+                    label = stringResource(R.string.settings_meal_reminders),
                     checked = settings.notificationsEnabled,
                     onCheckedChange = { newValue ->
                         if (newValue &&
@@ -128,7 +131,7 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
             Spacer(Modifier.height(14.dp))
 
             // ── Aspect ────────────────────────────────────────────────────────
-            SettingsSectionTitle("ASPECT")
+            SettingsSectionTitle(stringResource(R.string.settings_appearance))
             Spacer(Modifier.height(8.dp))
             Column(
                 Modifier
@@ -137,7 +140,7 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
                     .glassCard(16)
             ) {
                 SettingsToggleRow(
-                    label = "Temă întunecată",
+                    label = stringResource(R.string.settings_theme_dark),
                     checked = settings.isDarkTheme,
                     onCheckedChange = {
                         viewModel.updateAppSettings(settings.copy(isDarkTheme = it))
@@ -148,7 +151,7 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
             Spacer(Modifier.height(14.dp))
 
             // ── Limbă ─────────────────────────────────────────────────────────
-            SettingsSectionTitle("LIMBĂ")
+            SettingsSectionTitle(stringResource(R.string.settings_language))
             Spacer(Modifier.height(8.dp))
             Column(
                 Modifier
@@ -195,7 +198,7 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
             Spacer(Modifier.height(14.dp))
 
             // ── Cont ──────────────────────────────────────────────────────────
-            SettingsSectionTitle("CONT")
+            SettingsSectionTitle(stringResource(R.string.settings_account))
             Spacer(Modifier.height(8.dp))
             Column(
                 Modifier
@@ -204,7 +207,7 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
                     .glassCard(16)
             ) {
                 SettingsActionRow(
-                    label = "Deconectare",
+                    label = stringResource(R.string.action_logout),
                     color = GlassColors.accentOrange,
                     onClick = { showLogoutDialog = true }
                 )
@@ -216,7 +219,7 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
                         .background(GlassColors.cardBorder)
                 )
                 SettingsActionRow(
-                    label = "Șterge cont",
+                    label = stringResource(R.string.settings_delete_account),
                     color = Color(0xFFFF4444),
                     onClick = { showDeleteDialog = true }
                 )
@@ -225,7 +228,7 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
             Spacer(Modifier.height(14.dp))
 
             // ── Despre ────────────────────────────────────────────────────────
-            SettingsSectionTitle("DESPRE")
+            SettingsSectionTitle(stringResource(R.string.settings_about))
             Spacer(Modifier.height(8.dp))
             val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
             Column(
@@ -237,13 +240,13 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
                     .padding(horizontal = 16.dp, vertical = 14.dp),
             ) {
                 Text(
-                    "Date despre produse",
+                    stringResource(R.string.settings_off_data),
                     fontSize = 13.sp,
                     color = GlassColors.textSecondary,
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Open Food Facts (ODbL)",
+                    stringResource(R.string.settings_off_source),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = GlassColors.textPrimary,
@@ -266,13 +269,13 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
                     .padding(horizontal = 16.dp, vertical = 14.dp),
             ) {
                 Text(
-                    "Date nutriționale alimente generice",
+                    stringResource(R.string.settings_usda_data),
                     fontSize = 13.sp,
                     color = GlassColors.textSecondary,
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "USDA FoodData Central (domeniu public)",
+                    stringResource(R.string.settings_usda_source),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = GlassColors.textPrimary,
@@ -301,17 +304,17 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
-            title = { Text("Deconectare", color = GlassColors.textPrimary) },
+            title = { Text(stringResource(R.string.action_logout), color = GlassColors.textPrimary) },
             text  = {
                 Text(
-                    "Ești sigur că vrei să te deconectezi?",
+                    stringResource(R.string.settings_logout_confirm),
                     color = GlassColors.textSecondary
                 )
             },
             confirmButton = {
                 TextButton(onClick = { showLogoutDialog = false }) {
                     Text(
-                        "Deconectare",
+                        stringResource(R.string.action_logout),
                         color = GlassColors.accentOrange,
                         fontWeight = FontWeight.Bold
                     )
@@ -319,7 +322,7 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
             },
             dismissButton = {
                 TextButton(onClick = { showLogoutDialog = false }) {
-                    Text("Anulează", color = GlassColors.textSecondary)
+                    Text(stringResource(R.string.action_cancel), color = GlassColors.textSecondary)
                 }
             },
             containerColor = GlassColors.cardBackground,
@@ -330,17 +333,17 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Șterge cont", color = GlassColors.textPrimary) },
+            title = { Text(stringResource(R.string.settings_delete_account), color = GlassColors.textPrimary) },
             text  = {
                 Text(
-                    "Această acțiune este ireversibilă. Ești sigur?",
+                    stringResource(R.string.settings_delete_confirm),
                     color = GlassColors.textSecondary
                 )
             },
             confirmButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
                     Text(
-                        "Șterge",
+                        stringResource(R.string.action_delete),
                         color = Color(0xFFFF4444),
                         fontWeight = FontWeight.Bold
                     )
@@ -348,7 +351,7 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Anulează", color = GlassColors.textSecondary)
+                    Text(stringResource(R.string.action_cancel), color = GlassColors.textSecondary)
                 }
             },
             containerColor = GlassColors.cardBackground,
