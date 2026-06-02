@@ -119,6 +119,12 @@ def build_recipe_prompt(top_foods, meal_type, goals) -> list[dict]:
     ]
 
 
+# Small models (e.g. gemma3:4b) occasionally emit JSON that doesn't match the
+# recipe shape. Each attempt re-samples the model, so a quick retry almost
+# always recovers — only surface RecipeParseError once every attempt has failed.
+_MAX_PARSE_ATTEMPTS = 3
+
+
 async def generate_recipe(db: AsyncSession, uid: str, meal_type: str, ollama) -> RecipeDto:
     top = await get_top_foods(db, uid)
     if len(top) < 3:
@@ -130,10 +136,13 @@ async def generate_recipe(db: AsyncSession, uid: str, meal_type: str, ollama) ->
     goals = calculate_goals(profile)
 
     messages = build_recipe_prompt(top, meal_type, goals)
-    content = await ollama.generate_json(messages)
 
-    try:
-        data = json.loads(content)
-        return RecipeDto.model_validate(data)
-    except (json.JSONDecodeError, ValidationError, TypeError) as exc:
-        raise RecipeParseError(str(exc)) from exc
+    last_error: Exception | None = None
+    for _ in range(_MAX_PARSE_ATTEMPTS):
+        content = await ollama.generate_json(messages)
+        try:
+            data = json.loads(content)
+            return RecipeDto.model_validate(data)
+        except (json.JSONDecodeError, ValidationError, TypeError) as exc:
+            last_error = exc
+    raise RecipeParseError(str(last_error)) from last_error

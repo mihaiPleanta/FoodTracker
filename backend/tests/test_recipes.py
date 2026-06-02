@@ -128,6 +128,28 @@ async def test_generate_recipe_invalid_json_raises():
             await generate_recipe(db, "u1", "LUNCH", fake)
 
 
+async def test_generate_recipe_retries_then_succeeds():
+    class _FlakyOllama:
+        def __init__(self):
+            self.calls = 0
+
+        async def generate_json(self, messages):
+            self.calls += 1
+            if self.calls == 1:
+                return "not json at all"
+            return json.dumps(_RECIPE_JSON)
+
+    fake = _FlakyOllama()
+    async with SessionLocal() as db:
+        db.add(_seed())
+        db.add_all([_log("Pui", 100), _log("Orez", 100), _log("Mar", 100)])
+        await db.commit()
+        recipe = await generate_recipe(db, "u1", "LUNCH", fake)
+
+    assert recipe.title == "Omletă cu brânză"
+    assert fake.calls == 2  # first attempt failed, second recovered
+
+
 from fastapi.testclient import TestClient
 
 from main import app
