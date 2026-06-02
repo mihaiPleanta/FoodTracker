@@ -126,3 +126,105 @@ async def test_generate_recipe_invalid_json_raises():
         await db.commit()
         with pytest.raises(RecipeParseError):
             await generate_recipe(db, "u1", "LUNCH", fake)
+
+
+from fastapi.testclient import TestClient
+
+from main import app
+from services.ollama_client import get_ollama_client
+
+AUTH_HEADER = {"Authorization": "Bearer fake-test-token"}
+_PROFILE_BODY = {
+    "name": "Mihai", "age": 22, "gender": "MALE", "height_cm": 180,
+    "current_weight_kg": 78.0, "target_weight_kg": 75.0, "activity_level": "MODERATE",
+}
+
+
+def _log_body(name):
+    return {
+        "log_date": "2026-06-01", "meal": "BREAKFAST", "grams": 100,
+        "barcode": "000", "name": name, "categories": [],
+        "kcal_100g": 100.0, "protein_100g": 5.0, "carbs_100g": 10.0, "fat_100g": 2.0,
+    }
+
+
+@pytest.fixture
+def http():
+    return TestClient(app)
+
+
+@pytest.fixture
+def override_ollama():
+    fake = _FakeOllama(content=json.dumps(_RECIPE_JSON))
+    app.dependency_overrides[get_ollama_client] = lambda: fake
+    yield fake
+    app.dependency_overrides.pop(get_ollama_client, None)
+
+
+def _setup_user(http, n_foods=3):
+    http.post("/profile", json=_PROFILE_BODY, headers=AUTH_HEADER)
+    for name in ["Pui", "Orez", "Mar", "Cartof"][:n_foods]:
+        http.post("/food-logs", json=_log_body(name), headers=AUTH_HEADER)
+
+
+def test_generate_endpoint_returns_recipe(http, override_ollama):
+    _setup_user(http)
+    r = http.post("/recipes/generate", json={"meal_type": "LUNCH"}, headers=AUTH_HEADER)
+    assert r.status_code == 200, r.text
+    assert r.json()["title"] == "Omletă cu brânză"
+
+
+def test_generate_endpoint_insufficient_returns_422(http, override_ollama):
+    _setup_user(http, n_foods=2)
+    r = http.post("/recipes/generate", json={"meal_type": "LUNCH"}, headers=AUTH_HEADER)
+    assert r.status_code == 422
+
+
+def test_generate_endpoint_ollama_down_returns_503(http):
+    fake = _FakeOllama(error=OllamaUnavailable("down"))
+    app.dependency_overrides[get_ollama_client] = lambda: fake
+    try:
+        _setup_user(http)
+        r = http.post("/recipes/generate", json={"meal_type": "LUNCH"}, headers=AUTH_HEADER)
+        assert r.status_code == 503
+    finally:
+        app.dependency_overrides.pop(get_ollama_client, None)
+
+
+def test_generate_endpoint_bad_json_returns_502(http):
+    fake = _FakeOllama(content="not json")
+    app.dependency_overrides[get_ollama_client] = lambda: fake
+    try:
+        _setup_user(http)
+        r = http.post("/recipes/generate", json={"meal_type": "LUNCH"}, headers=AUTH_HEADER)
+        assert r.status_code == 502
+    finally:
+        app.dependency_overrides.pop(get_ollama_client, None)
+
+
+def test_save_list_delete_recipe(http):
+    http.post("/profile", json=_PROFILE_BODY, headers=AUTH_HEADER)
+    save_body = {"meal_type": "DINNER", "recipe": _RECIPE_JSON}
+    created = http.post("/recipes", json=save_body, headers=AUTH_HEADER)
+    assert created.status_code == 201, created.text
+    rid = created.json()["id"]
+
+    listed = http.get("/recipes", headers=AUTH_HEADER)
+    assert listed.status_code == 200
+    assert any(item["id"] == rid for item in listed.json())
+
+    deleted = http.delete(f"/recipes/{rid}", headers=AUTH_HEADER)
+    assert deleted.status_code == 204
+    assert http.delete(f"/recipes/{rid}", headers=AUTH_HEADER).status_code == 404
+
+
+def test_delete_recipe_other_user_returns_403(http, mock_firebase_token):
+    http.post("/profile", json=_PROFILE_BODY, headers=AUTH_HEADER)
+    created = http.post(
+        "/recipes", json={"meal_type": "DINNER", "recipe": _RECIPE_JSON}, headers=AUTH_HEADER
+    ).json()
+    rid = created["id"]
+    mock_firebase_token.return_value = {"uid": "other-uid", "email": "x@y.com"}
+    http.post("/profile", json=_PROFILE_BODY, headers=AUTH_HEADER)
+    r = http.delete(f"/recipes/{rid}", headers=AUTH_HEADER)
+    assert r.status_code == 403
