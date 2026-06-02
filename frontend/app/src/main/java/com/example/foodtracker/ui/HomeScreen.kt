@@ -28,12 +28,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.foodtracker.R
 import com.example.foodtracker.model.GoalsMode
 import com.example.foodtracker.model.NutritionGoals
 import com.example.foodtracker.ui.theme.FoodTrackerTheme
@@ -73,10 +75,11 @@ data class MealSection(
     val accentColor: Color
 )
 
-private fun goalsModeLabel(mode: GoalsMode): String = when (mode) {
-    GoalsMode.DEFICIT     -> "Deficit 500 kcal/zi"
-    GoalsMode.SURPLUS     -> "Surplus 300 kcal/zi"
-    GoalsMode.MAINTENANCE -> "Menținere"
+@androidx.annotation.StringRes
+private fun goalsModeRes(mode: GoalsMode): Int = when (mode) {
+    GoalsMode.DEFICIT     -> R.string.goal_deficit
+    GoalsMode.SURPLUS     -> R.string.goal_surplus
+    GoalsMode.MAINTENANCE -> R.string.goal_maintenance
 }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -104,9 +107,10 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
         viewModel.setSelectedHomeDate(fallbackDate)
     }
 
-    val headerTitle = remember(selectedDate) {
+    val todayLabel = stringResource(R.string.home_today)
+    val headerTitle = remember(selectedDate, todayLabel) {
         val cal = Calendar.getInstance().apply { time = selectedDate }
-        if (isSameDay(cal, Calendar.getInstance())) "Today"
+        if (isSameDay(cal, Calendar.getInstance())) todayLabel
         else SimpleDateFormat("EEEE", Locale.ENGLISH).format(selectedDate)
     }
     val headerSubtitle = remember(selectedDate) {
@@ -242,7 +246,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
             ) {
                 Text("Meals", fontSize = 18.sp, fontWeight = FontWeight.Bold,
                     color = GlassColors.textPrimary)
-                Text("See all", fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                Text(stringResource(R.string.home_see_all), fontSize = 13.sp, fontWeight = FontWeight.Medium,
                     color = GlassColors.accentGreen)
             }
             Spacer(Modifier.height(12.dp))
@@ -305,7 +309,7 @@ fun HomeHeader(title: String, subtitle: String, initial: String, onSettingsClick
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Settings,
-                    contentDescription = "Setări",
+                    contentDescription = stringResource(R.string.settings_title),
                     tint = GlassColors.textSecondary,
                     modifier = Modifier.size(20.dp)
                 )
@@ -422,7 +426,7 @@ fun CalorieSummaryCard(
 
             Spacer(Modifier.height(8.dp))
             Text(
-                text = goalsModeLabel(goalsMode),
+                text = stringResource(goalsModeRes(goalsMode)),
                 fontSize = 11.sp,
                 color = GlassColors.textSecondary,
             )
@@ -430,11 +434,11 @@ fun CalorieSummaryCard(
             Spacer(Modifier.height(24.dp))
 
             Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(10.dp)) {
-                MacroPill("Protein", consumedProtein, proteinGoal, "g",
+                MacroPill(stringResource(R.string.home_protein), consumedProtein, proteinGoal, "g",
                     GlassColors.proteinColor, Modifier.weight(1f))
-                MacroPill("Carbs", consumedCarbs, carbsGoal, "g",
+                MacroPill(stringResource(R.string.home_carbs), consumedCarbs, carbsGoal, "g",
                     GlassColors.carbsColor,  Modifier.weight(1f))
-                MacroPill("Fat",   consumedFat,   fatGoal,   "g",
+                MacroPill(stringResource(R.string.home_fat),   consumedFat,   fatGoal,   "g",
                     GlassColors.fatColor,    Modifier.weight(1f))
             }
         }
@@ -544,7 +548,7 @@ fun MealCard(
                     Text(meal.name, fontSize = 16.sp, fontWeight = FontWeight.Bold,
                         color = GlassColors.textPrimary)
                     Spacer(Modifier.height(2.dp))
-                    Text("Recommended: ${meal.recommendedRange} kcal",
+                    Text(stringResource(R.string.home_recommended, meal.recommendedRange),
                         fontSize = 11.sp, color = GlassColors.textTertiary)
                     Spacer(Modifier.height(6.dp))
 
@@ -554,7 +558,7 @@ fun MealCard(
                                 .background(meal.accentColor.copy(.10f))
                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                         ) {
-                            Text("Tap + to add food", fontSize = 11.sp,
+                            Text(stringResource(R.string.home_tap_to_add), fontSize = 11.sp,
                                 color = meal.accentColor, fontWeight = FontWeight.SemiBold)
                         }
                     } else {
@@ -675,7 +679,7 @@ fun HydrationMiniWidget(
             .padding(14.dp)
     ) {
         Text(
-            "Hydration",
+            stringResource(R.string.home_hydration),
             fontSize = 12.sp,
             color = GlassColors.textSecondary,
             fontWeight = FontWeight.Medium
@@ -750,7 +754,7 @@ fun WeightMiniWidget(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "Weight",
+                stringResource(R.string.home_weight),
                 fontSize = 12.sp,
                 color = GlassColors.textSecondary,
                 fontWeight = FontWeight.Medium
@@ -761,7 +765,7 @@ fun WeightMiniWidget(
             ) {
                 Icon(
                     Icons.Default.Add,
-                    contentDescription = "Check-in greutate",
+                    contentDescription = stringResource(R.string.weight_checkin),
                     tint = GlassColors.textPrimary,
                     modifier = Modifier.size(18.dp),
                 )
@@ -769,26 +773,27 @@ fun WeightMiniWidget(
         }
         Spacer(Modifier.height(6.dp))
         Text(
-            latestWeight?.let { "${"%.1f".format(Locale.ENGLISH, it)} kg" } ?: "No check-in",
+            latestWeight?.let { "${"%.1f".format(Locale.ENGLISH, it)} kg" } ?: stringResource(R.string.home_no_checkin),
             fontSize = 18.sp,
             color = GlassColors.textPrimary,
             fontWeight = FontWeight.ExtraBold
         )
         Spacer(Modifier.height(8.dp))
+        val trendText = when {
+            delta7Days == null -> stringResource(R.string.home_trend_unavailable)
+            delta7Days > 0f -> stringResource(R.string.weight_trend_up, "%.1f".format(Locale.ENGLISH, delta7Days))
+            delta7Days < 0f -> stringResource(R.string.weight_trend_down, "%.1f".format(Locale.ENGLISH, delta7Days))
+            else -> stringResource(R.string.weight_trend_stable)
+        }
         Text(
-            when {
-                delta7Days == null -> "Trend 7d unavailable"
-                delta7Days > 0f -> "7d trend: +${"%.1f".format(Locale.ENGLISH, delta7Days)} kg"
-                delta7Days < 0f -> "7d trend: ${"%.1f".format(Locale.ENGLISH, delta7Days)} kg"
-                else -> "7d trend: stable"
-            },
+            trendText,
             fontSize = 12.sp,
             color = if ((delta7Days ?: 0f) <= 0f) GlassColors.accentGreen else GlassColors.accentOrange,
             fontWeight = FontWeight.SemiBold
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            "Last 7 days",
+            stringResource(R.string.home_last_7_days),
             fontSize = 11.sp,
             color = GlassColors.textTertiary
         )
