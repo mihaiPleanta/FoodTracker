@@ -13,10 +13,12 @@ rețete personalizate cu inteligență artificială**. Ideea, în limbaj simplu:
 1. Aplicația știe ce alimente loghezi cel mai des (din istoricul tău de mese).
 2. Alegi pentru ce masă vrei o rețetă (mic dejun / prânz / cină / gustare).
 3. Apeși „Generează rețetă".
-4. Un model AI care rulează **local pe calculator** primește lista alimentelor tale
-   preferate + obiectivul tău nutrițional și „inventează" o rețetă concretă:
-   titlu, descriere, ingrediente cu cantități, pași de preparare și macros (kcal,
-   proteine, carbohidrați, grăsimi).
+4. Backend-ul alege **un singur „ingredient-vedetă"** dintre alimentele tale frecvente
+   (vezi secțiunea 4b — de ce un singur ingredient și nu toată lista) și îl trimite unui
+   model AI care rulează **local pe calculator**, împreună cu obiectivul tău nutrițional.
+   Modelul „inventează" o rețetă concretă în jurul acelui ingredient: titlu, descriere,
+   ingrediente cu cantități, pași de preparare și macros (kcal, proteine, carbohidrați,
+   grăsimi).
 5. Poți salva rețeta ca favorită.
 
 **Diferența față de un ChatGPT obișnuit:** rețeta e construită din *datele tale reale*
@@ -84,8 +86,9 @@ disponibil" (HTTP 503) în loc să crape.
    trimite `POST /recipes/generate` cu `{"meal_type": "BREAKFAST"}`.
 2. **Backend** verifică token-ul Firebase (cine ești), apoi:
    - se uită în baza de date `food_logs` și calculează **top alimentele** tale;
+   - alege **un singur ingredient-ancoră** dintre ele (aleator, ponderat după frecvență);
    - calculează **obiectivul nutrițional** din profilul tău;
-   - construiește un **prompt** (instrucțiuni în text pentru AI);
+   - construiește un **prompt** (instrucțiuni în text pentru AI) în jurul ancorei;
    - trimite promptul la **Ollama**.
 3. **Ollama** rulează modelul și întoarce un text JSON cu rețeta.
 4. **Backend** validează că JSON-ul are forma corectă și îl trimite înapoi la telefon.
@@ -135,24 +138,39 @@ Rezultat: o listă cu „alimentele tale semnătură" + valorile lor nutriționa
 Aici se construiește textul trimis modelului. Sunt **două mesaje**:
 
 - **System prompt** (`_SYSTEM_PROMPT`) — „personalitatea" și regulile fixe ale AI-ului:
-  *„Ești un asistent culinar. Folosește preponderent produsele userului. Scrie în română.
-  Cantitățile să fie concrete. Răspunde DOAR cu JSON în forma exactă {…}."* Aici i se dă
-  și **șablonul JSON** pe care trebuie să-l completeze.
+  *„Ești un bucătar profesionist. Construiește o rețetă clasică, recognoscibilă, în jurul
+  ingredientului-vedetă. Completează cu ingrediente obișnuite de cămară. Scrie în română.
+  Cantitățile să fie concrete. Descrierea: maxim 12 cuvinte, factuală. Răspunde DOAR cu
+  JSON în forma exactă {…}."* Aici i se dă și **șablonul JSON** pe care trebuie să-l completeze.
 - **User prompt** — datele concrete de data asta: ce masă (`mic dejun`), care e
-  obiectivul (`ex: DEFICIT, 1800 kcal/zi, P 130g, C 180g, G 50g`) și **lista produselor
-  tale** cu macros la 100g.
+  obiectivul (`ex: DEFICIT, 1800 kcal/zi, P 130g, C 180g, G 50g`) și **un singur
+  ingredient-vedetă** (ex: `Ou întreg`).
 
 > De ce două mesaje? E convenția standard la LLM-uri: „system" = reguli permanente,
 > „user" = cererea curentă. Modelul tratează regulile din system ca fiind prioritare.
+
+> **De ce un singur ingredient și nu toată lista? (decizie importantă de design)**
+> Prima versiune trimitea modelului **toată lista** de top alimente și îi cerea să le
+> folosească. Problema: un model mic (`gemma3:4b`) le înghesuie naiv pe toate într-un
+> singur fel de mâncare → combinații absurde precum „omletă cu banană și piept de pui".
+> Soluția nu a fost un prompt mai bun, ci o schimbare **structurală**: backend-ul alege
+> **un singur ingredient-ancoră** și îi arată modelului doar pe acela. Astfel modelul
+> nici nu „vede" celelalte alimente, deci nu le mai poate amesteca, și completează singur
+> ingrediente complementare care merg natural → rețete clasice, coerente. Vezi secțiunea 7
+> pentru detalii despre acest experiment (e un punct bun de discuție la prezentare).
 
 **c) `generate_recipe(...)` — orchestrarea + plasă de siguranță**
 Leagă totul:
 1. Ia top foods. Dacă ai **mai puțin de 3** alimente distincte → aruncă `InsufficientData`
    (n-are din ce compune o rețetă) → backend-ul răspunde 422.
 2. Ia profilul și calculează goal-urile (refolosește `calculate_goals` din nutriție).
-3. Construiește promptul.
-4. Trimite la Ollama și încearcă să parseze răspunsul ca JSON valid.
-5. **Retry de 3 ori:** modelele mici uneori scapă un JSON stricat. Fiecare reîncercare
+3. **Alege ingredientul-ancoră:** dintre top alimente, alege unul singur prin
+   `random.choices` **ponderat după frecvență** (alimentele mai des logate au șanse mai
+   mari, dar nu sunt mereu alese). Alegerea aleatoare dă **varietate** — regenerezi și
+   primești o rețetă în jurul altui ingredient, nu mereu aceeași.
+4. Construiește promptul cu acel ingredient.
+5. Trimite la Ollama și încearcă să parseze răspunsul ca JSON valid.
+6. **Retry de 3 ori:** modelele mici uneori scapă un JSON stricat. Fiecare reîncercare
    „regenerează" răspunsul, și de obicei a doua oară iese curat. Doar dacă eșuează toate
    3 încercările aruncă `RecipeParseError` → 502.
 
@@ -246,6 +264,45 @@ utilizabilă și explică problema, în loc să arate un ecran alb.
   fallback când serviciul e jos — toate arată maturitate inginerească.
 - **Arhitectură curată:** separare clară client AI / logică / endpoint-uri / schemă,
   testabilă (clientul Ollama e „fake-uit" în teste, fără să ai nevoie de AI real).
+- **Înțelegerea limitelor modelelor mici (prompt engineering aplicat):** vezi mai jos —
+  e poate cel mai interesant punct de discuție tehnică.
+
+### Studiu de caz: cum am obținut rețete realiste dintr-un model mic
+
+Acesta e un fir narativ bun pentru prezentare, pentru că arată raționament ingineresc, nu
+doar „am chemat un AI".
+
+**Problema observată:** la mic dejun, modelul genera „Omletă cu banană și piept de pui" —
+o combinație pe care niciun om n-ar mânca-o. Cauza: îi dădeam **toată lista** de alimente
+frecvente și el le amesteca mecanic pe toate.
+
+**Ce am încercat și ce am învățat:**
+
+1. **Prompt-uri mai detaliate cu reguli** („folosește doar ce se potrivește") — *au eșuat*.
+   Modelul mic ignoră instrucțiunile abstracte și tot ancorează pe primele alimente din listă.
+2. **Reguli negative explicite** („NU pune banană în omletă") — *au înrăutățit lucrurile*.
+   Pe modelele mici, a numi o combinație greșită o **primează**: a ajuns să genereze omletă
+   cu banană în 6 din 6 cazuri. Lecție: regulile negative pot avea efect invers.
+3. **Schimbarea unui model mai mare** (`qwen2.5:7b`, care urmează instrucțiunile mai bine) —
+   *compromis prost*: respecta regulile, dar avea **română stricată** („brânză de pecel",
+   „cibul minciu"), inacceptabil pentru un demo în română. Concluzie: pentru output în
+   română, `gemma3:4b` e mai bun chiar dacă e mai mic.
+4. **Soluția câștigătoare — structurală + reguli pozitive:**
+   - **Un singur ingredient-ancoră** (modelul nu mai vede celelalte alimente → nu le poate
+     amesteca).
+   - **Reguli pozitive, nu negative:** în loc de „nu pune banană în omletă", i-am spus
+     „dacă ingredientul e un fruct, fă un preparat dulce: clătite, fulgi de ovăz, smoothie".
+     Astfel modelul e ghidat *spre* ce e bine, fără să-i amintim de combinația greșită.
+   - **Descrieri concise:** în loc de o listă de cuvinte interzise (pe care le ignora),
+     i-am dat un format clar + exemplu („maxim 12 cuvinte, factual"), ca să scape de
+     descrierile pompoase gen „o omletă delicioasă și perfectă".
+
+**Rezultat:** banană → clătite/fulgi de ovăz, ou → omletă cu brânză și spanac, pui → piept
+la grătar cu salată. Coerent și recognoscibil.
+
+> Ideea de bază a discuției: **uneori soluția nu e un prompt mai inteligent, ci o schimbare
+> de arhitectură** (ce date îi dai modelului). Și: **regulile pozitive bat regulile negative**
+> pe modelele mici.
 
 ---
 
