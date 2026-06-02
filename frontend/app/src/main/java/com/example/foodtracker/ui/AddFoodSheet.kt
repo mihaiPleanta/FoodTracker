@@ -31,6 +31,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.stringResource
 import com.example.foodtracker.R
+import com.example.foodtracker.util.AppLocale
+import com.example.foodtracker.util.LocalAppLanguage
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
@@ -63,6 +65,7 @@ fun AddFoodSheet(
         containerColor = GlassColors.cardBackgroundAlt,
         dragHandle = null,
     ) {
+      AppLocale(LocalAppLanguage.current) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -102,6 +105,7 @@ fun AddFoodSheet(
                 onClick = { gramsInt?.let { onConfirm(target, it) } },
             )
         }
+      }
     }
 }
 

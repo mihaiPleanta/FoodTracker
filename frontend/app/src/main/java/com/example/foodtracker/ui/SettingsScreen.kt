@@ -300,21 +300,30 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
     }
 
     // ── Dialogs ───────────────────────────────────────────────────────────────
+    // AlertDialog content runs in a separate window that re-provides the system
+    // locale, so resolve the strings here (in the screen's localized scope) and
+    // pass plain Strings into the dialog slots.
+    val logoutLabel = stringResource(R.string.action_logout)
+    val logoutConfirmMsg = stringResource(R.string.settings_logout_confirm)
+    val deleteAccountLabel = stringResource(R.string.settings_delete_account)
+    val deleteConfirmMsg = stringResource(R.string.settings_delete_confirm)
+    val deleteLabel = stringResource(R.string.action_delete)
+    val cancelLabel = stringResource(R.string.action_cancel)
 
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
-            title = { Text(stringResource(R.string.action_logout), color = GlassColors.textPrimary) },
+            title = { Text(logoutLabel, color = GlassColors.textPrimary) },
             text  = {
                 Text(
-                    stringResource(R.string.settings_logout_confirm),
+                    logoutConfirmMsg,
                     color = GlassColors.textSecondary
                 )
             },
             confirmButton = {
                 TextButton(onClick = { showLogoutDialog = false }) {
                     Text(
-                        stringResource(R.string.action_logout),
+                        logoutLabel,
                         color = GlassColors.accentOrange,
                         fontWeight = FontWeight.Bold
                     )
@@ -322,7 +331,7 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
             },
             dismissButton = {
                 TextButton(onClick = { showLogoutDialog = false }) {
-                    Text(stringResource(R.string.action_cancel), color = GlassColors.textSecondary)
+                    Text(cancelLabel, color = GlassColors.textSecondary)
                 }
             },
             containerColor = GlassColors.cardBackground,
@@ -333,17 +342,17 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text(stringResource(R.string.settings_delete_account), color = GlassColors.textPrimary) },
+            title = { Text(deleteAccountLabel, color = GlassColors.textPrimary) },
             text  = {
                 Text(
-                    stringResource(R.string.settings_delete_confirm),
+                    deleteConfirmMsg,
                     color = GlassColors.textSecondary
                 )
             },
             confirmButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
                     Text(
-                        stringResource(R.string.action_delete),
+                        deleteLabel,
                         color = Color(0xFFFF4444),
                         fontWeight = FontWeight.Bold
                     )
@@ -351,7 +360,7 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
-                    Text(stringResource(R.string.action_cancel), color = GlassColors.textSecondary)
+                    Text(cancelLabel, color = GlassColors.textSecondary)
                 }
             },
             containerColor = GlassColors.cardBackground,

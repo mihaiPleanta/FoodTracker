@@ -16,6 +16,8 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.example.foodtracker.R
+import com.example.foodtracker.util.AppLocale
+import com.example.foodtracker.util.LocalAppLanguage
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +41,7 @@ fun WeightCheckInSheet(
     val isValid = parsed != null && parsed in 30f..300f
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+      AppLocale(LocalAppLanguage.current) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -64,5 +67,6 @@ fun WeightCheckInSheet(
             }
             Spacer(modifier = Modifier.height(8.dp))
         }
+      }
     }
 }

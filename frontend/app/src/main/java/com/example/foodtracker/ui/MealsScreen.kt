@@ -32,6 +32,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import android.widget.Toast
 import com.example.foodtracker.R
 import com.example.foodtracker.model.AppLanguage
+import com.example.foodtracker.util.AppLocale
+import com.example.foodtracker.util.LocalAppLanguage
 import com.example.foodtracker.model.FoodItem
 import com.example.foodtracker.model.LoggedFood
 import com.example.foodtracker.model.RecipeDto
@@ -262,6 +264,7 @@ private fun SavedRecipeDialog(
 ) {
     val recipe = item.recipe
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+      AppLocale(LocalAppLanguage.current) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -321,6 +324,7 @@ private fun SavedRecipeDialog(
                 contentAlignment = Alignment.Center,
             ) { Text(stringResource(R.string.meals_close), fontWeight = FontWeight.Bold, color = GlassColors.textPrimary, fontSize = 14.sp) }
         }
+      }
     }
 }
 

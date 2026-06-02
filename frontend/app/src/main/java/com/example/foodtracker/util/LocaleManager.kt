@@ -7,11 +7,20 @@ import android.content.res.Configuration
 import android.content.res.Resources
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import com.example.foodtracker.model.AppLanguage
 import java.util.Locale
+
+/**
+ * Carries the active in-app language. Unlike LocalConfiguration/LocalContext (which a
+ * Dialog/Popup window re-provides from the system locale), a custom CompositionLocal
+ * propagates into Dialog/ModalBottomSheet content — so dialogs can re-apply [AppLocale]
+ * with [LocalAppLanguage].current to keep their text in the chosen language.
+ */
+val LocalAppLanguage = compositionLocalOf { AppLanguage.ROMANIAN }
 
 /**
  * Overrides the Compose locale so stringResource() resolves to the in-app
@@ -46,6 +55,7 @@ fun AppLocale(language: AppLanguage, content: @Composable () -> Unit) {
     CompositionLocalProvider(
         LocalContext provides localizedContext,
         LocalConfiguration provides localizedConfig,
+        LocalAppLanguage provides language,
         content = content,
     )
 }
