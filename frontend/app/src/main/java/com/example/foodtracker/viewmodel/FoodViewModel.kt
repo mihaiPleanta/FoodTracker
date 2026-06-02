@@ -66,6 +66,9 @@ class FoodViewModel(
         data class Error(@StringRes val messageRes: Int, val arg: Int? = null) : SearchUiState()
     }
 
+    /** A localizable snackbar message; [code] (HTTP status) is appended in the UI when present. */
+    data class ToastEvent(@StringRes val messageRes: Int, val code: Int? = null)
+
     private val foodApi: FoodApi = RetrofitInstance.retrofit.create(FoodApi::class.java)
     private val logsApi: LogsApi = RetrofitInstance.retrofit.create(LogsApi::class.java)
     private val profileApi: ProfileApi = RetrofitInstance.retrofit.create(ProfileApi::class.java)
@@ -191,8 +194,8 @@ class FoodViewModel(
 
     private val _loadedDates = mutableSetOf<String>()
 
-    private val _toastEvents = MutableSharedFlow<String>(extraBufferCapacity = 8)
-    val toastEvents: SharedFlow<String> = _toastEvents.asSharedFlow()
+    private val _toastEvents = MutableSharedFlow<ToastEvent>(extraBufferCapacity = 8)
+    val toastEvents: SharedFlow<ToastEvent> = _toastEvents.asSharedFlow()
 
     private val _selectedHomeDate = MutableStateFlow(Date())
     val selectedHomeDate: StateFlow<Date> = _selectedHomeDate.asStateFlow()
@@ -221,13 +224,13 @@ class FoodViewModel(
                 logsApi.putHydration(key, HydrationUpdateDto(liters = updated))
             } catch (e: java.io.IOException) {
                 _hydrationByDate.value = _hydrationByDate.value + (key to current)
-                _toastEvents.tryEmit("Verifică conexiunea la internet")
+                _toastEvents.tryEmit(ToastEvent(R.string.error_no_internet))
             } catch (e: retrofit2.HttpException) {
                 _hydrationByDate.value = _hydrationByDate.value + (key to current)
-                _toastEvents.tryEmit("Eroare la salvare hidratare (${e.code()})")
+                _toastEvents.tryEmit(ToastEvent(R.string.error_save_hydration, e.code()))
             } catch (e: Throwable) {
                 _hydrationByDate.value = _hydrationByDate.value + (key to current)
-                _toastEvents.tryEmit("Eroare la salvare hidratare")
+                _toastEvents.tryEmit(ToastEvent(R.string.error_save_hydration))
             }
         }
     }
@@ -264,11 +267,11 @@ class FoodViewModel(
             }
             _loadedDates += key
         } catch (e: java.io.IOException) {
-            _toastEvents.tryEmit("Verifică conexiunea la internet")
+            _toastEvents.tryEmit(ToastEvent(R.string.error_no_internet))
         } catch (e: retrofit2.HttpException) {
-            _toastEvents.tryEmit("Eroare la încărcarea zilei (${e.code()})")
+            _toastEvents.tryEmit(ToastEvent(R.string.error_load_day, e.code()))
         } catch (e: Throwable) {
-            _toastEvents.tryEmit("Eroare la încărcarea zilei")
+            _toastEvents.tryEmit(ToastEvent(R.string.error_load_day))
         } finally {
             _loadingDay.value = false
         }
@@ -287,11 +290,11 @@ class FoodViewModel(
                     WeightCheckIn(parsed, dto.weightKg)
                 }
             } catch (e: java.io.IOException) {
-                _toastEvents.tryEmit("Verifică conexiunea la internet")
+                _toastEvents.tryEmit(ToastEvent(R.string.error_no_internet))
             } catch (e: retrofit2.HttpException) {
-                _toastEvents.tryEmit("Eroare la istoricul greutății (${e.code()})")
+                _toastEvents.tryEmit(ToastEvent(R.string.error_weight_history, e.code()))
             } catch (e: Throwable) {
-                _toastEvents.tryEmit("Eroare la istoricul greutății")
+                _toastEvents.tryEmit(ToastEvent(R.string.error_weight_history))
             }
         }
     }
@@ -318,15 +321,15 @@ class FoodViewModel(
             } catch (e: java.io.IOException) {
                 _weightHistory.value = previousHistory
                 _userProfile.value = _userProfile.value.copy(currentWeightKg = previousProfileWeight)
-                _toastEvents.tryEmit("Verifică conexiunea la internet")
+                _toastEvents.tryEmit(ToastEvent(R.string.error_no_internet))
             } catch (e: retrofit2.HttpException) {
                 _weightHistory.value = previousHistory
                 _userProfile.value = _userProfile.value.copy(currentWeightKg = previousProfileWeight)
-                _toastEvents.tryEmit("Eroare la check-in greutate (${e.code()})")
+                _toastEvents.tryEmit(ToastEvent(R.string.error_weight_checkin, e.code()))
             } catch (e: Throwable) {
                 _weightHistory.value = previousHistory
                 _userProfile.value = _userProfile.value.copy(currentWeightKg = previousProfileWeight)
-                _toastEvents.tryEmit("Eroare la check-in greutate")
+                _toastEvents.tryEmit(ToastEvent(R.string.error_weight_checkin))
             }
         }
     }
@@ -407,13 +410,13 @@ class FoodViewModel(
                 }
             } catch (e: java.io.IOException) {
                 removeByTempId(key, mealName, tempId)
-                _toastEvents.tryEmit("Verifică conexiunea la internet")
+                _toastEvents.tryEmit(ToastEvent(R.string.error_no_internet))
             } catch (e: retrofit2.HttpException) {
                 removeByTempId(key, mealName, tempId)
-                _toastEvents.tryEmit("Eroare la salvare (${e.code()})")
+                _toastEvents.tryEmit(ToastEvent(R.string.error_save, e.code()))
             } catch (e: Throwable) {
                 removeByTempId(key, mealName, tempId)
-                _toastEvents.tryEmit("Eroare la salvare")
+                _toastEvents.tryEmit(ToastEvent(R.string.error_save))
             }
         }
         return insertedIndex
@@ -472,20 +475,20 @@ class FoodViewModel(
                 logsApi.deleteFoodLog(id)
             } catch (e: java.io.IOException) {
                 restoreFood(key, mealName, index, target)
-                _toastEvents.tryEmit("Verifică conexiunea la internet")
+                _toastEvents.tryEmit(ToastEvent(R.string.error_no_internet))
                 return@launch
             } catch (e: retrofit2.HttpException) {
                 restoreFood(key, mealName, index, target)
-                _toastEvents.tryEmit("Eroare la ștergere (${e.code()})")
+                _toastEvents.tryEmit(ToastEvent(R.string.error_delete, e.code()))
                 return@launch
             } catch (e: Throwable) {
                 restoreFood(key, mealName, index, target)
-                _toastEvents.tryEmit("Eroare la ștergere")
+                _toastEvents.tryEmit(ToastEvent(R.string.error_delete))
                 return@launch
             }
             if (!response.isSuccessful) {
                 restoreFood(key, mealName, index, target)
-                _toastEvents.tryEmit("Eroare la ștergere (${response.code()})")
+                _toastEvents.tryEmit(ToastEvent(R.string.error_delete, response.code()))
             }
         }
     }

@@ -28,6 +28,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -95,8 +96,11 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
     val loadingDay by viewModel.loadingDay.collectAsState()
     val userProfile by viewModel.userProfile.collectAsState()
 
-    LaunchedEffect(Unit) {
-        viewModel.toastEvents.collect { msg ->
+    val resources = LocalContext.current.resources
+    LaunchedEffect(resources) {
+        viewModel.toastEvents.collect { event ->
+            val base = resources.getString(event.messageRes)
+            val msg = if (event.code != null) "$base (${event.code})" else base
             snackbarHostState.showSnackbar(msg)
         }
     }

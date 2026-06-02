@@ -204,6 +204,12 @@
     <string name="error_ai_unavailable">Serviciul AI nu e disponibil, încearcă din nou</string>
     <string name="error_ai_invalid">Răspuns AI invalid, încearcă din nou</string>
     <string name="error_unexpected_code">Eroare neașteptată (%1$d)</string>
+    <string name="error_save_hydration">Eroare la salvare hidratare</string>
+    <string name="error_load_day">Eroare la încărcarea zilei</string>
+    <string name="error_weight_history">Eroare la istoricul greutății</string>
+    <string name="error_weight_checkin">Eroare la check-in greutate</string>
+    <string name="error_save">Eroare la salvare</string>
+    <string name="error_delete">Eroare la ștergere</string>
 <string name="error_db_busy">Baza de date e ocupată, încearcă din nou</string>
     <string name="error_email_in_use">Acest email este deja folosit</string>
     <string name="error_bad_credentials">Email sau parolă incorectă</string>

@@ -201,6 +201,12 @@
     <string name="error_ai_unavailable">AI service unavailable, try again</string>
     <string name="error_ai_invalid">Invalid AI response, try again</string>
     <string name="error_unexpected_code">Unexpected error (%1$d)</string>
+    <string name="error_save_hydration">Failed to save hydration</string>
+    <string name="error_load_day">Failed to load day</string>
+    <string name="error_weight_history">Failed to load weight history</string>
+    <string name="error_weight_checkin">Failed to save weight check-in</string>
+    <string name="error_save">Failed to save</string>
+    <string name="error_delete">Failed to delete</string>
     <string name="error_db_busy">Database is busy, try again</string>
     <string name="error_email_in_use">This email is already in use</string>
     <string name="error_bad_credentials">Wrong email or password</string>
