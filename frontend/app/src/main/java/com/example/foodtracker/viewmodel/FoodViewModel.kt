@@ -93,7 +93,8 @@ class FoodViewModel(
                         } catch (e: java.io.IOException) {
                             SearchUiState.Error(R.string.error_no_internet)
                         } catch (e: retrofit2.HttpException) {
-                            SearchUiState.Error(R.string.error_unexpected_code, e.code())
+                            if (e.code() == 503) SearchUiState.Error(R.string.error_db_busy)
+                            else SearchUiState.Error(R.string.error_unexpected_code, e.code())
                         } catch (e: Throwable) {
                             SearchUiState.Error(R.string.error_generic)
                         }

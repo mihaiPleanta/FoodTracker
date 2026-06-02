@@ -21,12 +21,15 @@ fun AppLocale(language: AppLanguage, content: @Composable () -> Unit) {
         AppLanguage.ENGLISH -> "en"
     }
     val baseContext = LocalContext.current
-    val localizedConfig = remember(tag, baseContext) {
-        Configuration(baseContext.resources.configuration).apply {
+    // Base off LocalConfiguration (not baseContext.resources.configuration) so the
+    // override recomposes correctly and satisfies Compose's LocalContextConfigurationRead lint.
+    val baseConfig = LocalConfiguration.current
+    val localizedConfig = remember(tag, baseConfig) {
+        Configuration(baseConfig).apply {
             setLocale(Locale(tag))
         }
     }
-    val localizedContext = remember(tag, baseContext) {
+    val localizedContext = remember(tag, baseContext, localizedConfig) {
         baseContext.createConfigurationContext(localizedConfig)
     }
     CompositionLocalProvider(

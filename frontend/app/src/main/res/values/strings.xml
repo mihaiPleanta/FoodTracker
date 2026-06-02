@@ -1,7 +1,7 @@
 <resources>
-    <string name="app_name">FoodTracker</string>
+    <string name="app_name" translatable="false">FoodTracker</string>
     <!-- Replace with your Web Client ID from Firebase Console → Authentication → Sign-in method → Google -->
-    <string name="default_web_client_id">681739565121-64l09djqa9tkf1o89gnsl96t7dsnb6h2.apps.googleusercontent.com</string>
+    <string name="default_web_client_id" translatable="false">681739565121-64l09djqa9tkf1o89gnsl96t7dsnb6h2.apps.googleusercontent.com</string>
 
     <!-- Common -->
     <string name="meal_breakfast">Mic dejun</string>
@@ -204,10 +204,23 @@
     <string name="error_ai_unavailable">Serviciul AI nu e disponibil, încearcă din nou</string>
     <string name="error_ai_invalid">Răspuns AI invalid, încearcă din nou</string>
     <string name="error_unexpected_code">Eroare neașteptată (%1$d)</string>
+<string name="error_db_busy">Baza de date e ocupată, încearcă din nou</string>
     <string name="error_email_in_use">Acest email este deja folosit</string>
     <string name="error_bad_credentials">Email sau parolă incorectă</string>
     <string name="error_invalid_email">Email invalid</string>
     <string name="error_weak_password">Parola trebuie să aibă minim 6 caractere</string>
     <string name="error_generic">A apărut o eroare. Încearcă din nou.</string>
     <string name="error_profile_save">Nu s-a putut salva profilul</string>
+
+    <!-- Bottom nav -->
+    <string name="nav_home">Acasă</string>
+    <string name="nav_stats">Statistici</string>
+    <string name="nav_meals">Mese</string>
+    <string name="nav_profile">Profil</string>
+
+    <!-- Stats extras -->
+    <string name="stats_title">Statistici</string>
+    <string name="stats_change_up">Variație 7z: +%1$s kg</string>
+    <string name="stats_change_down">Variație 7z: %1$s kg</string>
+    <string name="stats_change_stable">Variație 7z: stabil</string>
 </resources>

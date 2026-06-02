@@ -201,10 +201,23 @@
     <string name="error_ai_unavailable">AI service unavailable, try again</string>
     <string name="error_ai_invalid">Invalid AI response, try again</string>
     <string name="error_unexpected_code">Unexpected error (%1$d)</string>
+    <string name="error_db_busy">Database is busy, try again</string>
     <string name="error_email_in_use">This email is already in use</string>
     <string name="error_bad_credentials">Wrong email or password</string>
     <string name="error_invalid_email">Invalid email</string>
     <string name="error_weak_password">Password must be at least 6 characters</string>
     <string name="error_generic">An error occurred. Try again.</string>
     <string name="error_profile_save">Could not save profile</string>
+
+    <!-- Bottom nav -->
+    <string name="nav_home">Home</string>
+    <string name="nav_stats">Stats</string>
+    <string name="nav_meals">Meals</string>
+    <string name="nav_profile">Profile</string>
+
+    <!-- Stats extras -->
+    <string name="stats_title">Stats</string>
+    <string name="stats_change_up">7d change: +%1$s kg</string>
+    <string name="stats_change_down">7d change: %1$s kg</string>
+    <string name="stats_change_stable">7d change: stable</string>
 </resources>
