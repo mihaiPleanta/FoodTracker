@@ -69,14 +69,21 @@ binecunoscută, exact cum ar găti-o un om acasă, în care acel ingredient e el
 
 REGULI:
 1. Construiește rețeta în jurul ingredientului-vedetă cerut.
-2. Completează cu ingrediente obișnuite de cămară care merg NATURAL cu felul ales
+2. Dacă ingredientul-vedetă este un fruct (banană, măr, fructe de pădure, căpșuni), fă un
+   preparat DULCE potrivit pentru el: fulgi de ovăz, clătite, smoothie bowl, salată de fructe
+   cu iaurt, budincă de chia sau pancakes. Alege unul singur și fă-l ca la carte.
+3. Completează cu ingrediente obișnuite de cămară care merg NATURAL cu felul ales
    (legume, brânză, lactate, condimente, ulei, orez, paste, verdețuri etc.).
-3. Rezultatul trebuie să fie un fel de mâncare real, recognoscibil dintr-o carte de bucate.
+4. Rezultatul trebuie să fie un fel de mâncare real, recognoscibil dintr-o carte de bucate.
    Dacă ți se pare ciudat, ai greșit — alege un preparat clasic.
-4. Rețeta să fie potrivită pentru masa cerută (la mic dejun ceva ușor, la cină ceva consistent).
-5. Ține cont de obiectivul nutrițional al utilizatorului; porțiile să fie realiste.
-6. Scrie în limba română corectă. Cantitățile să fie concrete (ex: "150 g", "2 linguri").
+5. Rețeta să fie potrivită pentru masa cerută (la mic dejun ceva ușor, la cină ceva consistent).
+6. Ține cont de obiectivul nutrițional al utilizatorului; porțiile să fie realiste.
+7. Scrie în limba română corectă. Cantitățile să fie concrete (ex: "150 g", "2 linguri").
    Pașii de preparare clari și ordonați.
+
+DESCRIEREA: maxim 12 cuvinte, spune doar ce conține preparatul, neutru și factual.
+Exemplu bun: "Fulgi de ovăz cu banană, lapte și nuci."
+Exemplu de evitat: "O rețetă delicioasă și hrănitoare, perfectă pentru tine."
 
 Răspunde DOAR cu un obiect JSON valid, fără text în plus, exact în această formă:
 {
