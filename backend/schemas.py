@@ -109,3 +109,50 @@ class GoalsResponse(BaseModel):
     carbs_goal_g: int
     fat_goal_g: int
     mode: Literal["DEFICIT", "MAINTENANCE", "SURPLUS"]
+
+
+MealType = Literal["BREAKFAST", "LUNCH", "DINNER", "SNACKS"]
+
+
+class TopFood(BaseModel):
+    name: str
+    brand: Optional[str] = None
+    kcal_100g: float
+    protein_100g: float
+    carbs_100g: float
+    fat_100g: float
+
+
+class RecipeIngredient(BaseModel):
+    name: str
+    quantity: str
+
+
+class RecipeDto(BaseModel):
+    title: str
+    description: str
+    ingredients: List[RecipeIngredient]
+    steps: List[str]
+    servings: int
+    kcal_per_serving: int
+    protein_g: int
+    carbs_g: int
+    fat_g: int
+
+
+class RecipeGenerateRequest(BaseModel):
+    meal_type: MealType
+
+
+class SavedRecipeCreate(BaseModel):
+    meal_type: MealType
+    recipe: RecipeDto
+
+
+class SavedRecipeDto(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    meal_type: str
+    title: str
+    recipe: RecipeDto
+    created_at: _datetime
