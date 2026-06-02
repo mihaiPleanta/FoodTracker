@@ -58,7 +58,7 @@ fun AddFoodSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color(0xFF242424),
+        containerColor = GlassColors.cardBackgroundAlt,
         dragHandle = null,
     ) {
         Column(
@@ -114,7 +114,7 @@ private fun AddFoodSheetGrabber() {
                 .width(40.dp)
                 .height(5.dp)
                 .clip(RoundedCornerShape(3.dp))
-                .background(Color(0xFF555555)),
+                .background(GlassColors.textTertiary),
         )
     }
 }
@@ -166,7 +166,7 @@ private fun AddFoodSheetGramsField(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(14.dp))
-                .background(Color(0xFF2E2E2E))
+                .background(GlassColors.backgroundSurface2)
                 .border(2.dp, borderColor, RoundedCornerShape(14.dp))
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.Bottom,
@@ -251,7 +251,7 @@ private fun AddFoodSheetPreview(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF2E2E2E))
+            .background(GlassColors.backgroundSurface2)
             .border(1.dp, accentColor.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
             .padding(horizontal = 14.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,

@@ -460,6 +460,13 @@ private fun Sparkline(weights: List<Float>) {
     val maxValue = weights.maxOrNull() ?: 0f
     val range = max(0.1f, maxValue - minValue)
 
+    // Resolve theme colours outside the (non-composable) DrawScope lambda.
+    val gridColor = GlassColors.cardBorder
+    val lineStart = GlassColors.accentBlue
+    val lineEnd = GlassColors.accentGreen
+    val dotLast = GlassColors.accentGreen
+    val dotOther = GlassColors.textSecondary
+
     Canvas(
         modifier = Modifier
             .fillMaxWidth()
@@ -480,7 +487,7 @@ private fun Sparkline(weights: List<Float>) {
         repeat(3) { idx ->
             val y = (idx + 1) * (size.height / 4f)
             drawLine(
-                color = GlassColors.cardBorder,
+                color = gridColor,
                 start = Offset(0f, y),
                 end = Offset(size.width, y),
                 strokeWidth = 1.dp.toPx()
@@ -497,7 +504,7 @@ private fun Sparkline(weights: List<Float>) {
         drawPath(
             path = path,
             brush = Brush.horizontalGradient(
-                listOf(GlassColors.accentBlue, GlassColors.accentGreen)
+                listOf(lineStart, lineEnd)
             ),
             style = Stroke(width = 3.dp.toPx())
         )
@@ -505,7 +512,7 @@ private fun Sparkline(weights: List<Float>) {
         points.forEachIndexed { index, point ->
             val isLast = index == points.lastIndex
             drawCircle(
-                color = if (isLast) GlassColors.accentGreen else GlassColors.textSecondary,
+                color = if (isLast) dotLast else dotOther,
                 radius = if (isLast) 4.dp.toPx() else 3.dp.toPx(),
                 center = point
             )

@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.view.WindowCompat
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -53,16 +54,25 @@ class MainActivity : ComponentActivity() {
         NotificationChannels.ensureCreated(applicationContext)
         pendingDeepLink = readDeepLinkFromIntent(intent)
         setContent {
-            FoodTrackerTheme {
-                val navController = rememberNavController()
-                val foodViewModelFactory = remember {
-                    FoodViewModelFactory(
-                        settingsRepository = DataStoreSettingsRepository(applicationContext.settingsDataStore),
-                        mealLogTracker = MealLogTracker(applicationContext.mealLogTrackerDataStore),
-                    )
+            val foodViewModelFactory = remember {
+                FoodViewModelFactory(
+                    settingsRepository = DataStoreSettingsRepository(applicationContext.settingsDataStore),
+                    mealLogTracker = MealLogTracker(applicationContext.mealLogTrackerDataStore),
+                )
+            }
+            val viewModel: FoodViewModel = viewModel(factory = foodViewModelFactory)
+            val authViewModel: AuthViewModel = viewModel()
+            val appSettings by viewModel.appSettings.collectAsState()
+            // enableEdgeToEdge()'s auto() follows the *system* dark mode; keep the
+            // status/nav bar icon contrast in sync with the in-app theme toggle.
+            LaunchedEffect(appSettings.isDarkTheme) {
+                WindowCompat.getInsetsController(window, window.decorView).apply {
+                    isAppearanceLightStatusBars = !appSettings.isDarkTheme
+                    isAppearanceLightNavigationBars = !appSettings.isDarkTheme
                 }
-                val viewModel: FoodViewModel = viewModel(factory = foodViewModelFactory)
-                val authViewModel: AuthViewModel = viewModel()
+            }
+            FoodTrackerTheme(isDark = appSettings.isDarkTheme) {
+                val navController = rememberNavController()
                 val backStack by navController.currentBackStackEntryAsState()
                 val currentRoute = backStack?.destination?.route
 

@@ -478,31 +478,36 @@ fun MacroPill(
 
 @Composable
 fun CalorieRing(progress: Float, modifier: Modifier = Modifier) {
+    // Resolve theme colours outside the (non-composable) DrawScope lambda.
+    val ringTrack = GlassColors.ringTrack
+    val green = GlassColors.accentGreen
+    val blue = GlassColors.accentBlue
+    val orange = GlassColors.accentOrange
     Canvas(modifier) {
         val stroke  = 16.dp.toPx()
         val pad     = stroke / 2f
         val rect    = Size(size.width - stroke, size.height - stroke)
         val tl      = Offset(pad, pad)
 
-        drawArc(GlassColors.ringTrack, 0f, 360f, false, tl, rect,
+        drawArc(ringTrack, 0f, 360f, false, tl, rect,
             style = Stroke(stroke, cap = StrokeCap.Round))
 
         if (progress > 0f) {
             drawArc(
                 Brush.sweepGradient(
-                    0f to GlassColors.accentGreen.copy(.3f),
-                    .4f to GlassColors.accentBlue.copy(.3f),
-                    .7f to GlassColors.accentOrange.copy(.3f),
-                    1f  to GlassColors.accentGreen.copy(.3f)
+                    0f to green.copy(.3f),
+                    .4f to blue.copy(.3f),
+                    .7f to orange.copy(.3f),
+                    1f  to green.copy(.3f)
                 ), -90f, progress*360f, false, tl, rect,
                 style = Stroke(stroke + 8.dp.toPx(), cap = StrokeCap.Round)
             )
             drawArc(
                 Brush.sweepGradient(
-                    0f to GlassColors.accentGreen,
-                    .4f to GlassColors.accentBlue,
-                    .7f to GlassColors.accentOrange,
-                    1f  to GlassColors.accentGreen
+                    0f to green,
+                    .4f to blue,
+                    .7f to orange,
+                    1f  to green
                 ), -90f, progress*360f, false, tl, rect,
                 style = Stroke(stroke, cap = StrokeCap.Round)
             )

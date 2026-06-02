@@ -196,6 +196,11 @@ fun DailySummaryStrip(meals: List<MealTypeInfo>, modifier: Modifier = Modifier) 
     val progress      = if (totalGoal > 0) (totalConsumed.toFloat() / totalGoal).coerceIn(0f, 1f) else 0f
     val animProg by animateFloatAsState(progress, tween(1000), label = "stripProg")
 
+    // Resolve theme colours outside the (non-composable) DrawScope lambda.
+    val ringTrack = GlassColors.ringTrack
+    val ringGreen = GlassColors.accentGreen
+    val ringBlue = GlassColors.accentBlue
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -213,14 +218,14 @@ fun DailySummaryStrip(meals: List<MealTypeInfo>, modifier: Modifier = Modifier) 
                 val pad    = stroke / 2f
                 val rect   = Size(size.width - stroke, size.height - stroke)
                 val tl     = Offset(pad, pad)
-                drawArc(GlassColors.ringTrack, 0f, 360f, false, tl, rect,
+                drawArc(ringTrack, 0f, 360f, false, tl, rect,
                     style = Stroke(stroke, cap = StrokeCap.Round))
                 if (animProg > 0f) {
                     drawArc(
                         brush = Brush.sweepGradient(
-                            0f to GlassColors.accentGreen,
-                            .5f to GlassColors.accentBlue,
-                            1f  to GlassColors.accentGreen
+                            0f to ringGreen,
+                            .5f to ringBlue,
+                            1f  to ringGreen
                         ),
                         startAngle = -90f, sweepAngle = animProg * 360f,
                         useCenter = false, topLeft = tl, size = rect,
