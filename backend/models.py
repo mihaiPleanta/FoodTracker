@@ -99,3 +99,22 @@ class WeightCheckIn(Base):
         CheckConstraint("weight_kg > 0 AND weight_kg < 500", name="ck_weight_range"),
         Index("idx_weight_check_ins_uid_date", "uid", "log_date"),
     )
+
+
+class SavedRecipe(Base):
+    __tablename__ = "saved_recipes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    uid: Mapped[str] = mapped_column(
+        String, ForeignKey("profiles.uid", ondelete="CASCADE"), nullable=False
+    )
+    meal_type: Mapped[str] = mapped_column(String, nullable=False)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    recipe: Mapped[dict] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index("idx_saved_recipes_uid", "uid"),
+    )
