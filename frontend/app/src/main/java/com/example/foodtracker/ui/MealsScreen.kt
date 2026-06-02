@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -29,6 +30,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import android.widget.Toast
+import com.example.foodtracker.R
 import com.example.foodtracker.model.FoodItem
 import com.example.foodtracker.model.LoggedFood
 import com.example.foodtracker.model.RecipeDto
@@ -38,13 +40,13 @@ import com.example.foodtracker.viewmodel.FoodViewModel
 import com.example.foodtracker.viewmodel.RecipeUiState
 import com.example.foodtracker.viewmodel.RecipeViewModel
 
-private data class MealChip(val type: String, val label: String, val accent: Color)
+private data class MealChip(val type: String, val labelRes: Int, val accent: Color)
 
 private val mealChips = listOf(
-    MealChip("BREAKFAST", "Mic dejun", Color(0xFFFFD600)),
-    MealChip("LUNCH", "Prânz", Color(0xFF00E676)),
-    MealChip("DINNER", "Cină", Color(0xFF448AFF)),
-    MealChip("SNACKS", "Gustare", Color(0xFFFF6D00)),
+    MealChip("BREAKFAST", R.string.meal_breakfast, Color(0xFFFFD600)),
+    MealChip("LUNCH", R.string.meal_lunch, Color(0xFF00E676)),
+    MealChip("DINNER", R.string.meal_dinner, Color(0xFF448AFF)),
+    MealChip("SNACKS", R.string.meal_snacks, Color(0xFFFF6D00)),
 )
 
 // FoodViewModel keys meals by capitalized name; RecipeViewModel uses the wire form.
@@ -92,14 +94,14 @@ fun MealsScreen(
     ) {
         item {
             Text(
-                "Rețete AI",
+                stringResource(R.string.meals_title),
                 fontSize = 26.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = GlassColors.textPrimary,
             )
             Spacer(Modifier.height(2.dp))
             Text(
-                "Generate din produsele tale frecvente",
+                stringResource(R.string.meals_subtitle),
                 fontSize = 13.sp,
                 color = GlassColors.textSecondary,
             )
@@ -128,7 +130,7 @@ fun MealsScreen(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            chip.label,
+                            stringResource(chip.labelRes),
                             fontSize = 12.sp,
                             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                             color = if (selected) chip.accent else GlassColors.textSecondary,
@@ -152,7 +154,7 @@ fun MealsScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    "Generează rețetă",
+                    stringResource(R.string.meals_generate_button),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black,
@@ -171,7 +173,7 @@ fun MealsScreen(
                 ) {
                     CircularProgressIndicator(color = accent, modifier = Modifier.size(22.dp))
                     Spacer(Modifier.width(12.dp))
-                    Text("Se gătește o rețetă…", color = GlassColors.textSecondary, fontSize = 14.sp)
+                    Text(stringResource(R.string.meals_cooking), color = GlassColors.textSecondary, fontSize = 14.sp)
                 }
                 is RecipeUiState.Result -> RecipeCard(
                     recipe = s.recipe,
@@ -181,14 +183,14 @@ fun MealsScreen(
                     onAddToJournal = {
                         val mealName = backendMealToFoodVm[selectedMeal] ?: "Breakfast"
                         foodViewModel.addFoodToMeal(mealName, s.recipe.toLoggedPortion())
-                        Toast.makeText(context, "Adăugat în jurnal", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.meals_added_to_journal), Toast.LENGTH_SHORT).show()
                     },
                 )
                 is RecipeUiState.Error -> Column {
                     Text(s.message, color = Color(0xFFFF5252), fontSize = 14.sp)
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Reîncearcă",
+                        stringResource(R.string.action_retry),
                         color = accent,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.clickable { viewModel.generate() },
@@ -200,7 +202,7 @@ fun MealsScreen(
 
         item {
             Text(
-                "Rețetele mele",
+                stringResource(R.string.meals_my_recipes),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = GlassColors.textPrimary,
@@ -208,7 +210,7 @@ fun MealsScreen(
             Spacer(Modifier.height(12.dp))
             if (savedForMeal.isEmpty()) {
                 Text(
-                    "Nicio rețetă salvată pentru această masă.",
+                    stringResource(R.string.meals_none_saved),
                     color = GlassColors.textTertiary,
                     fontSize = 13.sp,
                 )
@@ -234,7 +236,7 @@ fun MealsScreen(
             onAddToJournal = {
                 val mealName = backendMealToFoodVm[opened.mealType] ?: "Breakfast"
                 foodViewModel.addFoodToMeal(mealName, opened.recipe.toLoggedPortion())
-                Toast.makeText(context, "Adăugat în jurnal", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.meals_added_to_journal), Toast.LENGTH_SHORT).show()
                 openedRecipe = null
             },
             onDismiss = { openedRecipe = null },
@@ -266,7 +268,7 @@ private fun SavedRecipeDialog(
             Text(recipe.description, fontSize = 13.sp, color = GlassColors.textSecondary)
             Spacer(Modifier.height(16.dp))
 
-            Text("Ingrediente", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = accent)
+            Text(stringResource(R.string.meals_ingredients), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = accent)
             Spacer(Modifier.height(6.dp))
             recipe.ingredients.forEach { ing ->
                 Text("• ${ing.name} — ${ing.quantity}", fontSize = 13.sp, color = GlassColors.textPrimary)
@@ -274,7 +276,7 @@ private fun SavedRecipeDialog(
             }
             Spacer(Modifier.height(16.dp))
 
-            Text("Preparare", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = accent)
+            Text(stringResource(R.string.meals_steps), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = accent)
             Spacer(Modifier.height(6.dp))
             recipe.steps.forEachIndexed { i, step ->
                 Text("${i + 1}. $step", fontSize = 13.sp, color = GlassColors.textPrimary)
@@ -298,7 +300,7 @@ private fun SavedRecipeDialog(
                     .clickable { onAddToJournal() }
                     .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center,
-            ) { Text("Adaugă în jurnal", fontWeight = FontWeight.Bold, color = Color.Black, fontSize = 14.sp) }
+            ) { Text(stringResource(R.string.meals_add_to_journal), fontWeight = FontWeight.Bold, color = Color.Black, fontSize = 14.sp) }
             Spacer(Modifier.height(10.dp))
             Box(
                 modifier = Modifier
@@ -308,7 +310,7 @@ private fun SavedRecipeDialog(
                     .clickable { onDismiss() }
                     .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center,
-            ) { Text("Închide", fontWeight = FontWeight.Bold, color = GlassColors.textPrimary, fontSize = 14.sp) }
+            ) { Text(stringResource(R.string.meals_close), fontWeight = FontWeight.Bold, color = GlassColors.textPrimary, fontSize = 14.sp) }
         }
     }
 }
@@ -334,14 +336,14 @@ private fun RecipeCard(
         Text(recipe.description, fontSize = 13.sp, color = GlassColors.textSecondary)
         Spacer(Modifier.height(14.dp))
 
-        Text("Ingrediente", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = accent)
+        Text(stringResource(R.string.meals_ingredients), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = accent)
         Spacer(Modifier.height(6.dp))
         recipe.ingredients.forEach { ing ->
             Text("• ${ing.name} — ${ing.quantity}", fontSize = 13.sp, color = GlassColors.textPrimary)
         }
         Spacer(Modifier.height(14.dp))
 
-        Text("Preparare", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = accent)
+        Text(stringResource(R.string.meals_steps), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = accent)
         Spacer(Modifier.height(6.dp))
         recipe.steps.forEachIndexed { i, step ->
             Text("${i + 1}. $step", fontSize = 13.sp, color = GlassColors.textPrimary)
@@ -365,7 +367,7 @@ private fun RecipeCard(
                 .clickable { onAddToJournal() }
                 .padding(vertical = 12.dp),
             contentAlignment = Alignment.Center,
-        ) { Text("Adaugă în jurnal", fontWeight = FontWeight.Bold, color = Color.Black, fontSize = 14.sp) }
+        ) { Text(stringResource(R.string.meals_add_to_journal), fontWeight = FontWeight.Bold, color = Color.Black, fontSize = 14.sp) }
         Spacer(Modifier.height(10.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -377,7 +379,7 @@ private fun RecipeCard(
                     .clickable { onSave() }
                     .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center,
-            ) { Text("Salvează", fontWeight = FontWeight.Bold, color = GlassColors.textPrimary, fontSize = 14.sp) }
+            ) { Text(stringResource(R.string.action_save), fontWeight = FontWeight.Bold, color = GlassColors.textPrimary, fontSize = 14.sp) }
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -386,7 +388,7 @@ private fun RecipeCard(
                     .clickable { onRegenerate() }
                     .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center,
-            ) { Text("Regenerează", fontWeight = FontWeight.Bold, color = GlassColors.textPrimary, fontSize = 14.sp) }
+            ) { Text(stringResource(R.string.meals_regenerate), fontWeight = FontWeight.Bold, color = GlassColors.textPrimary, fontSize = 14.sp) }
         }
     }
 }
@@ -413,7 +415,7 @@ private fun SavedRecipeCard(item: SavedRecipeDto, onClick: () -> Unit, onDelete:
             )
         }
         Text(
-            "Șterge",
+            stringResource(R.string.action_delete),
             fontSize = 13.sp,
             color = Color(0xFFFF5252),
             modifier = Modifier.clickable { onDelete() },
