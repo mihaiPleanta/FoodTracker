@@ -140,21 +140,29 @@ fun StatsScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            MacroProgressCard(
-                totalProtein = totalProtein,
-                proteinGoal = goals.proteinGoal,
-                totalCarbs = totalCarbs,
-                carbsGoal = goals.carbsGoal,
-                totalFat = totalFat,
-                fatGoal = goals.fatGoal
-            )
+            if (totalCalories == 0) {
+                EmptyStateCard(
+                    emoji = "🍽️",
+                    title = stringResource(R.string.stats_empty_day_title),
+                    subtitle = stringResource(R.string.stats_empty_day_subtitle),
+                )
+            } else {
+                MacroProgressCard(
+                    totalProtein = totalProtein,
+                    proteinGoal = goals.proteinGoal,
+                    totalCarbs = totalCarbs,
+                    carbsGoal = goals.carbsGoal,
+                    totalFat = totalFat,
+                    fatGoal = goals.fatGoal
+                )
 
-            Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(12.dp))
 
-            MealDistributionCard(
-                meals = mealSplits,
-                totalCalories = totalCalories
-            )
+                MealDistributionCard(
+                    meals = mealSplits,
+                    totalCalories = totalCalories
+                )
+            }
 
             Spacer(Modifier.height(12.dp))
 

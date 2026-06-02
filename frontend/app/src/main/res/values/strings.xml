@@ -79,6 +79,9 @@
     <string name="home_see_all">Vezi tot</string>
     <string name="home_recommended">Recomandat: %1$s kcal</string>
     <string name="home_tap_to_add">Apasă + pentru a adăuga</string>
+    <string name="home_meals">Mese</string>
+    <string name="home_empty_day_title">Nicio masă logată azi</string>
+    <string name="home_empty_day_subtitle">Apasă + la o masă ca să începi</string>
     <string name="home_hydration">Hidratare</string>
     <string name="home_weight">Greutate</string>
     <string name="home_no_checkin">Niciun check-in</string>
@@ -107,6 +110,8 @@
     <string name="stats_fat">Grăsimi</string>
     <string name="stats_meal_distribution">Distribuție pe mese</string>
     <string name="stats_no_calories">Nicio calorie logată pentru această zi</string>
+    <string name="stats_empty_day_title">Nimic logat în această zi</string>
+    <string name="stats_empty_day_subtitle">Adaugă mâncare din ecranul Acasă</string>
     <string name="stats_weight_trend">Evoluție greutate</string>
     <string name="stats_no_checkins_available">Niciun check-in disponibil</string>
     <string name="stats_one_checkin">Un singur check-in disponibil</string>

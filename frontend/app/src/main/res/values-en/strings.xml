@@ -76,6 +76,9 @@
     <string name="home_see_all">See all</string>
     <string name="home_recommended">Recommended: %1$s kcal</string>
     <string name="home_tap_to_add">Tap + to add food</string>
+    <string name="home_meals">Meals</string>
+    <string name="home_empty_day_title">No meals logged today</string>
+    <string name="home_empty_day_subtitle">Tap + on a meal to get started</string>
     <string name="home_hydration">Hydration</string>
     <string name="home_weight">Weight</string>
     <string name="home_no_checkin">No check-in</string>
@@ -104,6 +107,8 @@
     <string name="stats_fat">Fat</string>
     <string name="stats_meal_distribution">Meal distribution</string>
     <string name="stats_no_calories">No calories logged for this day</string>
+    <string name="stats_empty_day_title">Nothing logged this day</string>
+    <string name="stats_empty_day_subtitle">Add food from the Home screen</string>
     <string name="stats_weight_trend">Weight trend</string>
     <string name="stats_no_checkins_available">No check-ins available</string>
     <string name="stats_one_checkin">Only one check-in available</string>
