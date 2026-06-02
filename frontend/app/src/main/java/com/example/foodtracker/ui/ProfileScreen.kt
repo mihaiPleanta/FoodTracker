@@ -69,14 +69,17 @@ fun ProfileScreen(viewModel: FoodViewModel, authViewModel: AuthViewModel) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
+    val profileSaveErrorMsg = (saveState as? ProfileSaveState.Error)?.messageRes
+        ?.let { stringResource(it) }
+
     LaunchedEffect(saveState) {
-        when (val state = saveState) {
+        when (saveState) {
             is ProfileSaveState.Success -> {
                 delay(1200)
                 authViewModel.clearProfileSaveState()
             }
             is ProfileSaveState.Error -> {
-                snackbarHostState.showSnackbar(state.message)
+                snackbarHostState.showSnackbar(profileSaveErrorMsg ?: "")
                 authViewModel.clearProfileSaveState()
             }
             else -> {}

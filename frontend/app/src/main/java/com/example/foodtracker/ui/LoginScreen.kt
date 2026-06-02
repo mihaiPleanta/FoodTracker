@@ -43,7 +43,8 @@ fun LoginScreen(
 
     val uiState by authViewModel.uiState.collectAsState()
     val isLoading = uiState is AuthUiState.Loading
-    val errorMessage = (uiState as? AuthUiState.Error)?.message
+    val errorResId = (uiState as? AuthUiState.Error)?.messageRes
+    val errorMessage = errorResId?.let { stringResource(it) }
 
     val context = LocalContext.current
     val googleSignInClient = remember {

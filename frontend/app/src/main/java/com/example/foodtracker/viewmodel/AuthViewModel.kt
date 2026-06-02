@@ -1,7 +1,9 @@
 package com.example.foodtracker.viewmodel
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.foodtracker.R
 import com.example.foodtracker.api.ProfileApi
 import com.example.foodtracker.api.RetrofitInstance
 import com.example.foodtracker.model.ActivityLevel
@@ -26,13 +28,13 @@ sealed class ProfileSaveState {
     object Idle : ProfileSaveState()
     object Saving : ProfileSaveState()
     object Success : ProfileSaveState()
-    data class Error(val message: String) : ProfileSaveState()
+    data class Error(@StringRes val messageRes: Int) : ProfileSaveState()
 }
 
 sealed class AuthUiState {
     object Idle : AuthUiState()
     object Loading : AuthUiState()
-    data class Error(val message: String) : AuthUiState()
+    data class Error(@StringRes val messageRes: Int) : AuthUiState()
     object NavigateLogin : AuthUiState()
     object NavigateHome : AuthUiState()
     object NavigateOnboarding : AuthUiState()
@@ -204,7 +206,7 @@ class AuthViewModel : ViewModel() {
                     _profileSaveState.value = ProfileSaveState.Success
                 }
                 .onFailure {
-                    _profileSaveState.value = ProfileSaveState.Error("Nu s-a putut salva profilul")
+                    _profileSaveState.value = ProfileSaveState.Error(R.string.error_profile_save)
                 }
         }
     }

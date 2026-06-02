@@ -42,7 +42,8 @@ fun RegisterScreen(
 
     val uiState by authViewModel.uiState.collectAsState()
     val isLoading = uiState is AuthUiState.Loading
-    val firebaseError = (uiState as? AuthUiState.Error)?.message
+    val firebaseErrorRes = (uiState as? AuthUiState.Error)?.messageRes
+    val firebaseError = firebaseErrorRes?.let { stringResource(it) }
     val errorMessage = localError ?: firebaseError
 
     val strPasswordTooShort = stringResource(R.string.register_password_too_short)
