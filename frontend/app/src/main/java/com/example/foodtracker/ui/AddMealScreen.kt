@@ -13,6 +13,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.res.stringResource
+import com.example.foodtracker.R
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -137,14 +139,14 @@ fun AddMealScreen(navController: NavController) {
             // ── Header ────────────────────────────────────────────────────────
             Column(Modifier.padding(horizontal = 20.dp)) {
                 Text(
-                    text = "Add Food",
+                    text = stringResource(R.string.add_meal_title),
                     fontSize = 30.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = GlassColors.textPrimary
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "Choose a meal to log food into",
+                    text = stringResource(R.string.add_meal_choose),
                     fontSize = 14.sp,
                     color = GlassColors.textSecondary
                 )
@@ -159,7 +161,7 @@ fun AddMealScreen(navController: NavController) {
 
             // ── Meals label ───────────────────────────────────────────────────
             Text(
-                text = "Select Meal",
+                text = stringResource(R.string.add_meal_select),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = GlassColors.textSecondary,
@@ -357,7 +359,7 @@ fun AddMealCard(
 
                     if (isEmpty) {
                         Text(
-                            "Recommended: ${meal.recommendedRange} kcal",
+                            stringResource(R.string.home_recommended, meal.recommendedRange),
                             fontSize = 12.sp,
                             color = GlassColors.textTertiary
                         )
@@ -417,7 +419,7 @@ fun AddMealCard(
                     Arrangement.SpaceBetween
                 ) {
                     Text(
-                        if (isEmpty) "No food logged yet"
+                        if (isEmpty) stringResource(R.string.add_meal_no_food)
                         else "${meal.consumedCalories} / ${meal.calorieGoal} kcal",
                         fontSize = 11.sp,
                         color = GlassColors.textTertiary
@@ -464,7 +466,8 @@ fun AddMealCard(
                     Alignment.CenterVertically
                 ) {
                     Text(
-                        if (expanded) "Hide items ▲" else "Show ${meal.entries.size} items ▼",
+                        if (expanded) stringResource(R.string.add_meal_hide_items)
+                        else stringResource(R.string.add_meal_show_items, meal.entries.size),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         color = meal.accentColor.copy(.8f)
@@ -543,9 +546,9 @@ fun AddMealScreenPreview() {
                     .verticalScroll(rememberScrollState())
             ) {
                 Spacer(Modifier.height(12.dp))
-                Text("Add Food", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold,
+                Text(stringResource(R.string.add_meal_title), fontSize = 30.sp, fontWeight = FontWeight.ExtraBold,
                     color = GlassColors.textPrimary)
-                Text("Choose a meal to log food into", fontSize = 14.sp,
+                Text(stringResource(R.string.add_meal_choose), fontSize = 14.sp,
                     color = GlassColors.textSecondary)
                 Spacer(Modifier.height(20.dp))
                 listOf(
