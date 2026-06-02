@@ -22,6 +22,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.example.foodtracker.R
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -166,12 +168,12 @@ fun StatsScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text(
-                        text = "Nu ai niciun check-in de greutate.",
+                        text = stringResource(R.string.stats_no_checkins),
                         fontSize = 13.sp,
                         color = GlassColors.textSecondary
                     )
                     Button(onClick = { showWeightSheet = true }) {
-                        Text("Adaugă primul check-in")
+                        Text(stringResource(R.string.stats_add_first_checkin))
                     }
                 }
             } else {
@@ -207,23 +209,23 @@ private fun QuickKpiRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         KpiCard(
-            title = "Calories",
+            title = stringResource(R.string.stats_calories),
             value = "$totalCalories",
             subtitle = "/ $calorieGoal kcal",
             accentColor = GlassColors.accentGreen,
             modifier = Modifier.weight(1f)
         )
         KpiCard(
-            title = "Hydration",
+            title = stringResource(R.string.stats_hydration),
             value = "${"%.1f".format(Locale.ENGLISH, hydrationLiters)}L",
             subtitle = "/ ${"%.1f".format(Locale.ENGLISH, hydrationGoal)}L",
             accentColor = GlassColors.accentBlue,
             modifier = Modifier.weight(1f)
         )
         KpiCard(
-            title = "Protein",
+            title = stringResource(R.string.stats_protein),
             value = "${totalProtein}g",
-            subtitle = "today",
+            subtitle = stringResource(R.string.stats_today),
             accentColor = GlassColors.proteinColor,
             modifier = Modifier.weight(1f)
         )
@@ -281,17 +283,17 @@ private fun MacroProgressCard(
             .padding(16.dp)
     ) {
         Text(
-            text = "Macro progress",
+            text = stringResource(R.string.stats_macro_progress),
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
             color = GlassColors.textPrimary
         )
         Spacer(Modifier.height(10.dp))
-        MacroLine(label = "Protein", value = totalProtein, goal = proteinGoal, color = GlassColors.proteinColor)
+        MacroLine(label = stringResource(R.string.stats_protein), value = totalProtein, goal = proteinGoal, color = GlassColors.proteinColor)
         Spacer(Modifier.height(10.dp))
-        MacroLine(label = "Carbs", value = totalCarbs, goal = carbsGoal, color = GlassColors.carbsColor)
+        MacroLine(label = stringResource(R.string.stats_carbs), value = totalCarbs, goal = carbsGoal, color = GlassColors.carbsColor)
         Spacer(Modifier.height(10.dp))
-        MacroLine(label = "Fat", value = totalFat, goal = fatGoal, color = GlassColors.fatColor)
+        MacroLine(label = stringResource(R.string.stats_fat), value = totalFat, goal = fatGoal, color = GlassColors.fatColor)
     }
 }
 
@@ -344,14 +346,14 @@ private fun MealDistributionCard(meals: List<MealSplit>, totalCalories: Int) {
             .padding(16.dp)
     ) {
         Text(
-            text = "Meal distribution",
+            text = stringResource(R.string.stats_meal_distribution),
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
             color = GlassColors.textPrimary
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = if (totalCalories > 0) "$totalCalories kcal consumed" else "No calories logged for this day",
+            text = if (totalCalories > 0) "$totalCalories kcal consumed" else stringResource(R.string.stats_no_calories),
             fontSize = 12.sp,
             color = GlassColors.textSecondary
         )
@@ -416,7 +418,7 @@ private fun WeightTrendCard(weightHistory: List<WeightCheckIn>) {
             .padding(16.dp)
     ) {
         Text(
-            text = "Weight trend",
+            text = stringResource(R.string.stats_weight_trend),
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
             color = GlassColors.textPrimary
@@ -424,8 +426,8 @@ private fun WeightTrendCard(weightHistory: List<WeightCheckIn>) {
         Spacer(Modifier.height(4.dp))
         Text(
             text = when {
-                lastWeight == null -> "No check-ins available"
-                delta == null -> "Only one check-in available"
+                lastWeight == null -> stringResource(R.string.stats_no_checkins_available)
+                delta == null -> stringResource(R.string.stats_one_checkin)
                 delta > 0f -> "7d change: +${"%.1f".format(Locale.ENGLISH, delta)} kg"
                 delta < 0f -> "7d change: ${"%.1f".format(Locale.ENGLISH, delta)} kg"
                 else -> "7d change: stable"
@@ -438,7 +440,7 @@ private fun WeightTrendCard(weightHistory: List<WeightCheckIn>) {
 
         if (recent.size < 2) {
             Text(
-                text = "Add at least 2 weight check-ins to show the trend line.",
+                text = stringResource(R.string.stats_need_two_checkins),
                 fontSize = 12.sp,
                 color = GlassColors.textTertiary
             )
