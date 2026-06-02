@@ -55,6 +55,7 @@ import com.example.foodtracker.model.FoodItem
 import com.example.foodtracker.model.LoggedFood
 import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.util.CategoryEmojiMapper
+import com.example.foodtracker.util.findActivity
 import com.example.foodtracker.util.scaleNutrition
 import com.example.foodtracker.viewmodel.FoodViewModel
 import kotlinx.coroutines.launch
@@ -133,7 +134,7 @@ fun MealDetailScreen(
                     accentColor = accentColor,
                     onClick = {
                         coroutineScope.launch {
-                            val activity = context as? android.app.Activity ?: return@launch
+                            val activity = context.findActivity() ?: return@launch
                             val code = try {
                                 com.example.foodtracker.util.BarcodeScanner.scan(activity)
                             } catch (_: Throwable) { null }
