@@ -18,10 +18,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.foodtracker.R
 import com.example.foodtracker.model.ActivityLevel
 import com.example.foodtracker.model.Gender
 import com.example.foodtracker.ui.theme.GlassColors
@@ -127,15 +129,15 @@ private fun OnboardingStep1(
     onNext: () -> Unit
 ) {
     Column {
-        Text("Bun venit! 👋", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
+        Text(stringResource(R.string.onboarding_welcome), fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
             color = GlassColors.textPrimary)
         Spacer(Modifier.height(6.dp))
-        Text("Cum te numești?", fontSize = 14.sp, color = GlassColors.textSecondary)
+        Text(stringResource(R.string.onboarding_name_q), fontSize = 14.sp, color = GlassColors.textSecondary)
         Spacer(Modifier.height(28.dp))
-        AuthTextField(value = name, onValueChange = onNameChange, placeholder = "Numele tău")
+        AuthTextField(value = name, onValueChange = onNameChange, placeholder = stringResource(R.string.onboarding_name_hint))
         Spacer(Modifier.height(24.dp))
         AuthPrimaryButton(
-            text = "Continuă",
+            text = stringResource(R.string.action_continue),
             enabled = name.isNotBlank(),
             modifier = Modifier.fillMaxWidth(),
             onClick = onNext
@@ -157,18 +159,18 @@ private fun OnboardingStep2(
     onNext: () -> Unit
 ) {
     Column {
-        Text("Câteva detalii", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
+        Text(stringResource(R.string.onboarding_details_title), fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
             color = GlassColors.textPrimary)
         Spacer(Modifier.height(6.dp))
-        Text("Despre tine", fontSize = 14.sp, color = GlassColors.textSecondary)
+        Text(stringResource(R.string.onboarding_details_subtitle), fontSize = 14.sp, color = GlassColors.textSecondary)
         Spacer(Modifier.height(28.dp))
 
         AuthTextField(value = age, onValueChange = onAgeChange,
-            placeholder = "Vârstă", keyboardType = KeyboardType.Number)
+            placeholder = stringResource(R.string.onboarding_age), keyboardType = KeyboardType.Number)
         Spacer(Modifier.height(12.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            listOf(Gender.MALE to "Masculin", Gender.FEMALE to "Feminin", Gender.OTHER to "Altul")
+            listOf(Gender.MALE to stringResource(R.string.gender_male), Gender.FEMALE to stringResource(R.string.gender_female), Gender.OTHER to stringResource(R.string.gender_other))
                 .forEach { (g, label) ->
                     val selected = g == gender
                     Box(
@@ -187,10 +189,10 @@ private fun OnboardingStep2(
         Spacer(Modifier.height(12.dp))
 
         AuthTextField(value = heightCm, onValueChange = onHeightChange,
-            placeholder = "Înălțime (cm)", keyboardType = KeyboardType.Number)
+            placeholder = stringResource(R.string.onboarding_height), keyboardType = KeyboardType.Number)
         Spacer(Modifier.height(12.dp))
         AuthTextField(value = currentWeightKg, onValueChange = onWeightChange,
-            placeholder = "Greutate curentă (kg)", keyboardType = KeyboardType.Decimal)
+            placeholder = stringResource(R.string.onboarding_current_weight), keyboardType = KeyboardType.Decimal)
         Spacer(Modifier.height(24.dp))
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -198,7 +200,7 @@ private fun OnboardingStep2(
                 Modifier.weight(1f).height(52.dp).glassCard(16).clickable { onBack() },
                 contentAlignment = Alignment.Center
             ) {
-                Text("Înapoi", fontSize = 15.sp, color = GlassColors.textSecondary)
+                Text(stringResource(R.string.action_back), fontSize = 15.sp, color = GlassColors.textSecondary)
             }
             Box(
                 Modifier.weight(2f).height(52.dp)
@@ -208,7 +210,7 @@ private fun OnboardingStep2(
                     .clickable { onNext() },
                 contentAlignment = Alignment.Center
             ) {
-                Text("Continuă", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                Text(stringResource(R.string.action_continue), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.Black)
             }
         }
     }
@@ -227,26 +229,31 @@ private fun OnboardingStep3(
     onBack: () -> Unit,
     onFinish: () -> Unit
 ) {
+    val strSedentary = stringResource(R.string.activity_sedentary)
+    val strLight = stringResource(R.string.activity_light)
+    val strModerate = stringResource(R.string.activity_moderate)
+    val strActive = stringResource(R.string.activity_active)
+    val strVeryActive = stringResource(R.string.activity_very_active)
     val activityLabels = mapOf(
-        ActivityLevel.SEDENTARY to "Sedentar",
-        ActivityLevel.LIGHT to "Ușor",
-        ActivityLevel.MODERATE to "Moderat",
-        ActivityLevel.ACTIVE to "Activ",
-        ActivityLevel.VERY_ACTIVE to "F. activ"
+        ActivityLevel.SEDENTARY to strSedentary,
+        ActivityLevel.LIGHT to strLight,
+        ActivityLevel.MODERATE to strModerate,
+        ActivityLevel.ACTIVE to strActive,
+        ActivityLevel.VERY_ACTIVE to strVeryActive
     )
 
     Column {
-        Text("Obiectivul tău 🎯", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
+        Text(stringResource(R.string.onboarding_goal_title), fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
             color = GlassColors.textPrimary)
         Spacer(Modifier.height(6.dp))
-        Text("Vom calcula necesarul caloric", fontSize = 14.sp, color = GlassColors.textSecondary)
+        Text(stringResource(R.string.onboarding_goal_subtitle), fontSize = 14.sp, color = GlassColors.textSecondary)
         Spacer(Modifier.height(28.dp))
 
         AuthTextField(value = targetWeightKg, onValueChange = onTargetWeightChange,
-            placeholder = "Greutate țintă (kg)", keyboardType = KeyboardType.Decimal)
+            placeholder = stringResource(R.string.onboarding_target_weight), keyboardType = KeyboardType.Decimal)
         Spacer(Modifier.height(16.dp))
 
-        Text("Nivel activitate", fontSize = 13.sp, color = GlassColors.textSecondary)
+        Text(stringResource(R.string.onboarding_activity), fontSize = 13.sp, color = GlassColors.textSecondary)
         Spacer(Modifier.height(8.dp))
         Row(
             Modifier.horizontalScroll(rememberScrollState()),
@@ -280,7 +287,7 @@ private fun OnboardingStep3(
                 CircularProgressIndicator(color = GlassColors.accentGreen,
                     modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
             } else {
-                Text("Calculează obiectivul caloric", fontSize = 14.sp,
+                Text(stringResource(R.string.onboarding_calculate), fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold, color = GlassColors.accentGreen)
             }
         }
@@ -298,7 +305,7 @@ private fun OnboardingStep3(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.fillMaxWidth()) {
-                        Text("Obiectiv caloric calculat", fontSize = 12.sp,
+                        Text(stringResource(R.string.onboarding_calculated), fontSize = 12.sp,
                             color = GlassColors.textSecondary)
                         Spacer(Modifier.height(4.dp))
                         Text("${calculatedCalorieGoal ?: 0} kcal/zi", fontSize = 26.sp,
@@ -315,10 +322,10 @@ private fun OnboardingStep3(
                 Modifier.weight(1f).height(52.dp).glassCard(16).clickable { onBack() },
                 contentAlignment = Alignment.Center
             ) {
-                Text("Înapoi", fontSize = 15.sp, color = GlassColors.textSecondary)
+                Text(stringResource(R.string.action_back), fontSize = 15.sp, color = GlassColors.textSecondary)
             }
             AuthPrimaryButton(
-                text = "Hai să începem",
+                text = stringResource(R.string.onboarding_start),
                 isLoading = isSubmitting,
                 modifier = Modifier.weight(2f),
                 onClick = onFinish
