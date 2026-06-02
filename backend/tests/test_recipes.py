@@ -30,6 +30,25 @@ def test_recipe_json_schema_has_expected_fields():
         assert field in props
 
 
+def test_recipe_coerces_float_macros_to_int():
+    # Small LLMs often emit macros as floats (protein_g: 12.5); these must be
+    # accepted and rounded, not rejected.
+    recipe = RecipeDto.model_validate({
+        "title": "Test",
+        "description": "x",
+        "ingredients": [{"name": "Ou", "quantity": "2"}],
+        "steps": ["fa"],
+        "servings": 1.0,
+        "kcal_per_serving": 320.6,
+        "protein_g": 12.5,
+        "carbs_g": 3.2,
+        "fat_g": 22.0,
+    })
+    assert recipe.kcal_per_serving == 321
+    assert recipe.protein_g == 12  # round(12.5) banker's rounding -> 12
+    assert recipe.fat_g == 22
+
+
 async def test_get_top_foods_orders_by_frequency_then_grams():
     async with SessionLocal() as db:
         db.add(Profile(uid="u1", **_PROFILE_KW))

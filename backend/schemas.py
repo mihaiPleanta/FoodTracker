@@ -1,7 +1,7 @@
 from datetime import date as _date, datetime as _datetime
 from typing import Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ProfileRequest(BaseModel):
@@ -138,6 +138,24 @@ class RecipeDto(BaseModel):
     protein_g: int
     carbs_g: int
     fat_g: int
+
+    # Small LLMs frequently return macros as floats (e.g. protein_g: 12.5).
+    # Round them to int so the wire stays integer (the Android DTO expects Int)
+    # instead of rejecting an otherwise-valid recipe.
+    @field_validator(
+        "servings", "kcal_per_serving", "protein_g", "carbs_g", "fat_g",
+        mode="before",
+    )
+    @classmethod
+    def _round_floats_to_int(cls, v):
+        if isinstance(v, float):
+            return round(v)
+        if isinstance(v, str):
+            try:
+                return round(float(v))
+            except ValueError:
+                return v
+        return v
 
 
 class RecipeGenerateRequest(BaseModel):
