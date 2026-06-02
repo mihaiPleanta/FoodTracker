@@ -21,15 +21,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.widget.Toast
+import com.example.foodtracker.model.FoodItem
+import com.example.foodtracker.model.LoggedFood
 import com.example.foodtracker.model.RecipeDto
 import com.example.foodtracker.model.SavedRecipeDto
 import com.example.foodtracker.ui.theme.GlassColors
+import com.example.foodtracker.viewmodel.FoodViewModel
 import com.example.foodtracker.viewmodel.RecipeUiState
 import com.example.foodtracker.viewmodel.RecipeViewModel
 
@@ -42,8 +47,35 @@ private val mealChips = listOf(
     MealChip("SNACKS", "Gustare", Color(0xFFFF6D00)),
 )
 
+// FoodViewModel keys meals by capitalized name; RecipeViewModel uses the wire form.
+private val backendMealToFoodVm = mapOf(
+    "BREAKFAST" to "Breakfast",
+    "LUNCH" to "Lunch",
+    "DINNER" to "Dinner",
+    "SNACKS" to "Snacks",
+)
+
+// A recipe is logged as a single 100g "portion", so its per-serving macros map
+// directly onto the per-100g fields the food log stores.
+private fun RecipeDto.toLoggedPortion(): LoggedFood = LoggedFood(
+    food = FoodItem(
+        barcode = "recipe",
+        name = title,
+        categories = listOf("recipe"),
+        per100g = kcalPerServing,
+        protein100g = proteinG.toFloat(),
+        carbs100g = carbsG.toFloat(),
+        fat100g = fatG.toFloat(),
+    ),
+    grams = 100,
+)
+
 @Composable
-fun MealsScreen(viewModel: RecipeViewModel = viewModel()) {
+fun MealsScreen(
+    foodViewModel: FoodViewModel,
+    viewModel: RecipeViewModel = viewModel(),
+) {
+    val context = LocalContext.current
     val recipeState by viewModel.recipeState.collectAsState()
     val saved by viewModel.savedRecipes.collectAsState()
     val selectedMeal by viewModel.selectedMealType.collectAsState()
@@ -146,6 +178,11 @@ fun MealsScreen(viewModel: RecipeViewModel = viewModel()) {
                     accent = accent,
                     onSave = { viewModel.saveCurrent() },
                     onRegenerate = { viewModel.generate() },
+                    onAddToJournal = {
+                        val mealName = backendMealToFoodVm[selectedMeal] ?: "Breakfast"
+                        foodViewModel.addFoodToMeal(mealName, s.recipe.toLoggedPortion())
+                        Toast.makeText(context, "Adăugat în jurnal", Toast.LENGTH_SHORT).show()
+                    },
                 )
                 is RecipeUiState.Error -> Column {
                     Text(s.message, color = Color(0xFFFF5252), fontSize = 14.sp)
@@ -194,6 +231,12 @@ fun MealsScreen(viewModel: RecipeViewModel = viewModel()) {
         SavedRecipeDialog(
             item = opened,
             accent = openedAccent,
+            onAddToJournal = {
+                val mealName = backendMealToFoodVm[opened.mealType] ?: "Breakfast"
+                foodViewModel.addFoodToMeal(mealName, opened.recipe.toLoggedPortion())
+                Toast.makeText(context, "Adăugat în jurnal", Toast.LENGTH_SHORT).show()
+                openedRecipe = null
+            },
             onDismiss = { openedRecipe = null },
         )
     }
@@ -203,6 +246,7 @@ fun MealsScreen(viewModel: RecipeViewModel = viewModel()) {
 private fun SavedRecipeDialog(
     item: SavedRecipeDto,
     accent: Color,
+    onAddToJournal: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val recipe = item.recipe
@@ -251,10 +295,20 @@ private fun SavedRecipeDialog(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(accent)
+                    .clickable { onAddToJournal() }
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) { Text("Adaugă în jurnal", fontWeight = FontWeight.Bold, color = Color.Black, fontSize = 14.sp) }
+            Spacer(Modifier.height(10.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .border(1.dp, GlassColors.cardBorder, RoundedCornerShape(12.dp))
                     .clickable { onDismiss() }
                     .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center,
-            ) { Text("Închide", fontWeight = FontWeight.Bold, color = Color.Black, fontSize = 14.sp) }
+            ) { Text("Închide", fontWeight = FontWeight.Bold, color = GlassColors.textPrimary, fontSize = 14.sp) }
         }
     }
 }
@@ -265,6 +319,7 @@ private fun RecipeCard(
     accent: Color,
     onSave: () -> Unit,
     onRegenerate: () -> Unit,
+    onAddToJournal: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -302,16 +357,27 @@ private fun RecipeCard(
         )
         Spacer(Modifier.height(16.dp))
 
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(accent)
+                .clickable { onAddToJournal() }
+                .padding(vertical = 12.dp),
+            contentAlignment = Alignment.Center,
+        ) { Text("Adaugă în jurnal", fontWeight = FontWeight.Bold, color = Color.Black, fontSize = 14.sp) }
+        Spacer(Modifier.height(10.dp))
+
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(accent)
+                    .border(1.dp, GlassColors.cardBorder, RoundedCornerShape(12.dp))
                     .clickable { onSave() }
                     .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center,
-            ) { Text("Salvează", fontWeight = FontWeight.Bold, color = Color.Black, fontSize = 14.sp) }
+            ) { Text("Salvează", fontWeight = FontWeight.Bold, color = GlassColors.textPrimary, fontSize = 14.sp) }
             Box(
                 modifier = Modifier
                     .weight(1f)

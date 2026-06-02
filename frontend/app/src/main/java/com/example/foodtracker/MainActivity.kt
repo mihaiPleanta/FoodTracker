@@ -194,7 +194,7 @@ class MainActivity : ComponentActivity() {
                                     StatsScreen(viewModel)
                                 }
                                 composable("meals") {
-                                    MealsScreen()
+                                    MealsScreen(foodViewModel = viewModel)
                                 }
                                 composable("profile") {
                                     ProfileScreen(viewModel, authViewModel)
