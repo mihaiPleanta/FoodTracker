@@ -1,7 +1,9 @@
 package com.example.foodtracker.viewmodel
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.foodtracker.R
 import com.example.foodtracker.api.RetrofitInstance
 import com.example.foodtracker.model.RecipeDto
 import com.example.foodtracker.model.RecipeGenerateRequest
@@ -21,7 +23,7 @@ sealed interface RecipeUiState {
     data object Idle : RecipeUiState
     data object Loading : RecipeUiState
     data class Result(val recipe: RecipeDto) : RecipeUiState
-    data class Error(val message: String) : RecipeUiState
+    data class Error(@StringRes val messageRes: Int, val arg: Int? = null) : RecipeUiState
 }
 
 class RecipeViewModel : ViewModel() {
@@ -66,16 +68,14 @@ class RecipeViewModel : ViewModel() {
                 val recipe = api.generateRecipe(RecipeGenerateRequest(meal))
                 setState(meal, RecipeUiState.Result(recipe))
             } catch (e: HttpException) {
-                setState(meal, RecipeUiState.Error(
-                    when (e.code()) {
-                        422 -> "Loghează mai multe alimente ca să generăm rețete"
-                        503 -> "Serviciul AI nu e disponibil, încearcă din nou"
-                        502 -> "Răspuns AI invalid, încearcă din nou"
-                        else -> "Eroare neașteptată (${e.code()})"
-                    }
-                ))
+                setState(meal, when (e.code()) {
+                    422 -> RecipeUiState.Error(R.string.error_recipe_insufficient)
+                    503 -> RecipeUiState.Error(R.string.error_ai_unavailable)
+                    502 -> RecipeUiState.Error(R.string.error_ai_invalid)
+                    else -> RecipeUiState.Error(R.string.error_unexpected_code, e.code())
+                })
             } catch (e: IOException) {
-                setState(meal, RecipeUiState.Error("Verifică conexiunea la internet"))
+                setState(meal, RecipeUiState.Error(R.string.error_no_internet))
             }
         }
     }

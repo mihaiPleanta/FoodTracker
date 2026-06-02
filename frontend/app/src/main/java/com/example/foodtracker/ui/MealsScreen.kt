@@ -187,7 +187,12 @@ fun MealsScreen(
                     },
                 )
                 is RecipeUiState.Error -> Column {
-                    Text(s.message, color = Color(0xFFFF5252), fontSize = 14.sp)
+                    Text(
+                        if (s.arg != null) stringResource(s.messageRes, s.arg)
+                        else stringResource(s.messageRes),
+                        color = Color(0xFFFF5252),
+                        fontSize = 14.sp,
+                    )
                     Spacer(Modifier.height(8.dp))
                     Text(
                         stringResource(R.string.action_retry),
