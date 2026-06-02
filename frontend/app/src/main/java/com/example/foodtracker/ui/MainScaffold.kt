@@ -58,7 +58,7 @@ val navItems = listOf(
 )
 
 // Routes that are actually implemented
-val enabledRoutes = setOf("home", "stats", "profile")
+val enabledRoutes = setOf("home", "stats", "meals", "profile")
 
 // ── Bottom bar ────────────────────────────────────────────────────────────────
 
