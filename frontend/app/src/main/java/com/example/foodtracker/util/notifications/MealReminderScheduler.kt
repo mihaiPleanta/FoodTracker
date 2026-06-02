@@ -1,6 +1,8 @@
 package com.example.foodtracker.util.notifications
 
 import android.content.Context
+import androidx.annotation.StringRes
+import com.example.foodtracker.R
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
@@ -16,17 +18,17 @@ object MealReminderScheduler {
 
     enum class Meal(
         val key: String,
-        val displayName: String,
+        @StringRes val nameRes: Int,
         val emoji: String,
         val accentHex: String,
         val targetHour: Int,
         val notificationId: Int,
         val uniqueWorkName: String,
     ) {
-        BREAKFAST("Breakfast", "micul dejun", "🍳", "FFD600", 8,  1, "meal_reminder_breakfast"),
-        LUNCH    ("Lunch",     "prânz",       "🥗", "00E676", 13, 2, "meal_reminder_lunch"),
-        SNACKS   ("Snacks",    "gustare",     "🍎", "FF6D00", 16, 3, "meal_reminder_snacks"),
-        DINNER   ("Dinner",    "cină",        "🍝", "448AFF", 19, 4, "meal_reminder_dinner"),
+        BREAKFAST("Breakfast", R.string.notif_meal_name_breakfast, "🍳", "FFD600", 8,  1, "meal_reminder_breakfast"),
+        LUNCH    ("Lunch",     R.string.notif_meal_name_lunch,     "🥗", "00E676", 13, 2, "meal_reminder_lunch"),
+        SNACKS   ("Snacks",    R.string.notif_meal_name_snacks,    "🍎", "FF6D00", 16, 3, "meal_reminder_snacks"),
+        DINNER   ("Dinner",    R.string.notif_meal_name_dinner,    "🍝", "448AFF", 19, 4, "meal_reminder_dinner"),
     }
 
     /** Enqueue four unique periodic work requests, idempotent thanks to KEEP policy. */

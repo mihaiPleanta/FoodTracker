@@ -194,6 +194,10 @@
     <!-- Notifications -->
     <string name="notif_meal_time">Time for %1$s</string>
     <string name="notif_meal_body">Log what you ate %1$s</string>
+    <string name="notif_meal_name_breakfast">breakfast</string>
+    <string name="notif_meal_name_lunch">lunch</string>
+    <string name="notif_meal_name_snacks">snacks</string>
+    <string name="notif_meal_name_dinner">dinner</string>
 
     <!-- Errors -->
     <string name="error_no_internet">Check your internet connection</string>

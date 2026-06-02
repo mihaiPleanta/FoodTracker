@@ -197,6 +197,10 @@
     <!-- Notifications -->
     <string name="notif_meal_time">Timpul pentru %1$s</string>
     <string name="notif_meal_body">Loghează ce ai mâncat %1$s</string>
+    <string name="notif_meal_name_breakfast">micul dejun</string>
+    <string name="notif_meal_name_lunch">prânz</string>
+    <string name="notif_meal_name_snacks">gustare</string>
+    <string name="notif_meal_name_dinner">cină</string>
 
     <!-- Errors -->
     <string name="error_no_internet">Verifică conexiunea la internet</string>

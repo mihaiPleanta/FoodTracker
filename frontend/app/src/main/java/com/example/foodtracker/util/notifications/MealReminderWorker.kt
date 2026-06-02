@@ -50,7 +50,8 @@ class MealReminderWorker(
         }
         val localizedCtx = applicationContext.createConfigurationContext(config)
 
-        val title = localizedCtx.getString(R.string.notif_meal_time, meal.displayName)
+        val mealLabel = localizedCtx.getString(meal.nameRes)
+        val title = localizedCtx.getString(R.string.notif_meal_time, mealLabel)
         val body = localizedCtx.getString(R.string.notif_meal_body, meal.emoji)
 
         val encodedIcon = URLEncoder.encode(meal.emoji, "UTF-8")
