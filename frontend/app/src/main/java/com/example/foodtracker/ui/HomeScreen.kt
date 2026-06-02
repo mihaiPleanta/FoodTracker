@@ -545,7 +545,7 @@ fun MealCard(
                 Spacer(Modifier.width(14.dp))
 
                 Column(Modifier.weight(1f)) {
-                    Text(meal.name, fontSize = 16.sp, fontWeight = FontWeight.Bold,
+                    Text(stringResource(mealLabelRes(meal.name)), fontSize = 16.sp, fontWeight = FontWeight.Bold,
                         color = GlassColors.textPrimary)
                     Spacer(Modifier.height(2.dp))
                     Text(stringResource(R.string.home_recommended, meal.recommendedRange),

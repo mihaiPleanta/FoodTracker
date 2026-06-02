@@ -257,7 +257,7 @@ fun MealDetailHeader(
 
         Column(Modifier.weight(1f)) {
             Text(
-                text = mealName,
+                text = stringResource(mealLabelRes(mealName)),
                 fontSize = 22.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = GlassColors.textPrimary

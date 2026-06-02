@@ -11,6 +11,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
@@ -22,6 +23,8 @@ import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.res.stringResource
+import com.example.foodtracker.R
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,16 +48,16 @@ import kotlinx.coroutines.delay
 
 data class NavItem(
     val route: String,
-    val label: String,
+    @StringRes val labelRes: Int,
     val iconSelected: ImageVector,
     val iconUnselected: ImageVector
 )
 
 val navItems = listOf(
-    NavItem("home",    "Home",    Icons.Filled.Home,        Icons.Outlined.Home),
-    NavItem("stats",   "Stats",   Icons.Rounded.BarChart,   Icons.Rounded.BarChart),
-    NavItem("meals",   "Meals",   Icons.Rounded.Restaurant, Icons.Rounded.Restaurant),
-    NavItem("profile", "Profile", Icons.Filled.Person,      Icons.Outlined.Person)
+    NavItem("home",    R.string.nav_home,    Icons.Filled.Home,        Icons.Outlined.Home),
+    NavItem("stats",   R.string.nav_stats,   Icons.Rounded.BarChart,   Icons.Rounded.BarChart),
+    NavItem("meals",   R.string.nav_meals,   Icons.Rounded.Restaurant, Icons.Rounded.Restaurant),
+    NavItem("profile", R.string.nav_profile, Icons.Filled.Person,      Icons.Outlined.Person)
 )
 
 // Routes that are actually implemented
@@ -192,7 +195,7 @@ fun FabButton(onClick: () -> Unit, isOpen: Boolean = false) {
     ) {
         Icon(
             imageVector = Icons.Filled.Add,
-            contentDescription = "Add food",
+            contentDescription = stringResource(R.string.scaffold_add_food),
             tint = Color.Black,
             modifier = Modifier
                 .size(28.dp)
@@ -235,14 +238,14 @@ fun NavBarItem(
     ) {
         Icon(
             imageVector = if (isSelected) item.iconSelected else item.iconUnselected,
-            contentDescription = item.label,
+            contentDescription = stringResource(item.labelRes),
             tint = if (isSelected) GlassColors.accentGreen
                    else GlassColors.textTertiary.copy(alpha = alpha),
             modifier = Modifier.size(22.dp).scale(iconScale)
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = item.label,
+            text = stringResource(item.labelRes),
             fontSize = 10.sp,
             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
             color = if (isSelected) GlassColors.accentGreen
@@ -275,6 +278,15 @@ val mealOptions = listOf(
     MealOption("Dinner",    "🌙", "18:00 – 21:00", Color(0xFF448AFF)),
     MealOption("Snacks",    "🍎", "Anytime",        Color(0xFFFF6D00))
 )
+
+@StringRes
+fun mealLabelRes(name: String): Int = when (name) {
+    "Breakfast" -> R.string.meal_breakfast
+    "Lunch"     -> R.string.meal_lunch
+    "Dinner"    -> R.string.meal_dinner
+    "Snacks"    -> R.string.meal_snacks
+    else        -> R.string.meal_snacks
+}
 
 @Composable
 fun MealSelectorOverlay(
@@ -345,14 +357,14 @@ fun MealSelectorOverlay(
             ) {
                 Column {
                     Text(
-                        text = "Add Food",
+                        text = stringResource(R.string.scaffold_add_food),
                         fontSize = 22.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = GlassColors.textPrimary
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        text = "Select a meal to log into",
+                        text = stringResource(R.string.scaffold_select_meal),
                         fontSize = 13.sp,
                         color = GlassColors.textSecondary
                     )
@@ -436,7 +448,7 @@ fun MealOptionCard(
             }
             Spacer(Modifier.height(14.dp))
             Text(
-                text = meal.name,
+                text = stringResource(mealLabelRes(meal.name)),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 color = GlassColors.textPrimary
