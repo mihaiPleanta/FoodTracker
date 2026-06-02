@@ -18,10 +18,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.foodtracker.R
 import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.viewmodel.AuthUiState
 import com.example.foodtracker.viewmodel.AuthViewModel
@@ -42,6 +44,9 @@ fun RegisterScreen(
     val isLoading = uiState is AuthUiState.Loading
     val firebaseError = (uiState as? AuthUiState.Error)?.message
     val errorMessage = localError ?: firebaseError
+
+    val strPasswordTooShort = stringResource(R.string.register_password_too_short)
+    val strPasswordsMismatch = stringResource(R.string.register_passwords_mismatch)
 
     LaunchedEffect(uiState) {
         if (uiState is AuthUiState.NavigateOnboarding) onNavigateOnboarding()
@@ -66,16 +71,16 @@ fun RegisterScreen(
                         .clickable { onNavigateLogin() },
                     Alignment.Center
                 ) {
-                    Icon(Icons.Rounded.ArrowBackIosNew, contentDescription = "Înapoi",
+                    Icon(Icons.Rounded.ArrowBackIosNew, contentDescription = stringResource(R.string.action_back),
                         tint = GlassColors.textSecondary, modifier = Modifier.size(16.dp))
                 }
             }
 
             Spacer(Modifier.height(40.dp))
 
-            Text("Cont nou", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold,
+            Text(stringResource(R.string.register_title), fontSize = 28.sp, fontWeight = FontWeight.ExtraBold,
                 color = GlassColors.textPrimary)
-            Text("Completează datele de mai jos", fontSize = 13.sp,
+            Text(stringResource(R.string.register_subtitle), fontSize = 13.sp,
                 color = GlassColors.textSecondary)
 
             Spacer(Modifier.height(32.dp))
@@ -83,14 +88,14 @@ fun RegisterScreen(
             AuthTextField(
                 value = email,
                 onValueChange = { email = it; localError = null; authViewModel.resetState() },
-                placeholder = "Email",
+                placeholder = stringResource(R.string.login_email),
                 keyboardType = KeyboardType.Email
             )
             Spacer(Modifier.height(12.dp))
             AuthTextField(
                 value = password,
                 onValueChange = { password = it; localError = null; authViewModel.resetState() },
-                placeholder = "Parolă",
+                placeholder = stringResource(R.string.login_password),
                 keyboardType = KeyboardType.Password,
                 isPassword = true,
                 passwordVisible = passwordVisible,
@@ -100,7 +105,7 @@ fun RegisterScreen(
             AuthTextField(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it; localError = null },
-                placeholder = "Confirmă parola",
+                placeholder = stringResource(R.string.register_confirm_password),
                 keyboardType = KeyboardType.Password,
                 isPassword = true,
                 passwordVisible = passwordVisible
@@ -121,16 +126,16 @@ fun RegisterScreen(
             Spacer(Modifier.height(20.dp))
 
             AuthPrimaryButton(
-                text = "Creează cont",
+                text = stringResource(R.string.register_button),
                 enabled = email.isNotBlank() && password.isNotBlank() && confirmPassword.isNotBlank(),
                 isLoading = isLoading,
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
                     when {
                         password.length < 6 ->
-                            localError = "Parola trebuie să aibă minim 6 caractere"
+                            localError = strPasswordTooShort
                         password != confirmPassword ->
-                            localError = "Parolele nu coincid"
+                            localError = strPasswordsMismatch
                         else ->
                             authViewModel.registerWithEmail(email, password)
                     }
@@ -140,9 +145,9 @@ fun RegisterScreen(
             Spacer(Modifier.height(24.dp))
 
             Row {
-                Text("Ai deja cont? ", fontSize = 13.sp, color = GlassColors.textSecondary)
+                Text(stringResource(R.string.register_have_account), fontSize = 13.sp, color = GlassColors.textSecondary)
                 Text(
-                    "Conectează-te",
+                    stringResource(R.string.login_button),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = GlassColors.accentGreen,

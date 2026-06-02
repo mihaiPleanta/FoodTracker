@@ -16,10 +16,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.foodtracker.R
 import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.ui.theme.glassCard
 import com.example.foodtracker.viewmodel.AuthUiState
@@ -87,7 +89,7 @@ fun LoginScreen(
             Spacer(Modifier.height(12.dp))
             Text("FoodTracker", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold,
                 color = GlassColors.textPrimary)
-            Text("Conectează-te pentru a continua", fontSize = 13.sp,
+            Text(stringResource(R.string.login_subtitle), fontSize = 13.sp,
                 color = GlassColors.textSecondary)
 
             Spacer(Modifier.height(40.dp))
@@ -95,14 +97,14 @@ fun LoginScreen(
             AuthTextField(
                 value = email,
                 onValueChange = { email = it; authViewModel.resetState() },
-                placeholder = "Email",
+                placeholder = stringResource(R.string.login_email),
                 keyboardType = KeyboardType.Email
             )
             Spacer(Modifier.height(12.dp))
             AuthTextField(
                 value = password,
                 onValueChange = { password = it; authViewModel.resetState() },
-                placeholder = "Parolă",
+                placeholder = stringResource(R.string.login_password),
                 keyboardType = KeyboardType.Password,
                 isPassword = true,
                 passwordVisible = passwordVisible,
@@ -124,7 +126,7 @@ fun LoginScreen(
             Spacer(Modifier.height(20.dp))
 
             AuthPrimaryButton(
-                text = "Conectează-te",
+                text = stringResource(R.string.login_button),
                 enabled = email.isNotBlank() && password.isNotBlank(),
                 isLoading = isLoading,
                 modifier = Modifier.fillMaxWidth(),
@@ -150,16 +152,16 @@ fun LoginScreen(
                     },
                 contentAlignment = Alignment.Center
             ) {
-                Text("Continuă cu Google", fontSize = 15.sp,
+                Text(stringResource(R.string.login_google), fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold, color = GlassColors.textPrimary)
             }
 
             Spacer(Modifier.height(32.dp))
 
             Row {
-                Text("Nu ai cont? ", fontSize = 13.sp, color = GlassColors.textSecondary)
+                Text(stringResource(R.string.login_no_account), fontSize = 13.sp, color = GlassColors.textSecondary)
                 Text(
-                    "Înregistrează-te",
+                    stringResource(R.string.login_register_link),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = GlassColors.accentGreen,

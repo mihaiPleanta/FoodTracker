@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -21,6 +22,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.foodtracker.R
 import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.ui.theme.glassCard
 
@@ -61,7 +63,7 @@ fun AuthTextField(
         if (isPassword && onTogglePasswordVisibility != null) {
             Spacer(Modifier.width(8.dp))
             Text(
-                text = if (passwordVisible) "Ascunde" else "Arată",
+                text = if (passwordVisible) stringResource(R.string.field_hide) else stringResource(R.string.field_show),
                 fontSize = 11.sp,
                 color = GlassColors.accentGreen,
                 fontWeight = FontWeight.SemiBold,

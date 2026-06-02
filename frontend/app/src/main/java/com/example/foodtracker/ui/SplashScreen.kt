@@ -10,9 +10,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.foodtracker.R
 import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.viewmodel.AuthUiState
 import com.example.foodtracker.viewmodel.AuthViewModel
@@ -64,7 +66,7 @@ fun SplashScreen(
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "Mănâncă inteligent",
+                stringResource(R.string.app_tagline),
                 fontSize = 14.sp,
                 color = GlassColors.textSecondary
             )
