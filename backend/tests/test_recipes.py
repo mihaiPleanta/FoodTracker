@@ -120,6 +120,22 @@ async def test_generate_recipe_happy_path():
     assert sum(name in user_msg for name in ("Pui", "Orez", "Mar")) == 1
 
 
+async def test_generate_recipe_uses_english_prompt_when_language_en():
+    fake = _FakeOllama(content=json.dumps(_RECIPE_JSON))
+    async with SessionLocal() as db:
+        db.add(_seed())
+        db.add_all([_log("Pui", 100), _log("Orez", 100), _log("Mar", 100)])
+        await db.commit()
+        await generate_recipe(db, "u1", "LUNCH", fake, "en")
+
+    system_msg = fake.calls[0][0]["content"]
+    user_msg = fake.calls[0][-1]["content"]
+    # English path selects the English system prompt + user content.
+    assert "professional chef" in system_msg
+    assert "Star ingredient" in user_msg
+    assert "Ingredient-vedetă" not in user_msg
+
+
 async def test_generate_recipe_insufficient_data_raises():
     fake = _FakeOllama(content=json.dumps(_RECIPE_JSON))
     async with SessionLocal() as db:

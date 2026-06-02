@@ -31,6 +31,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import android.widget.Toast
 import com.example.foodtracker.R
+import com.example.foodtracker.model.AppLanguage
 import com.example.foodtracker.model.FoodItem
 import com.example.foodtracker.model.LoggedFood
 import com.example.foodtracker.model.RecipeDto
@@ -81,6 +82,9 @@ fun MealsScreen(
     val recipeState by viewModel.recipeState.collectAsState()
     val saved by viewModel.savedRecipes.collectAsState()
     val selectedMeal by viewModel.selectedMealType.collectAsState()
+    val appSettings by foodViewModel.appSettings.collectAsState()
+    // Generate recipes in the app's current language.
+    val recipeLanguage = if (appSettings.language == AppLanguage.ENGLISH) "en" else "ro"
     val accent = mealChips.first { it.type == selectedMeal }.accent
     val savedForMeal = saved.filter { it.mealType == selectedMeal }
     var openedRecipe by remember { mutableStateOf<SavedRecipeDto?>(null) }
@@ -148,7 +152,7 @@ fun MealsScreen(
                     .clip(RoundedCornerShape(16.dp))
                     .background(accent)
                     .clickable(enabled = recipeState !is RecipeUiState.Loading) {
-                        viewModel.generate()
+                        viewModel.generate(recipeLanguage)
                     }
                     .padding(vertical = 16.dp),
                 contentAlignment = Alignment.Center,
@@ -179,7 +183,7 @@ fun MealsScreen(
                     recipe = s.recipe,
                     accent = accent,
                     onSave = { viewModel.saveCurrent() },
-                    onRegenerate = { viewModel.generate() },
+                    onRegenerate = { viewModel.generate(recipeLanguage) },
                     onAddToJournal = {
                         val mealName = backendMealToFoodVm[selectedMeal] ?: "Breakfast"
                         foodViewModel.addFoodToMeal(mealName, s.recipe.toLoggedPortion())
@@ -198,7 +202,7 @@ fun MealsScreen(
                         stringResource(R.string.action_retry),
                         color = accent,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.clickable { viewModel.generate() },
+                        modifier = Modifier.clickable { viewModel.generate(recipeLanguage) },
                     )
                 }
             }

@@ -63,6 +63,13 @@ _MEAL_LABELS = {
     "SNACKS": "gustare",
 }
 
+_MEAL_LABELS_EN = {
+    "BREAKFAST": "breakfast",
+    "LUNCH": "lunch",
+    "DINNER": "dinner",
+    "SNACKS": "snack",
+}
+
 _SYSTEM_PROMPT = """Ești un bucătar profesionist pentru o aplicație de nutriție.
 Utilizatorul consumă des ingredientul-vedetă pe care ți-l dau. Fă o rețetă CLASICĂ și
 binecunoscută, exact cum ar găti-o un om acasă, în care acel ingredient e elementul principal.
@@ -99,6 +106,44 @@ Răspunde DOAR cu un obiect JSON valid, fără text în plus, exact în această
 }
 """
 
+# English mirror of _SYSTEM_PROMPT — same single-anchor design + positive fruit rule
+# + concise-description constraint, so recipe quality is preserved when the app is in EN.
+_SYSTEM_PROMPT_EN = """You are a professional chef for a nutrition app.
+The user frequently eats the star ingredient I give you. Make a CLASSIC, well-known recipe,
+exactly how someone would cook it at home, in which that ingredient is the main element.
+
+RULES:
+1. Build the recipe around the requested star ingredient.
+2. If the star ingredient is a fruit (banana, apple, berries, strawberries), make a SWEET
+   dish suited to it: oatmeal, pancakes, smoothie bowl, fruit salad with yogurt, chia
+   pudding. Pick a single one and make it properly.
+3. Complete it with common pantry ingredients that go NATURALLY with the chosen dish
+   (vegetables, cheese, dairy, spices, oil, rice, pasta, greens, etc.).
+4. The result must be a real dish, recognizable from a cookbook.
+   If it seems weird, you got it wrong — pick a classic dish.
+5. Make the recipe fit the requested meal (something light for breakfast, hearty for dinner).
+6. Respect the user's nutrition goal; portions must be realistic.
+7. Write in correct English. Quantities must be concrete (e.g. "150 g", "2 tablespoons").
+   Clear, ordered preparation steps.
+
+THE DESCRIPTION: max 12 words, state only what the dish contains, neutral and factual.
+Good example: "Oatmeal with banana, milk and walnuts."
+Avoid: "A delicious and nutritious recipe, perfect for you."
+
+Respond ONLY with a valid JSON object, no extra text, in exactly this shape:
+{
+  "title": "string",
+  "description": "string",
+  "ingredients": [{"name": "string", "quantity": "string"}],
+  "steps": ["string"],
+  "servings": 1,
+  "kcal_per_serving": 0,
+  "protein_g": 0,
+  "carbs_g": 0,
+  "fat_g": 0
+}
+"""
+
 
 class InsufficientData(Exception):
     """User has fewer than 3 distinct logged foods."""
@@ -108,24 +153,40 @@ class RecipeParseError(Exception):
     """Ollama returned content that isn't a valid recipe."""
 
 
-def build_recipe_prompt(anchor, meal_type, goals) -> list[dict]:
+def build_recipe_prompt(anchor, meal_type, goals, language: str = "ro") -> list[dict]:
     """Build the chat prompt around a single anchor food. Showing the model only
     ONE of the user's frequent foods (instead of the whole list) is what keeps
     recipes coherent: small models otherwise cram every listed food into one dish
     (e.g. banană + pui în omletă). The anchor still ties the recipe to the user's
-    real eating habits; the model fills in classic complementary ingredients itself."""
+    real eating habits; the model fills in classic complementary ingredients itself.
+
+    `language` ("ro"/"en") follows the in-app language so the generated recipe text
+    matches the rest of the UI."""
     anchor_line = anchor.name + (f" ({anchor.brand})" if anchor.brand else "")
-    meal_label = _MEAL_LABELS.get(meal_type, "masă")
-    user_content = (
-        f"Masa: {meal_label}.\n"
-        f"Obiectiv nutrițional: {goals.mode}, {goals.calorie_goal} kcal/zi "
-        f"(proteine {goals.protein_goal_g}g, carbohidrați {goals.carbs_goal_g}g, "
-        f"grăsimi {goals.fat_goal_g}g).\n\n"
-        f"Ingredient-vedetă (consumat des de utilizator): {anchor_line}.\n\n"
-        f"Fă o rețetă clasică pentru {meal_label} cu acest ingredient principal."
-    )
+    if language == "en":
+        meal_label = _MEAL_LABELS_EN.get(meal_type, "meal")
+        system_prompt = _SYSTEM_PROMPT_EN
+        user_content = (
+            f"Meal: {meal_label}.\n"
+            f"Nutrition goal: {goals.mode}, {goals.calorie_goal} kcal/day "
+            f"(protein {goals.protein_goal_g}g, carbs {goals.carbs_goal_g}g, "
+            f"fat {goals.fat_goal_g}g).\n\n"
+            f"Star ingredient (frequently eaten by the user): {anchor_line}.\n\n"
+            f"Make a classic {meal_label} recipe with this main ingredient."
+        )
+    else:
+        meal_label = _MEAL_LABELS.get(meal_type, "masă")
+        system_prompt = _SYSTEM_PROMPT
+        user_content = (
+            f"Masa: {meal_label}.\n"
+            f"Obiectiv nutrițional: {goals.mode}, {goals.calorie_goal} kcal/zi "
+            f"(proteine {goals.protein_goal_g}g, carbohidrați {goals.carbs_goal_g}g, "
+            f"grăsimi {goals.fat_goal_g}g).\n\n"
+            f"Ingredient-vedetă (consumat des de utilizator): {anchor_line}.\n\n"
+            f"Fă o rețetă clasică pentru {meal_label} cu acest ingredient principal."
+        )
     return [
-        {"role": "system", "content": _SYSTEM_PROMPT},
+        {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_content},
     ]
 
@@ -136,7 +197,9 @@ def build_recipe_prompt(anchor, meal_type, goals) -> list[dict]:
 _MAX_PARSE_ATTEMPTS = 3
 
 
-async def generate_recipe(db: AsyncSession, uid: str, meal_type: str, ollama) -> RecipeDto:
+async def generate_recipe(
+    db: AsyncSession, uid: str, meal_type: str, ollama, language: str = "ro"
+) -> RecipeDto:
     top = await get_top_foods(db, uid)
     if len(top) < 3:
         raise InsufficientData()
@@ -150,7 +213,7 @@ async def generate_recipe(db: AsyncSession, uid: str, meal_type: str, ollama) ->
     # first in `top`) but random so regenerating gives variety instead of always
     # anchoring on the #1 food.
     anchor = random.choices(top, weights=range(len(top), 0, -1), k=1)[0]
-    messages = build_recipe_prompt(anchor, meal_type, goals)
+    messages = build_recipe_prompt(anchor, meal_type, goals, language)
 
     last_error: Exception | None = None
     for _ in range(_MAX_PARSE_ATTEMPTS):

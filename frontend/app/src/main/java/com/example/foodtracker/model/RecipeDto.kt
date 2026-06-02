@@ -21,6 +21,7 @@ data class RecipeDto(
 
 data class RecipeGenerateRequest(
     @SerializedName("meal_type") val mealType: String,
+    val language: String = "ro",
 )
 
 data class SavedRecipeCreate(

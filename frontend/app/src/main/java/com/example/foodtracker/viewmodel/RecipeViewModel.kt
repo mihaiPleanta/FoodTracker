@@ -58,14 +58,14 @@ class RecipeViewModel : ViewModel() {
         _recipeStates.value = _recipeStates.value + (meal to state)
     }
 
-    fun generate() {
+    fun generate(language: String = "ro") {
         // Capture the meal at request time so a mid-flight meal switch lands the
         // result on the meal it was generated for.
         val meal = _selectedMealType.value
         setState(meal, RecipeUiState.Loading)
         viewModelScope.launch {
             try {
-                val recipe = api.generateRecipe(RecipeGenerateRequest(meal))
+                val recipe = api.generateRecipe(RecipeGenerateRequest(meal, language))
                 setState(meal, RecipeUiState.Result(recipe))
             } catch (e: HttpException) {
                 setState(meal, when (e.code()) {

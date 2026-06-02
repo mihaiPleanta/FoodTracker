@@ -160,6 +160,7 @@ class RecipeDto(BaseModel):
 
 class RecipeGenerateRequest(BaseModel):
     meal_type: MealType
+    language: Literal["ro", "en"] = "ro"
 
 
 class SavedRecipeCreate(BaseModel):
