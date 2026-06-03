@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import argparse
+import asyncio
 import json
 import statistics
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from datetime import datetime
+from pathlib import Path
 
 from pydantic import ValidationError
 
@@ -228,3 +232,57 @@ def render_markdown(metrics, examples, runs: int, language: str) -> str:
             for idx, step in enumerate(recipe.steps, 1):
                 lines.append(f"  {idx}. {step}")
     return "\n".join(lines) + "\n"
+
+
+def _client_factory(model: str) -> OllamaClient:
+    return OllamaClient(model=model)
+
+
+async def _amain(args) -> None:
+    models = [m.strip() for m in args.models.split(",") if m.strip()]
+    metrics, examples = await run_comparison(
+        models, SCENARIOS, args.runs, _client_factory, args.lang
+    )
+    report = render_markdown(metrics, examples, args.runs, args.lang)
+    print(report)
+
+    out_dir = Path(__file__).parent / "out"
+    out_dir.mkdir(exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d-%H%M")
+    md_path = out_dir / f"compare-{stamp}.md"
+    md_path.write_text(report, encoding="utf-8")
+    print(f"\n[raport salvat în {md_path}]")
+
+    if args.json:
+        raw = {
+            "runs": args.runs,
+            "language": args.lang,
+            "metrics": [asdict(m) for m in metrics],
+            "examples": {
+                model: {label: r.model_dump() for label, r in by_label.items()}
+                for model, by_label in examples.items()
+            },
+        }
+        json_path = out_dir / f"compare-{stamp}.json"
+        json_path.write_text(
+            json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        print(f"[raw JSON salvat în {json_path}]")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Compară modele Ollama pe promptul de rețete al aplicației."
+    )
+    parser.add_argument("--models", default="gemma3:4b",
+                        help="Modele separate prin virgulă, ex: gemma3:4b,qwen2.5:7b")
+    parser.add_argument("--runs", type=int, default=5,
+                        help="Repetări per scenariu (default 5)")
+    parser.add_argument("--lang", choices=["ro", "en"], default="ro")
+    parser.add_argument("--json", action="store_true", help="Scrie și raw JSON")
+    args = parser.parse_args()
+    asyncio.run(_amain(args))
+
+
+if __name__ == "__main__":
+    main()
