@@ -26,14 +26,16 @@ def _dto(**overrides) -> FoodItemDto:
 
 class _FakeClient:
     def __init__(self):
-        self.search_calls: list[tuple[str, int]] = []
+        self.search_calls: list[tuple[str, int, int]] = []
         self.barcode_calls: list[str] = []
         self.search_result: list[FoodItemDto] = []
+        self.search_total: int | None = None
         self.barcode_result: FoodItemDto | None = None
 
-    async def search(self, query: str, page_size: int):
-        self.search_calls.append((query, page_size))
-        return self.search_result
+    async def search(self, query: str, page_size: int, page: int = 1):
+        self.search_calls.append((query, page_size, page))
+        total = self.search_total if self.search_total is not None else len(self.search_result)
+        return self.search_result, total
 
     async def get_by_barcode(self, barcode: str):
         self.barcode_calls.append(barcode)
@@ -73,7 +75,7 @@ def test_search_returns_filtered_results(client, fake_off):
     body = response.json()
     assert body["count"] == 1
     assert body["items"][0]["name"] == "Lapte"
-    assert fake_off.search_calls == [("lapte", 20)]
+    assert fake_off.search_calls == [("lapte", 20, 1)]
 
 
 def test_search_rejects_short_query(client, fake_off):
@@ -233,7 +235,7 @@ def test_off_network_error_with_generics_returns_generics_only(client, fake_off,
     assert body["items"][0]["name"] == "Piept de pui crud"
 
 
-def test_merged_results_capped_at_page_size_without_cutting_generics(client, fake_off, fake_generic):
+def test_page_one_returns_generics_plus_full_off_page(client, fake_off, fake_generic):
     fake_generic.search_result = [
         _dto(barcode="usda-a", name="Gen A"),
         _dto(barcode="usda-b", name="Gen B"),
@@ -241,7 +243,40 @@ def test_merged_results_capped_at_page_size_without_cutting_generics(client, fak
     fake_off.search_result = [_dto(barcode=str(i), name=f"OFF {i}") for i in range(20)]
     response = client.get("/foods/search", params={"q": "xx", "page_size": 20}, headers=AUTH_HEADER)
     body = response.json()
-    # 2 generics + 20 OFF = 22 merged, capped to 20; generics stay first and are never cut.
-    assert body["count"] == 20
+    # Fără trim: 2 generice + 20 OFF = 22, genericele rămân primele.
+    assert body["count"] == 22
     assert body["items"][0]["name"] == "Gen A"
     assert body["items"][1]["name"] == "Gen B"
+
+
+def test_page_two_returns_off_only(client, fake_off, fake_generic):
+    fake_generic.search_result = [_dto(barcode="usda-x", name="Gen X")]
+    fake_off.search_result = [_dto(barcode="222", name="OFF 222")]
+    response = client.get("/foods/search", params={"q": "xx", "page": 2}, headers=AUTH_HEADER)
+    body = response.json()
+    # Pe pagina 2 genericele NU se includ; page e forwardat la OFF.
+    assert [it["name"] for it in body["items"]] == ["OFF 222"]
+    assert fake_off.search_calls == [("xx", 20, 2)]
+
+
+def test_page_two_dedups_off_name_matching_generic(client, fake_off, fake_generic):
+    fake_generic.search_result = [_dto(barcode="usda-milk", name="Lapte")]
+    fake_off.search_result = [_dto(barcode="111", name="Lapte"), _dto(barcode="222", name="Iaurt")]
+    response = client.get("/foods/search", params={"q": "lapte", "page": 2}, headers=AUTH_HEADER)
+    body = response.json()
+    # Genericul nu apare pe pagina 2, dar OFF "Lapte" e tot eliminat ca duplicat al unui nume generic.
+    assert [it["name"] for it in body["items"]] == ["Iaurt"]
+
+
+def test_has_more_true_when_off_total_exceeds_page(client, fake_off, fake_generic):
+    fake_off.search_result = [_dto(barcode=str(i), name=f"OFF {i}") for i in range(20)]
+    fake_off.search_total = 100
+    response = client.get("/foods/search", params={"q": "xx", "page_size": 20}, headers=AUTH_HEADER)
+    assert response.json()["has_more"] is True
+
+
+def test_has_more_false_on_last_page(client, fake_off, fake_generic):
+    fake_off.search_result = [_dto(barcode="1", name="OFF 1")]
+    fake_off.search_total = 1
+    response = client.get("/foods/search", params={"q": "xx"}, headers=AUTH_HEADER)
+    assert response.json()["has_more"] is False

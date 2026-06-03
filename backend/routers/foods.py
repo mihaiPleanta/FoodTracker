@@ -30,38 +30,41 @@ def _translate_off_error(exc: httpx.HTTPStatusError) -> HTTPException:
 @router.get("/search", response_model=SearchResponseDto)
 async def search_foods(
     q: str = Query(..., min_length=2, max_length=50),
+    page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=50),
     off: OpenFoodFactsClient = Depends(get_off_client),
     generic: GenericFoodsClient = Depends(get_generic_client),
     token: dict = Depends(verify_token),
 ) -> SearchResponseDto:
-    # Generic foods come from a local in-memory dataset — always available.
+    # Genericele sunt locale (in-memory) — mereu disponibile. Le folosim pentru nume la
+    # dedup pe orice pagină, dar le includem în output doar pe pagina 1.
     generics = generic.search(q, page_size)
 
-    # Open Food Facts is live and may be down. If we already have generic matches,
-    # degrade gracefully and return just those instead of failing the whole search.
+    # OFF e live și poate pica. Pe pagina 1, dacă avem generice, degradăm grațios și
+    # întoarcem doar genericele. Pe paginile 2+ (load-more) lăsăm eroarea să propage.
     try:
-        off_items = await off.search(q, page_size)
+        off_items, off_total = await off.search(q, page_size, page)
     except httpx.HTTPStatusError as exc:
-        if not generics:
+        if page > 1 or not generics:
             raise _translate_off_error(exc) from exc
-        off_items = []
+        off_items, off_total = [], 0
     except httpx.RequestError as exc:
-        if not generics:
+        if page > 1 or not generics:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Food database busy, try again",
             ) from exc
-        off_items = []
+        off_items, off_total = [], 0
 
-    # Drop OFF products that duplicate a generic by name; generics always rank first.
+    # Drop OFF products that duplicate a generic by name (pe orice pagină).
     generic_names = {g.name.strip().lower() for g in generics}
     off_items = [it for it in off_items if it.name.strip().lower() not in generic_names]
 
-    # page_size caps the response, but matching generics are never trimmed — only the
-    # OFF tail is cut. (max(...) keeps every generic even if they alone exceed page_size.)
-    items = (generics + off_items)[: max(page_size, len(generics))]
-    return SearchResponseDto(items=items, count=len(items))
+    # Genericele se prepend doar pe pagina 1; paginile 2+ sunt doar OFF. Fără trim.
+    prefix = generics if page == 1 else []
+    items = prefix + off_items
+    has_more = page * page_size < off_total
+    return SearchResponseDto(items=items, count=len(items), has_more=has_more)
 
 
 @router.get("/barcode/{barcode}", response_model=FoodItemDto)
