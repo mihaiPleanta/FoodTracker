@@ -42,7 +42,7 @@ private class FakeCache : FoodCache {
     override suspend fun putSearch(query: String, items: List<FoodItem>, now: Long) {
         searches[query] = CachedSearch(items, now)
     }
-    override suspend fun touchSearch(query: String, now: Long) { touchedSearch++ }
+    override suspend fun touchSearch(query: String, barcodes: List<String>, now: Long) { touchedSearch++ }
     override suspend fun getProduct(barcode: String) = products[barcode]
     override suspend fun putProduct(item: FoodItem, now: Long) {
         products[item.barcode] = CachedProduct(item, now)

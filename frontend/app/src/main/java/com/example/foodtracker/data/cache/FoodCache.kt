@@ -12,7 +12,7 @@ data class CachedSearch(val items: List<FoodItem>, val cachedAt: Long)
 interface FoodCache {
     suspend fun getSearch(query: String): CachedSearch?
     suspend fun putSearch(query: String, items: List<FoodItem>, now: Long)
-    suspend fun touchSearch(query: String, now: Long)
+    suspend fun touchSearch(query: String, barcodes: List<String>, now: Long)
 
     suspend fun getProduct(barcode: String): CachedProduct?
     suspend fun putProduct(item: FoodItem, now: Long)
@@ -75,9 +75,9 @@ class RoomFoodCache(private val dao: FoodCacheDao) : FoodCache {
         dao.evictSearches(MAX_SEARCHES)
     }
 
-    override suspend fun touchSearch(query: String, now: Long) {
+    override suspend fun touchSearch(query: String, barcodes: List<String>, now: Long) {
         dao.touchSearch(query, now)
-        dao.getSearch(query)?.let { dao.touchProducts(it.barcodes, now) }
+        if (barcodes.isNotEmpty()) dao.touchProducts(barcodes, now)
     }
 
     override suspend fun getProduct(barcode: String): CachedProduct? =

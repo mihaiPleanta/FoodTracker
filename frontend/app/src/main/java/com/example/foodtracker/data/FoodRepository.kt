@@ -22,7 +22,7 @@ class FoodRepository(
         val query = rawQuery.trim().lowercase()
         val cached = cache.getSearch(query)
         if (cached != null && fresh(cached.cachedAt)) {
-            cache.touchSearch(query, now())
+            cache.touchSearch(query, cached.items.map { it.barcode }, now())
             return SearchResult(cached.items, stale = false)
         }
         return try {

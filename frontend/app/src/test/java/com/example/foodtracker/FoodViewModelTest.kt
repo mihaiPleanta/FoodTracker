@@ -33,7 +33,7 @@ import java.io.File
 private object NoOpCache : FoodCache {
     override suspend fun getSearch(query: String): CachedSearch? = null
     override suspend fun putSearch(query: String, items: List<FoodItem>, now: Long) {}
-    override suspend fun touchSearch(query: String, now: Long) {}
+    override suspend fun touchSearch(query: String, barcodes: List<String>, now: Long) {}
     override suspend fun getProduct(barcode: String): CachedProduct? = null
     override suspend fun putProduct(item: FoodItem, now: Long) {}
     override suspend fun touchProduct(barcode: String, now: Long) {}
