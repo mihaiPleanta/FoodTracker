@@ -12,6 +12,9 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -154,6 +157,7 @@ fun MealDetailScreen(
                         accentColor = accentColor,
                         onAdd       = { food -> sheetTarget = food },
                         onRetry     = { viewModel.searchFoods(searchQuery) },
+                        onLoadMore  = { viewModel.loadMore() },
                     )
                 } else {
                     LoggedFoodsList(
@@ -528,6 +532,7 @@ fun SearchResultsView(
     accentColor: Color,
     onAdd: (FoodItem) -> Unit,
     onRetry: () -> Unit,
+    onLoadMore: () -> Unit,
 ) {
     when (state) {
         FoodViewModel.SearchUiState.Idle -> {
@@ -581,6 +586,16 @@ fun SearchResultsView(
             }
         }
         is FoodViewModel.SearchUiState.Results -> {
+            val listState = rememberLazyListState()
+            LaunchedEffect(listState, state.items.size, state.hasMore) {
+                snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
+                    .distinctUntilChanged()
+                    .collect { lastVisible ->
+                        if (state.hasMore && lastVisible >= state.items.size - 3) {
+                            onLoadMore()
+                        }
+                    }
+            }
             Column(Modifier.fillMaxSize()) {
                 if (state.stale) {
                     Text(
@@ -591,11 +606,25 @@ fun SearchResultsView(
                     )
                 }
                 LazyColumn(
+                    state = listState,
                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     itemsIndexed(state.items, key = { _, item -> item.barcode.ifEmpty { item.name } }) { _, food ->
                         SearchResultRow(food = food, onAdd = { onAdd(food) })
+                    }
+                    if (state.loadingMore) {
+                        item {
+                            Box(
+                                Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                CircularProgressIndicator(
+                                    color = accentColor,
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            }
+                        }
                     }
                 }
             }
