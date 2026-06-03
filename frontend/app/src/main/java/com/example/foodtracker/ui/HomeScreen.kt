@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.foodtracker.R
 import com.example.foodtracker.model.GoalsMode
+import com.example.foodtracker.model.LoggedFood
 import com.example.foodtracker.model.NutritionGoals
 import com.example.foodtracker.ui.theme.FoodTrackerTheme
 import com.example.foodtracker.ui.theme.GlassColors
@@ -93,6 +94,8 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
 
     val snackbarHostState = remember { SnackbarHostState() }
     var showWeightSheet by remember { mutableStateOf(false) }
+    // (mealName, index, loggedFood) for inline grams edit; null = sheet hidden
+    var editTarget by remember { mutableStateOf<Triple<String, Int, LoggedFood>?>(null) }
     val loadingDay by viewModel.loadingDay.collectAsState()
     val userProfile by viewModel.userProfile.collectAsState()
 
@@ -275,6 +278,16 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
                         val colorHex = String.format("%06X", meal.accentColor.toArgb() and 0xFFFFFF)
                         navController.navigate("meal/${meal.name}/$encodedIcon/$colorHex")
                     },
+                    onEditEntry = { index ->
+                        val foods = when (meal.name) {
+                            "Breakfast" -> breakfastFoods
+                            "Lunch"     -> lunchFoods
+                            "Dinner"    -> dinnerFoods
+                            "Snacks"    -> snacksFoods
+                            else        -> emptyList()
+                        }
+                        foods.getOrNull(index)?.let { editTarget = Triple(meal.name, index, it) }
+                    },
                     modifier = Modifier.padding(horizontal = 20.dp)
                 )
                 Spacer(Modifier.height(12.dp))
@@ -295,6 +308,22 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
                 onSave = { kg ->
                     viewModel.addWeightCheckIn(kg)
                     showWeightSheet = false
+                },
+            )
+        }
+
+        editTarget?.let { (mealName, index, logged) ->
+            val accent = mealConfigs.firstOrNull { it.first == mealName }?.third
+                ?: GlassColors.accentGreen
+            AddFoodSheet(
+                target = logged.food,
+                accentColor = accent,
+                confirmLabel = stringResource(R.string.action_save),
+                initialGrams = logged.grams,
+                onDismiss = { editTarget = null },
+                onConfirm = { _, grams ->
+                    viewModel.updateFoodGrams(mealName, index, grams)
+                    editTarget = null
                 },
             )
         }
@@ -541,6 +570,7 @@ fun CalorieRing(progress: Float, modifier: Modifier = Modifier) {
 fun MealCard(
     meal: MealSection,
     onQuickAdd: () -> Unit,
+    onEditEntry: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -618,7 +648,7 @@ fun MealCard(
                         .background(meal.accentColor.copy(.12f)))
                     Spacer(Modifier.height(10.dp))
                     meal.entries.forEachIndexed { i, entry ->
-                        MealEntryRow(entry, meal.accentColor)
+                        MealEntryRow(entry, meal.accentColor, onEdit = { onEditEntry(i) })
                         if (i < meal.entries.lastIndex) Spacer(Modifier.height(8.dp))
                     }
                 }
@@ -659,11 +689,12 @@ fun MacroBadge(label: String, value: Int, color: Color) {
 }
 
 @Composable
-fun MealEntryRow(entry: MealEntry, accentColor: Color) {
+fun MealEntryRow(entry: MealEntry, accentColor: Color, onEdit: () -> Unit) {
     Row(
         Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
             .background(GlassColors.backgroundDark.copy(.6f))
+            .clickable { onEdit() }
             .padding(horizontal = 14.dp, vertical = 11.dp),
         Arrangement.SpaceBetween, Alignment.CenterVertically
     ) {
@@ -869,7 +900,7 @@ fun HomeScreenPreview() {
                     MealSection("Dinner","🌙","500–600",0,0,0,0,emptyList(),Color(0xFF448AFF)),
                     MealSection("Snacks","🍎","150–200",0,0,0,0,emptyList(),Color(0xFFFF6D00))
                 ).forEach { meal ->
-                    MealCard(meal = meal, onQuickAdd = {}); Spacer(Modifier.height(12.dp))
+                    MealCard(meal = meal, onQuickAdd = {}, onEditEntry = {}); Spacer(Modifier.height(12.dp))
                 }
             }
         }
