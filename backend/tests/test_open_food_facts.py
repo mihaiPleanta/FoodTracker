@@ -101,7 +101,7 @@ async def test_search_filters_out_incomplete_products():
         })
 
     client = OpenFoodFactsClient(http_client=_make_mock_http(handler))
-    items = await client.search("cola", page_size=20)
+    items, _ = await client.search("cola", page_size=20)
     assert len(items) == 1
     assert items[0].barcode == "111"
 
@@ -117,6 +117,21 @@ async def test_search_sends_user_agent_header():
     client = OpenFoodFactsClient(http_client=_make_mock_http(handler))
     await client.search("x", page_size=5)
     assert captured["ua"] == USER_AGENT
+
+
+@pytest.mark.asyncio
+async def test_search_forwards_page_and_returns_total():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params["page"] == "2"
+        return httpx.Response(200, json={
+            "products": [_complete_product(code="111", product_name="Complete")],
+            "count": 87,
+        })
+
+    client = OpenFoodFactsClient(http_client=_make_mock_http(handler))
+    items, total = await client.search("cola", page_size=20, page=2)
+    assert items[0].barcode == "111"
+    assert total == 87
 
 
 @pytest.mark.asyncio

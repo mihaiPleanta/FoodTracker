@@ -35,23 +35,28 @@ class OpenFoodFactsClient:
         last_response.raise_for_status()
         return last_response
 
-    async def search(self, query: str, page_size: int) -> list[FoodItemDto]:
+    async def search(
+        self, query: str, page_size: int, page: int = 1
+    ) -> tuple[list[FoodItemDto], int]:
         params = {
             "search_terms": query,
             "search_simple": 1,
             "action": "process",
             "json": 1,
             "page_size": page_size,
+            "page": page,
             "lc": "ro",
             "fields": FIELDS,
         }
         response = await self._get_with_retry(SEARCH_URL, params)
-        products = response.json().get("products") or []
+        body = response.json()
+        products = body.get("products") or []
+        total = int(body.get("count") or 0)
         normalized = (self._normalize(p) for p in products if isinstance(p, dict))
         items = [item for item in normalized if item is not None]
         # OFF returns results by popularity. Re-rank so the closest text/category match wins.
         items.sort(key=lambda it: relevance(it.name, it.categories, query))
-        return items
+        return items, total
 
     async def get_by_barcode(self, barcode: str) -> FoodItemDto | None:
         response = await self._get_with_retry(
