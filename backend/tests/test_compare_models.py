@@ -98,3 +98,38 @@ async def test_run_single_all_attempts_fail():
     assert result.attempts_used is None
     assert result.recipe is None
     assert len(result.latencies) == 3
+
+
+from scripts.compare_models import ModelMetrics, aggregate
+
+
+def _mk_result(first_valid, attempts, latencies, recipe):
+    return RunResult(first_valid, attempts, latencies, recipe)
+
+
+async def test_aggregate_basic_rates():
+    valid = _recipe(kcal_per_serving=165, protein_g=10, carbs_g=20, fat_g=5)
+    results = [
+        _mk_result(True, 1, [0.5], valid),
+        _mk_result(False, 2, [0.4, 0.6], valid),
+        _mk_result(False, None, [0.3, 0.3, 0.3], None),
+    ]
+    m = aggregate("gemma3:4b", results)
+    assert isinstance(m, ModelMetrics)
+    assert m.total_runs == 3
+    assert abs(m.first_attempt_valid_pct - (100 / 3)) < 1e-6
+    assert abs(m.success_pct - (200 / 3)) < 1e-6
+    assert m.avg_attempts == 1.5  # mean of [1, 2]
+    # macro_consistency is 0 for both valid recipes
+    assert m.macro_consistency_pct == 0.0
+    assert m.avg_steps == 2.0          # _recipe has 2 steps
+    assert m.avg_ingredients == 1.0    # _recipe has 1 ingredient
+    assert m.skipped is False
+
+
+async def test_aggregate_empty_is_skipped():
+    m = aggregate("missing:model", [])
+    assert m.skipped is True
+    assert m.total_runs == 0
+    assert m.macro_consistency_pct is None
+    assert m.avg_attempts is None
