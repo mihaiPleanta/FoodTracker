@@ -46,6 +46,7 @@ class FoodItemDto(BaseModel):
 class SearchResponseDto(BaseModel):
     items: List[FoodItemDto]
     count: int
+    has_more: bool = False
 
 
 _MEAL_VALUES = Literal["BREAKFAST", "LUNCH", "DINNER", "SNACKS"]
