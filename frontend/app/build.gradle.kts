@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("com.google.gms.google-services")
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -91,6 +92,11 @@ dependencies {
 
     // Async image loading for OFF thumbnails
     implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Cache local pe disc pentru produsele OFF (search + barcode)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
 
     // Persistență locală pentru AppSettings
     implementation("androidx.datastore:datastore-preferences:1.1.1")
