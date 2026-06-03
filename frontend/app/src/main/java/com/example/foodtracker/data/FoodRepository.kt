@@ -36,4 +36,22 @@ class FoodRepository(
             else throw e
         }
     }
+
+    suspend fun lookupBarcode(barcode: String): SearchResult {
+        val cached = cache.getProduct(barcode)
+        if (cached != null && fresh(cached.cachedAt)) {
+            cache.touchProduct(barcode, now())
+            return SearchResult(listOf(cached.item), stale = false)
+        }
+        return try {
+            val item = api.getFoodByBarcode(barcode).toDomain()
+            cache.putProduct(item, now())
+            SearchResult(listOf(item), stale = false)
+        } catch (e: IOException) {
+            cached?.let { SearchResult(listOf(it.item), stale = true) } ?: throw e
+        } catch (e: HttpException) {
+            if (e.code() == 503 && cached != null) SearchResult(listOf(cached.item), stale = true)
+            else throw e
+        }
+    }
 }

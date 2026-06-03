@@ -158,4 +158,51 @@ class FoodRepositoryTest {
         assertEquals(0, api.searchCalls)
         assertEquals("1", result.items.single().barcode)
     }
+
+    @Test fun barcode_freshCacheHit_noNetwork() = runTest {
+        val cache = FakeCache().apply {
+            products["1"] = CachedProduct(item("1"), cachedAt = 1_000)
+        }
+        val api = FakeApi(barcodeResult = { fail("nu trebuie apelat"); error("") })
+        val repo = FoodRepository(api, cache, now = { 1_000 + TTL - 1 })
+
+        val result = repo.lookupBarcode("1")
+        assertEquals("1", result.items.single().barcode)
+        assertTrue(!result.stale)
+        assertEquals(0, api.barcodeCalls)
+        assertEquals(1, cache.touchedProduct)
+    }
+
+    @Test fun barcode_miss_fetchesAndCaches() = runTest {
+        val cache = FakeCache()
+        val api = FakeApi(barcodeResult = { dto("1") })
+        val repo = FoodRepository(api, cache, now = { 7_000 })
+
+        val result = repo.lookupBarcode("1")
+        assertEquals("1", result.items.single().barcode)
+        assertEquals(1, api.barcodeCalls)
+        assertEquals(7_000, cache.products["1"]!!.cachedAt)
+    }
+
+    @Test fun barcode_404_rethrows() = runTest {
+        val cache = FakeCache()
+        val api = FakeApi(barcodeResult = { throw http(404) })
+        val repo = FoodRepository(api, cache, now = { 0 })
+
+        try {
+            repo.lookupBarcode("1"); fail("trebuia să arunce")
+        } catch (e: HttpException) { assertEquals(404, e.code()) }
+    }
+
+    @Test fun barcode_expired_offline_fallsBackStale() = runTest {
+        val cache = FakeCache().apply {
+            products["1"] = CachedProduct(item("1", "vechi"), cachedAt = 0)
+        }
+        val api = FakeApi(barcodeResult = { throw IOException("offline") })
+        val repo = FoodRepository(api, cache, now = { TTL + 10 })
+
+        val result = repo.lookupBarcode("1")
+        assertTrue(result.stale)
+        assertEquals("vechi", result.items.single().name)
+    }
 }
