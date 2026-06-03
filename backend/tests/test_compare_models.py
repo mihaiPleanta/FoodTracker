@@ -133,3 +133,39 @@ async def test_aggregate_empty_is_skipped():
     assert m.total_runs == 0
     assert m.macro_consistency_pct is None
     assert m.avg_attempts is None
+
+
+from services.ollama_client import OllamaUnavailable
+
+from scripts.compare_models import SCENARIOS, run_comparison
+
+
+async def test_scenarios_cover_four_meals():
+    assert len(SCENARIOS) == 4
+    assert {s.meal_type for s in SCENARIOS} == {"BREAKFAST", "LUNCH", "DINNER", "SNACKS"}
+
+
+async def test_run_comparison_collects_metrics_and_examples():
+    # One model, always-valid client. 1 run per scenario over 4 scenarios = 4 runs.
+    def factory(model):
+        return FakeClient([_valid_json()] * len(SCENARIOS))
+
+    metrics, examples = await run_comparison(
+        ["gemma3:4b"], SCENARIOS, runs=1, client_factory=factory
+    )
+    assert len(metrics) == 1
+    assert metrics[0].total_runs == len(SCENARIOS)
+    assert metrics[0].skipped is False
+    # one example recipe per scenario for the model
+    assert len(examples["gemma3:4b"]) == len(SCENARIOS)
+
+
+async def test_run_comparison_marks_unavailable_model_skipped():
+    def factory(model):
+        return FakeClient([OllamaUnavailable("connection refused")])
+
+    metrics, examples = await run_comparison(
+        ["ghost:model"], SCENARIOS, runs=1, client_factory=factory
+    )
+    assert metrics[0].skipped is True
+    assert examples["ghost:model"] == {}

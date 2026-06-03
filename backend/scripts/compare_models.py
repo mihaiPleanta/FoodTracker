@@ -7,7 +7,10 @@ from dataclasses import dataclass
 
 from pydantic import ValidationError
 
-from schemas import RecipeDto
+from schemas import RecipeDto, TopFood
+from services.nutrition import Goals
+from services.ollama_client import OllamaClient, OllamaUnavailable
+from services.recipes import build_recipe_prompt
 
 
 @dataclass
@@ -98,3 +101,75 @@ def aggregate(model: str, results: list[RunResult]) -> ModelMetrics:
         avg_steps=statistics.mean(len(r.steps) for r in valid_recipes) if valid_recipes else None,
         avg_ingredients=statistics.mean(len(r.ingredients) for r in valid_recipes) if valid_recipes else None,
     )
+
+
+@dataclass
+class Scenario:
+    label: str
+    anchor: TopFood
+    meal_type: str
+
+
+DEFAULT_GOALS = Goals(
+    calorie_goal=1900,
+    protein_goal_g=120,
+    carbs_goal_g=180,
+    fat_goal_g=53,
+    mode="DEFICIT",
+)
+
+SCENARIOS: list[Scenario] = [
+    Scenario(
+        "Banană",
+        TopFood(name="Banană", brand=None, kcal_100g=89, protein_100g=1.1, carbs_100g=23, fat_100g=0.3),
+        "BREAKFAST",
+    ),
+    Scenario(
+        "Piept de pui",
+        TopFood(name="Piept de pui", brand=None, kcal_100g=165, protein_100g=31, carbs_100g=0, fat_100g=3.6),
+        "LUNCH",
+    ),
+    Scenario(
+        "Orez",
+        TopFood(name="Orez", brand=None, kcal_100g=130, protein_100g=2.7, carbs_100g=28, fat_100g=0.3),
+        "DINNER",
+    ),
+    Scenario(
+        "Iaurt grecesc",
+        TopFood(name="Iaurt grecesc", brand=None, kcal_100g=59, protein_100g=10, carbs_100g=3.6, fat_100g=0.4),
+        "SNACKS",
+    ),
+]
+
+
+async def run_comparison(models, scenarios, runs, client_factory, language: str = "ro"):
+    """For each model, run every scenario `runs` times. Returns
+    (metrics: list[ModelMetrics], examples: dict[model -> dict[label -> RecipeDto]]).
+    A model whose first call raises OllamaUnavailable is recorded as skipped."""
+    metrics: list[ModelMetrics] = []
+    examples: dict[str, dict[str, RecipeDto]] = {}
+    for model in models:
+        client = client_factory(model)
+        all_results: list[RunResult] = []
+        model_examples: dict[str, RecipeDto] = {}
+        unavailable = False
+        for scenario in scenarios:
+            messages = build_recipe_prompt(
+                scenario.anchor, scenario.meal_type, DEFAULT_GOALS, language
+            )
+            for _ in range(runs):
+                try:
+                    result = await run_single(client, messages)
+                except OllamaUnavailable:
+                    unavailable = True
+                    break
+                all_results.append(result)
+                if scenario.label not in model_examples and result.recipe is not None:
+                    model_examples[scenario.label] = result.recipe
+            if unavailable:
+                break
+        examples[model] = {} if unavailable else model_examples
+        metrics.append(
+            aggregate(model, []) if unavailable else aggregate(model, all_results)
+        )
+    return metrics, examples
