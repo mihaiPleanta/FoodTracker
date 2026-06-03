@@ -169,3 +169,32 @@ async def test_run_comparison_marks_unavailable_model_skipped():
     )
     assert metrics[0].skipped is True
     assert examples["ghost:model"] == {}
+
+
+from scripts.compare_models import render_markdown
+
+
+async def test_render_markdown_has_table_and_examples():
+    valid = _recipe(title="Omletă cu pui")
+    metrics = [
+        ModelMetrics(
+            model="gemma3:4b", total_runs=4,
+            first_attempt_valid_pct=75.0, success_pct=100.0, avg_attempts=1.25,
+            latency_mean=0.5, latency_median=0.5, latency_p95=0.6,
+            macro_consistency_pct=12.0, avg_steps=3.0, avg_ingredients=4.0,
+        ),
+        ModelMetrics(
+            model="ghost:model", total_runs=0,
+            first_attempt_valid_pct=0.0, success_pct=0.0, avg_attempts=None,
+            latency_mean=None, latency_median=None, latency_p95=None,
+            macro_consistency_pct=None, avg_steps=None, avg_ingredients=None,
+            skipped=True,
+        ),
+    ]
+    examples = {"gemma3:4b": {"Banană": valid}, "ghost:model": {}}
+    md = render_markdown(metrics, examples, runs=1, language="ro")
+    assert "## Sumar metrici" in md
+    assert "gemma3:4b" in md
+    assert "Omletă cu pui" in md          # example recipe rendered
+    assert "skip" in md.lower()            # skipped model noted
+    assert "## Exemple side-by-side" in md

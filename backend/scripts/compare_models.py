@@ -173,3 +173,58 @@ async def run_comparison(models, scenarios, runs, client_factory, language: str 
             aggregate(model, []) if unavailable else aggregate(model, all_results)
         )
     return metrics, examples
+
+
+def _fmt(value: float | None, suffix: str = "", nd: int = 1) -> str:
+    return "—" if value is None else f"{value:.{nd}f}{suffix}"
+
+
+def render_markdown(metrics, examples, runs: int, language: str) -> str:
+    lines: list[str] = []
+    lines.append("# Comparație modele Ollama")
+    lines.append("")
+    lines.append(
+        f"- Repetări/scenariu: **{runs}** · Limbă: **{language}** · "
+        f"Scenarii: **{len(SCENARIOS)}**"
+    )
+    lines.append("")
+    lines.append("## Sumar metrici")
+    lines.append("")
+    lines.append(
+        "| Model | JSON valid din prima | Succes ≤3 | Încercări medii | "
+        "Latență mediană (s) | Latență p95 (s) | Eroare macro | Pași medii | Ingrediente medii |"
+    )
+    lines.append("|---|---|---|---|---|---|---|---|---|")
+    for m in metrics:
+        if m.skipped:
+            lines.append(f"| {m.model} | _skip (indisponibil)_ |  |  |  |  |  |  |  |")
+            continue
+        lines.append(
+            f"| {m.model} | {_fmt(m.first_attempt_valid_pct, '%')} | "
+            f"{_fmt(m.success_pct, '%')} | {_fmt(m.avg_attempts, nd=2)} | "
+            f"{_fmt(m.latency_median, 's', nd=2)} | {_fmt(m.latency_p95, 's', nd=2)} | "
+            f"{_fmt(m.macro_consistency_pct, '%')} | {_fmt(m.avg_steps, nd=1)} | "
+            f"{_fmt(m.avg_ingredients, nd=1)} |"
+        )
+    lines.append("")
+    lines.append("## Exemple side-by-side")
+    for scenario in SCENARIOS:
+        lines.append("")
+        lines.append(f"### {scenario.label} ({scenario.meal_type})")
+        for model, by_label in examples.items():
+            recipe = by_label.get(scenario.label)
+            lines.append("")
+            lines.append(f"**{model}:**")
+            if recipe is None:
+                lines.append("_nicio rețetă validă_")
+                continue
+            lines.append(f"- *{recipe.title}* — {recipe.description}")
+            lines.append(
+                f"- Macros: {recipe.kcal_per_serving} kcal · "
+                f"{recipe.protein_g}P / {recipe.carbs_g}C / {recipe.fat_g}G"
+            )
+            ingr = "; ".join(f"{i.name} ({i.quantity})" for i in recipe.ingredients)
+            lines.append(f"- Ingrediente: {ingr}")
+            for idx, step in enumerate(recipe.steps, 1):
+                lines.append(f"  {idx}. {step}")
+    return "\n".join(lines) + "\n"
