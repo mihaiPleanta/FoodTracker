@@ -4,10 +4,10 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.foodtracker.R
-import com.example.foodtracker.api.FoodApi
 import com.example.foodtracker.api.LogsApi
 import com.example.foodtracker.api.ProfileApi
 import com.example.foodtracker.api.RetrofitInstance
+import com.example.foodtracker.data.FoodRepository
 import com.example.foodtracker.data.MealLogTracker
 import com.example.foodtracker.data.SettingsRepository
 import com.example.foodtracker.model.AppSettings
@@ -55,13 +55,14 @@ data class WeightCheckIn(
 class FoodViewModel(
     private val settingsRepository: SettingsRepository,
     private val mealLogTracker: MealLogTracker,
+    private val foodRepository: FoodRepository,
 ) : ViewModel() {
 
     // ── Search state ──────────────────────────────────────────────────────────
     sealed class SearchUiState {
         data object Idle : SearchUiState()
         data object Loading : SearchUiState()
-        data class Results(val items: List<FoodItem>) : SearchUiState()
+        data class Results(val items: List<FoodItem>, val stale: Boolean = false) : SearchUiState()
         data object Empty : SearchUiState()
         data class Error(@StringRes val messageRes: Int, val arg: Int? = null) : SearchUiState()
     }
@@ -69,7 +70,6 @@ class FoodViewModel(
     /** A localizable snackbar message; [code] (HTTP status) is appended in the UI when present. */
     data class ToastEvent(@StringRes val messageRes: Int, val code: Int? = null)
 
-    private val foodApi: FoodApi = RetrofitInstance.retrofit.create(FoodApi::class.java)
     private val logsApi: LogsApi = RetrofitInstance.retrofit.create(LogsApi::class.java)
     private val profileApi: ProfileApi = RetrofitInstance.retrofit.create(ProfileApi::class.java)
 
@@ -89,10 +89,9 @@ class FoodViewModel(
                     } else {
                         _searchState.value = SearchUiState.Loading
                         try {
-                            val response = foodApi.searchFoods(query)
-                            val items = response.items.map { it.toDomain() }
-                            if (items.isEmpty()) SearchUiState.Empty
-                            else SearchUiState.Results(items)
+                            val result = foodRepository.search(query)
+                            if (result.items.isEmpty()) SearchUiState.Empty
+                            else SearchUiState.Results(result.items, result.stale)
                         } catch (e: java.io.IOException) {
                             SearchUiState.Error(R.string.error_no_internet)
                         } catch (e: retrofit2.HttpException) {
@@ -124,8 +123,9 @@ class FoodViewModel(
         viewModelScope.launch {
             _searchState.value = SearchUiState.Loading
             _searchState.value = try {
-                val dto = foodApi.getFoodByBarcode(barcode)
-                SearchUiState.Results(listOf(dto.toDomain()))
+                val result = foodRepository.lookupBarcode(barcode)
+                if (result.items.isEmpty()) SearchUiState.Empty
+                else SearchUiState.Results(result.items, result.stale)
             } catch (e: retrofit2.HttpException) {
                 if (e.code() == 404) SearchUiState.Empty
                 else SearchUiState.Error(R.string.error_unexpected_code, e.code())

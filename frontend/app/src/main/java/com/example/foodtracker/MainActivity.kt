@@ -24,8 +24,12 @@ import androidx.navigation.compose.*
 import com.example.foodtracker.ui.*
 import com.example.foodtracker.ui.theme.FoodTrackerTheme
 import com.example.foodtracker.ui.theme.GlassColors
+import com.example.foodtracker.api.RetrofitInstance
 import com.example.foodtracker.data.DataStoreSettingsRepository
+import com.example.foodtracker.data.FoodRepository
 import com.example.foodtracker.data.MealLogTracker
+import com.example.foodtracker.data.cache.FoodCacheDb
+import com.example.foodtracker.data.cache.RoomFoodCache
 import com.example.foodtracker.data.mealLogTrackerDataStore
 import com.example.foodtracker.data.settingsDataStore
 import com.example.foodtracker.util.notifications.MealReminderScheduler
@@ -59,6 +63,10 @@ class MainActivity : ComponentActivity() {
                 FoodViewModelFactory(
                     settingsRepository = DataStoreSettingsRepository(applicationContext.settingsDataStore),
                     mealLogTracker = MealLogTracker(applicationContext.mealLogTrackerDataStore),
+                    foodRepository = FoodRepository(
+                        api = RetrofitInstance.api,
+                        cache = RoomFoodCache(FoodCacheDb.get(applicationContext).foodCacheDao()),
+                    ),
                 )
             }
             val viewModel: FoodViewModel = viewModel(factory = foodViewModelFactory)

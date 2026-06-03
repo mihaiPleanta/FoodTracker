@@ -1,11 +1,18 @@
 package com.example.foodtracker
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import com.example.foodtracker.api.FoodApi
 import com.example.foodtracker.data.FakeSettingsRepository
+import com.example.foodtracker.data.FoodRepository
 import com.example.foodtracker.data.MealLogTracker
+import com.example.foodtracker.data.cache.CachedProduct
+import com.example.foodtracker.data.cache.CachedSearch
+import com.example.foodtracker.data.cache.FoodCache
 import com.example.foodtracker.model.*
 import com.example.foodtracker.model.FoodItem
+import com.example.foodtracker.model.FoodItemDto
 import com.example.foodtracker.model.LoggedFood
+import com.example.foodtracker.model.SearchResponseDto
 import com.example.foodtracker.viewmodel.FoodViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -21,6 +28,23 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
+
+// No-op stubs used only to satisfy FoodViewModel's FoodRepository dependency.
+private object NoOpCache : FoodCache {
+    override suspend fun getSearch(query: String): CachedSearch? = null
+    override suspend fun putSearch(query: String, items: List<FoodItem>, now: Long) {}
+    override suspend fun touchSearch(query: String, now: Long) {}
+    override suspend fun getProduct(barcode: String): CachedProduct? = null
+    override suspend fun putProduct(item: FoodItem, now: Long) {}
+    override suspend fun touchProduct(barcode: String, now: Long) {}
+}
+
+private object NoOpFoodApi : FoodApi {
+    override suspend fun searchFoods(query: String, pageSize: Int): SearchResponseDto =
+        SearchResponseDto(emptyList(), 0)
+    override suspend fun getFoodByBarcode(barcode: String): FoodItemDto =
+        throw UnsupportedOperationException("NoOpFoodApi")
+}
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FoodViewModelTest {
@@ -40,6 +64,7 @@ class FoodViewModelTest {
         viewModel = FoodViewModel(
             settingsRepository = FakeSettingsRepository(),
             mealLogTracker = MealLogTracker(trackerStore),
+            foodRepository = FoodRepository(NoOpFoodApi, NoOpCache),
         )
     }
 
