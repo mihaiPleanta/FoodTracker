@@ -62,7 +62,12 @@ class FoodViewModel(
     sealed class SearchUiState {
         data object Idle : SearchUiState()
         data object Loading : SearchUiState()
-        data class Results(val items: List<FoodItem>, val stale: Boolean = false) : SearchUiState()
+        data class Results(
+            val items: List<FoodItem>,
+            val stale: Boolean = false,
+            val hasMore: Boolean = false,
+            val loadingMore: Boolean = false,
+        ) : SearchUiState()
         data object Empty : SearchUiState()
         data class Error(@StringRes val messageRes: Int, val arg: Int? = null) : SearchUiState()
     }
@@ -77,6 +82,8 @@ class FoodViewModel(
     val searchState: StateFlow<SearchUiState> = _searchState.asStateFlow()
 
     private val _searchQuery = MutableStateFlow("")
+    private var currentQuery: String = ""
+    private var currentPage: Int = 1
 
     @OptIn(FlowPreview::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private fun observeSearchQueries() {
@@ -87,11 +94,13 @@ class FoodViewModel(
                     if (query.length < 2) {
                         SearchUiState.Idle
                     } else {
+                        currentQuery = query
+                        currentPage = 1
                         _searchState.value = SearchUiState.Loading
                         try {
                             val result = foodRepository.search(query)
                             if (result.items.isEmpty()) SearchUiState.Empty
-                            else SearchUiState.Results(result.items, result.stale)
+                            else SearchUiState.Results(result.items, result.stale, result.hasMore)
                         } catch (e: java.io.IOException) {
                             SearchUiState.Error(R.string.error_no_internet)
                         } catch (e: retrofit2.HttpException) {
@@ -112,6 +121,30 @@ class FoodViewModel(
 
     fun searchFoods(query: String) {
         _searchQuery.value = query
+    }
+
+    fun loadMore() {
+        val current = _searchState.value
+        if (current !is SearchUiState.Results) return
+        if (!current.hasMore || current.loadingMore) return
+        val queryAtStart = currentQuery
+        viewModelScope.launch {
+            _searchState.value = current.copy(loadingMore = true)
+            try {
+                val next = currentPage + 1
+                val result = foodRepository.search(queryAtStart, next)
+                // O căutare nouă a pornit între timp → renunță la rezultat.
+                if (currentQuery != queryAtStart) return@launch
+                currentPage = next
+                val merged = (current.items + result.items).distinctBy { it.barcode }
+                _searchState.value = SearchUiState.Results(merged, current.stale, result.hasMore, loadingMore = false)
+            } catch (e: Throwable) {
+                // Eroarea de load-more e ne-fatală: păstrăm ce avem, oprim paginarea.
+                if (currentQuery == queryAtStart) {
+                    _searchState.value = current.copy(hasMore = false, loadingMore = false)
+                }
+            }
+        }
     }
 
     fun clearSearch() {

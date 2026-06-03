@@ -46,6 +46,20 @@ private object NoOpFoodApi : FoodApi {
         throw UnsupportedOperationException("NoOpFoodApi")
 }
 
+private fun pagedDto(barcode: String) = FoodItemDto(
+    barcode = barcode, name = "Food $barcode", kcal100g = 100f,
+    protein100g = 5f, carbs100g = 10f, fat100g = 2f,
+)
+
+/** Returns page 1 with two items + hasMore=true, page 2 with one item + hasMore=false. */
+private object PagingFoodApi : FoodApi {
+    override suspend fun searchFoods(query: String, page: Int, pageSize: Int): SearchResponseDto =
+        if (page <= 1) SearchResponseDto(listOf(pagedDto("1"), pagedDto("2")), 2, hasMore = true)
+        else SearchResponseDto(listOf(pagedDto("3")), 1, hasMore = false)
+    override suspend fun getFoodByBarcode(barcode: String): FoodItemDto =
+        throw UnsupportedOperationException("PagingFoodApi")
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class FoodViewModelTest {
 
@@ -107,6 +121,30 @@ class FoodViewModelTest {
             LoggedFood(sampleFood("Oats"), 100)
         )
         assertEquals(0, index)
+    }
+
+    @Test
+    fun loadMore_appendsNextPage_andUpdatesHasMore() = runTest(testDispatcher) {
+        val store = PreferenceDataStoreFactory.create(
+            produceFile = { File(tempFolder.newFolder("tracker2"), "meal_log_tracker.preferences_pb") }
+        )
+        val vm = FoodViewModel(
+            settingsRepository = FakeSettingsRepository(),
+            mealLogTracker = MealLogTracker(store),
+            foodRepository = FoodRepository(PagingFoodApi, NoOpCache),
+        )
+
+        vm.searchFoods("banana")
+        advanceUntilIdle()   // drains the 350ms debounce + page-1 fetch
+        val first = vm.searchState.value as FoodViewModel.SearchUiState.Results
+        assertEquals(2, first.items.size)
+        assertEquals(true, first.hasMore)
+
+        vm.loadMore()
+        advanceUntilIdle()
+        val after = vm.searchState.value as FoodViewModel.SearchUiState.Results
+        assertEquals(3, after.items.size)
+        assertEquals(false, after.hasMore)
     }
 
     @Test
