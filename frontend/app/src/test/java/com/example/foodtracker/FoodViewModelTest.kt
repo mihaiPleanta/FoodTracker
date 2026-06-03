@@ -2,6 +2,7 @@ package com.example.foodtracker
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.example.foodtracker.api.FoodApi
+import com.example.foodtracker.api.LogsApi
 import com.example.foodtracker.data.FakeSettingsRepository
 import com.example.foodtracker.data.FoodRepository
 import com.example.foodtracker.data.MealLogTracker
@@ -16,6 +17,7 @@ import com.example.foodtracker.model.SearchResponseDto
 import com.example.foodtracker.viewmodel.FoodViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -44,6 +46,52 @@ private object NoOpFoodApi : FoodApi {
         SearchResponseDto(emptyList(), 0)
     override suspend fun getFoodByBarcode(barcode: String): FoodItemDto =
         throw UnsupportedOperationException("NoOpFoodApi")
+}
+
+/**
+ * Fake LogsApi for testing the PATCH-grams flow. getDay seeds one breakfast item with a real id
+ * (so updateFoodGrams has something to edit without going through the add path / markLogged);
+ * updateFoodLog echoes the new grams and records the call. The rest throw.
+ */
+private class FakeLogsApi : LogsApi {
+    var lastUpdate: Pair<Long, Int>? = null
+
+    override suspend fun getDay(date: String): DayResponseDto = DayResponseDto(
+        foodsByMeal = mapOf(
+            "breakfast" to listOf(
+                FoodLogDto(
+                    id = 42L, logDate = date, meal = "BREAKFAST", grams = 100,
+                    barcode = "111", name = "Oats", brand = null, imageUrl = null,
+                    categories = emptyList(), kcal100g = 100f, protein100g = 5f,
+                    carbs100g = 10f, fat100g = 2f,
+                )
+            )
+        ),
+        hydrationLiters = 0f,
+        weightCheckIn = null,
+    )
+
+    override suspend fun createFoodLog(body: FoodLogCreateDto): FoodLogDto =
+        throw UnsupportedOperationException()
+
+    override suspend fun updateFoodLog(id: Long, body: FoodLogUpdateDto): FoodLogDto {
+        lastUpdate = id to body.grams
+        return FoodLogDto(
+            id = id, logDate = "2026-06-03", meal = "BREAKFAST", grams = body.grams,
+            barcode = "111", name = "Oats", brand = null, imageUrl = null, categories = emptyList(),
+            kcal100g = 100f, protein100g = 5f, carbs100g = 10f, fat100g = 2f,
+        )
+    }
+
+    override suspend fun deleteFoodLog(id: Long): retrofit2.Response<Unit> =
+        retrofit2.Response.success(null)
+
+    override suspend fun putHydration(date: String, body: HydrationUpdateDto): HydrationDto =
+        throw UnsupportedOperationException()
+    override suspend fun postWeightCheckIn(body: WeightCheckInCreateDto): WeightCheckInDto =
+        throw UnsupportedOperationException()
+    override suspend fun getWeightCheckIns(from: String, to: String): WeightCheckInListDto =
+        throw UnsupportedOperationException()
 }
 
 private fun pagedDto(barcode: String) = FoodItemDto(
@@ -145,6 +193,35 @@ class FoodViewModelTest {
         val after = vm.searchState.value as FoodViewModel.SearchUiState.Results
         assertEquals(3, after.items.size)
         assertEquals(false, after.hasMore)
+    }
+
+    @Test
+    fun updateFoodGrams_updatesGramsInPlace() = runTest(testDispatcher) {
+        val fakeLogs = FakeLogsApi()
+        val store = PreferenceDataStoreFactory.create(
+            produceFile = { File(tempFolder.newFolder("tracker3"), "meal_log_tracker.preferences_pb") }
+        )
+        val vm = FoodViewModel(
+            settingsRepository = FakeSettingsRepository(),
+            mealLogTracker = MealLogTracker(store),
+            foodRepository = FoodRepository(NoOpFoodApi, NoOpCache),
+            logsApi = fakeLogs,
+        )
+        // Capture latest emission (WhileSubscribed needs an active collector).
+        var foods: List<LoggedFood> = emptyList()
+        val job = launch { vm.getFoodsFlow("Breakfast").collect { foods = it } }
+        advanceUntilIdle()  // drain init loadDay → seeds one breakfast item (id=42, 100g)
+
+        assertEquals(1, foods.size)
+        assertEquals(100, foods[0].grams)
+
+        vm.updateFoodGrams("Breakfast", 0, 175)
+        advanceUntilIdle()  // PATCH resolves
+
+        assertEquals(1, foods.size)                     // still one item, in place
+        assertEquals(175, foods[0].grams)               // grams updated
+        assertEquals(42L to 175, fakeLogs.lastUpdate)   // PATCH sent id + new grams
+        job.cancel()
     }
 
     @Test

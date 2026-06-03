@@ -13,6 +13,7 @@ import com.example.foodtracker.data.SettingsRepository
 import com.example.foodtracker.model.AppSettings
 import com.example.foodtracker.model.FoodItem
 import com.example.foodtracker.model.FoodLogCreateDto
+import com.example.foodtracker.model.FoodLogUpdateDto
 import com.example.foodtracker.model.HydrationUpdateDto
 import com.example.foodtracker.model.LoggedFood
 import com.example.foodtracker.model.NutritionGoals
@@ -56,6 +57,7 @@ class FoodViewModel(
     private val settingsRepository: SettingsRepository,
     private val mealLogTracker: MealLogTracker,
     private val foodRepository: FoodRepository,
+    private val logsApi: LogsApi = RetrofitInstance.retrofit.create(LogsApi::class.java),
 ) : ViewModel() {
 
     // ── Search state ──────────────────────────────────────────────────────────
@@ -75,7 +77,6 @@ class FoodViewModel(
     /** A localizable snackbar message; [code] (HTTP status) is appended in the UI when present. */
     data class ToastEvent(@StringRes val messageRes: Int, val code: Int? = null)
 
-    private val logsApi: LogsApi = RetrofitInstance.retrofit.create(LogsApi::class.java)
     private val profileApi: ProfileApi = RetrofitInstance.retrofit.create(ProfileApi::class.java)
 
     private val _searchState = MutableStateFlow<SearchUiState>(SearchUiState.Idle)
@@ -532,6 +533,43 @@ class FoodViewModel(
         val insertAt = index.coerceIn(0, list.size)
         list.add(insertAt, food)
         _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, list))
+    }
+
+    fun updateFoodGrams(mealName: String, index: Int, newGrams: Int) {
+        val key = dateKey(_selectedHomeDate.value)
+        val day = _foodsByDate.value[key] ?: return
+        val list = mealList(day, mealName)
+        if (index !in list.indices) return
+        val target = list[index]
+        val id = target.id ?: return          // încă în POST pending — edit indisponibil
+        if (newGrams == target.grams) return  // no-op
+
+        // Optimistic update (pe loc, fără reordonare)
+        val optimistic = target.copy(grams = newGrams)
+        val newList = list.toMutableList().also { it[index] = optimistic }
+        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
+
+        viewModelScope.launch {
+            try {
+                logsApi.updateFoodLog(id, FoodLogUpdateDto(grams = newGrams))
+            } catch (e: java.io.IOException) {
+                restoreGrams(key, mealName, id, target.grams)
+                _toastEvents.tryEmit(ToastEvent(R.string.error_no_internet))
+            } catch (e: retrofit2.HttpException) {
+                restoreGrams(key, mealName, id, target.grams)
+                _toastEvents.tryEmit(ToastEvent(R.string.error_save, e.code()))
+            } catch (e: Throwable) {
+                restoreGrams(key, mealName, id, target.grams)
+                _toastEvents.tryEmit(ToastEvent(R.string.error_save))
+            }
+        }
+    }
+
+    private fun restoreGrams(key: String, mealName: String, id: Long, oldGrams: Int) {
+        val day = _foodsByDate.value[key] ?: return
+        val list = mealList(day, mealName)
+        val newList = list.map { if (it.id == id) it.copy(grams = oldGrams) else it }
+        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
     }
 
     // ── Computed totals ───────────────────────────────────────────────────────

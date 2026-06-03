@@ -93,6 +93,7 @@ fun MealDetailScreen(
     val coroutineScope = rememberCoroutineScope()
 
     var sheetTarget by remember { mutableStateOf<FoodItem?>(null) }
+    var editTarget by remember { mutableStateOf<Pair<Int, LoggedFood>?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(searchQuery) {
@@ -164,6 +165,7 @@ fun MealDetailScreen(
                         loggedFoods = loggedFoods,
                         accentColor = accentColor,
                         onRemove    = { index -> viewModel.removeFoodFromMeal(mealName, index) },
+                        onEdit      = { index -> editTarget = index to loggedFoods[index] },
                     )
                 }
             }
@@ -205,6 +207,20 @@ fun MealDetailScreen(
                             viewModel.removeFoodFromMeal(mealName, newIndex)
                         }
                     }
+                },
+            )
+        }
+
+        editTarget?.let { (index, logged) ->
+            AddFoodSheet(
+                target = logged.food,
+                accentColor = accentColor,
+                confirmLabel = stringResource(R.string.action_save),
+                initialGrams = logged.grams,
+                onDismiss = { editTarget = null },
+                onConfirm = { _, grams ->
+                    viewModel.updateFoodGrams(mealName, index, grams)
+                    editTarget = null
                 },
             )
         }
@@ -379,7 +395,8 @@ fun BarcodeScanButton(accentColor: Color, onClick: () -> Unit) {
 fun LoggedFoodsList(
     loggedFoods: List<LoggedFood>,
     accentColor: Color,
-    onRemove: (Int) -> Unit
+    onRemove: (Int) -> Unit,
+    onEdit: (Int) -> Unit
 ) {
     if (loggedFoods.isEmpty()) {
         Box(Modifier.fillMaxSize(), Alignment.Center) {
@@ -418,7 +435,8 @@ fun LoggedFoodsList(
                 LoggedFoodRow(
                     logged      = logged,
                     accentColor = accentColor,
-                    onRemove    = { onRemove(index) }
+                    onRemove    = { onRemove(index) },
+                    onEdit      = { onEdit(index) }
                 )
             }
         }
@@ -429,7 +447,8 @@ fun LoggedFoodsList(
 fun LoggedFoodRow(
     logged: LoggedFood,
     accentColor: Color,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    onEdit: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -462,8 +481,14 @@ fun LoggedFoodRow(
 
         Spacer(Modifier.width(10.dp))
 
-        // Grams + calories column
-        Column(horizontalAlignment = Alignment.End) {
+        // Grams + calories column (tap → edit grams)
+        Column(
+            horizontalAlignment = Alignment.End,
+            modifier = Modifier
+                .clip(RoundedCornerShape(10.dp))
+                .clickable { onEdit() }
+                .padding(horizontal = 4.dp, vertical = 2.dp)
+        ) {
             Text(
                 text = "${logged.grams}g",
                 fontSize = 13.sp,

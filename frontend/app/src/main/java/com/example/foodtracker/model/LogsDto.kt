@@ -2,6 +2,10 @@ package com.example.foodtracker.model
 
 import com.google.gson.annotations.SerializedName
 
+data class FoodLogUpdateDto(
+    val grams: Int,
+)
+
 data class FoodLogCreateDto(
     @SerializedName("log_date") val logDate: String,    // "yyyy-MM-dd"
     val meal: String,                                   // BREAKFAST/LUNCH/DINNER/SNACKS

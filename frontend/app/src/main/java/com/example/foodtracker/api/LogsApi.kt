@@ -3,6 +3,7 @@ package com.example.foodtracker.api
 import com.example.foodtracker.model.DayResponseDto
 import com.example.foodtracker.model.FoodLogCreateDto
 import com.example.foodtracker.model.FoodLogDto
+import com.example.foodtracker.model.FoodLogUpdateDto
 import com.example.foodtracker.model.HydrationDto
 import com.example.foodtracker.model.HydrationUpdateDto
 import com.example.foodtracker.model.WeightCheckInCreateDto
@@ -12,6 +13,7 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
@@ -24,6 +26,9 @@ interface LogsApi {
 
     @POST("food-logs")
     suspend fun createFoodLog(@Body body: FoodLogCreateDto): FoodLogDto
+
+    @PATCH("food-logs/{id}")
+    suspend fun updateFoodLog(@Path("id") id: Long, @Body body: FoodLogUpdateDto): FoodLogDto
 
     @DELETE("food-logs/{id}")
     suspend fun deleteFoodLog(@Path("id") id: Long): Response<Unit>
