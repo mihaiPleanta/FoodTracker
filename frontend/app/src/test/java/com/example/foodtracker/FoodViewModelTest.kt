@@ -40,7 +40,7 @@ private object NoOpCache : FoodCache {
 }
 
 private object NoOpFoodApi : FoodApi {
-    override suspend fun searchFoods(query: String, pageSize: Int): SearchResponseDto =
+    override suspend fun searchFoods(query: String, page: Int, pageSize: Int): SearchResponseDto =
         SearchResponseDto(emptyList(), 0)
     override suspend fun getFoodByBarcode(barcode: String): FoodItemDto =
         throw UnsupportedOperationException("NoOpFoodApi")

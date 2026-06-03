@@ -56,9 +56,11 @@ private class FakeApi(
     var barcodeResult: (() -> FoodItemDto)? = null,
 ) : FoodApi {
     var searchCalls = 0
+    var lastPage = 0
     var barcodeCalls = 0
-    override suspend fun searchFoods(query: String, pageSize: Int): SearchResponseDto {
+    override suspend fun searchFoods(query: String, page: Int, pageSize: Int): SearchResponseDto {
         searchCalls++
+        lastPage = page
         return searchResult!!.invoke()
     }
     override suspend fun getFoodByBarcode(barcode: String): FoodItemDto {
@@ -157,6 +159,41 @@ class FoodRepositoryTest {
         val result = repo.search("  BaNaNa  ")
         assertEquals(0, api.searchCalls)
         assertEquals("1", result.items.single().barcode)
+    }
+
+    @Test fun search_pageTwo_networkOnly_noCacheWrite() = runTest {
+        val cache = FakeCache()
+        val api = FakeApi(searchResult = { SearchResponseDto(listOf(dto("2")), 1, hasMore = true) })
+        val repo = FoodRepository(api, cache, now = { 5_000 })
+
+        val result = repo.search("banana", page = 2)
+
+        assertEquals("2", result.items.single().barcode)
+        assertTrue(result.hasMore)
+        assertEquals(2, api.lastPage)
+        assertTrue(cache.searches.isEmpty())  // page>1 nu atinge cache-ul
+    }
+
+    @Test fun search_pageOne_live_propagatesHasMore() = runTest {
+        val cache = FakeCache()
+        val api = FakeApi(searchResult = { SearchResponseDto(listOf(dto("1")), 1, hasMore = true) })
+        val repo = FoodRepository(api, cache, now = { 5_000 })
+
+        val result = repo.search("banana")
+
+        assertTrue(result.hasMore)
+        assertEquals(1, api.lastPage)
+    }
+
+    @Test fun search_cacheHit_hasMoreFalse() = runTest {
+        val cache = FakeCache().apply {
+            searches["banana"] = CachedSearch(listOf(item("1")), cachedAt = 1_000)
+        }
+        val api = FakeApi(searchResult = { fail("nu trebuie apelat"); error("") })
+        val repo = FoodRepository(api, cache, now = { 1_000 })
+
+        val result = repo.search("banana")
+        assertTrue(!result.hasMore)
     }
 
     @Test fun barcode_freshCacheHit_noNetwork() = runTest {
