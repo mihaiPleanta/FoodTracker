@@ -67,6 +67,10 @@ class FoodLogCreate(BaseModel):
     fat_100g: float = Field(ge=0)
 
 
+class FoodLogUpdate(BaseModel):
+    grams: int = Field(gt=0)
+
+
 class FoodLogDto(FoodLogCreate):
     model_config = ConfigDict(from_attributes=True)
     id: int

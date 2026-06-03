@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from auth import verify_token
 from database import get_db
 from models import FoodLog
-from schemas import FoodLogCreate, FoodLogDto
+from schemas import FoodLogCreate, FoodLogDto, FoodLogUpdate
 
 router = APIRouter()
 
@@ -23,6 +23,26 @@ async def create_food_log(
     uid = token["uid"]
     row = FoodLog(uid=uid, **req.model_dump())
     db.add(row)
+    await db.commit()
+    await db.refresh(row)
+    return row
+
+
+@router.patch("/food-logs/{log_id}", response_model=FoodLogDto)
+async def update_food_log(
+    log_id: int,
+    req: FoodLogUpdate,
+    token: dict = Depends(verify_token),
+    db: AsyncSession = Depends(get_db),
+) -> FoodLog:
+    uid = token["uid"]
+    result = await db.execute(select(FoodLog).where(FoodLog.id == log_id))
+    row = result.scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Food log not found")
+    if row.uid != uid:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your food log")
+    row.grams = req.grams
     await db.commit()
     await db.refresh(row)
     return row

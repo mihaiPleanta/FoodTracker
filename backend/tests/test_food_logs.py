@@ -89,6 +89,54 @@ def test_delete_food_log_of_another_user_returns_403(client, mock_firebase_token
     assert r.status_code == 403
 
 
+def test_patch_food_log_updates_grams(client):
+    _ensure_profile(client)
+    created = client.post("/food-logs", json=_VALID_LOG, headers=AUTH_HEADER).json()
+    log_id = created["id"]
+    r = client.patch(f"/food-logs/{log_id}", json={"grams": 175}, headers=AUTH_HEADER)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["id"] == log_id
+    assert body["grams"] == 175
+    # snapshot-ul produsului rămâne neschimbat
+    assert body["name"] == "Nutella"
+    assert body["kcal_100g"] == 539.0
+
+
+def test_patch_food_log_persists(client):
+    _ensure_profile(client)
+    created = client.post("/food-logs", json=_VALID_LOG, headers=AUTH_HEADER).json()
+    log_id = created["id"]
+    client.patch(f"/food-logs/{log_id}", json={"grams": 200}, headers=AUTH_HEADER)
+    day = client.get("/days/2026-05-20", headers=AUTH_HEADER).json()
+    logged = day["foods_by_meal"]["breakfast"]
+    assert any(f["id"] == log_id and f["grams"] == 200 for f in logged)
+
+
+def test_patch_food_log_zero_grams_returns_422(client):
+    _ensure_profile(client)
+    created = client.post("/food-logs", json=_VALID_LOG, headers=AUTH_HEADER).json()
+    log_id = created["id"]
+    r = client.patch(f"/food-logs/{log_id}", json={"grams": 0}, headers=AUTH_HEADER)
+    assert r.status_code == 422
+
+
+def test_patch_food_log_not_found_returns_404(client):
+    _ensure_profile(client)
+    r = client.patch("/food-logs/99999", json={"grams": 150}, headers=AUTH_HEADER)
+    assert r.status_code == 404
+
+
+def test_patch_food_log_of_another_user_returns_403(client, mock_firebase_token):
+    _ensure_profile(client)
+    created = client.post("/food-logs", json=_VALID_LOG, headers=AUTH_HEADER).json()
+    log_id = created["id"]
+    mock_firebase_token.return_value = {"uid": "different-uid", "email": "x@y.com"}
+    client.post("/profile", json=_VALID_PROFILE, headers=AUTH_HEADER)
+    r = client.patch(f"/food-logs/{log_id}", json={"grams": 150}, headers=AUTH_HEADER)
+    assert r.status_code == 403
+
+
 def test_food_log_snapshot_persists_macros(client):
     _ensure_profile(client)
     created = client.post("/food-logs", json=_VALID_LOG, headers=AUTH_HEADER).json()
