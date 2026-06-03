@@ -29,4 +29,5 @@ data class FoodItemDto(
 data class SearchResponseDto(
     @SerializedName("items") val items: List<FoodItemDto>,
     @SerializedName("count") val count: Int,
+    @SerializedName("has_more") val hasMore: Boolean = false,
 )

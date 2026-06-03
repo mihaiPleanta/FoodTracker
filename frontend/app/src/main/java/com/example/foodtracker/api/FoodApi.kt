@@ -10,6 +10,7 @@ interface FoodApi {
     @GET("foods/search")
     suspend fun searchFoods(
         @Query("q") query: String,
+        @Query("page") page: Int = 1,
         @Query("page_size") pageSize: Int = 20,
     ): SearchResponseDto
 
