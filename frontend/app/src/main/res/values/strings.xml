@@ -233,6 +233,9 @@
     <string name="nav_meals">Mese</string>
     <string name="nav_profile">Profil</string>
 
+    <!-- Search -->
+    <string name="search_cached_offline">Rezultate din cache (offline)</string>
+
     <!-- Stats extras -->
     <string name="stats_title">Statistici</string>
     <string name="stats_change_up">Variație 7z: +%1$s kg</string>

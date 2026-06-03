@@ -581,12 +581,22 @@ fun SearchResultsView(
             }
         }
         is FoodViewModel.SearchUiState.Results -> {
-            LazyColumn(
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                itemsIndexed(state.items, key = { _, item -> item.barcode.ifEmpty { item.name } }) { _, food ->
-                    SearchResultRow(food = food, onAdd = { onAdd(food) })
+            Column(Modifier.fillMaxSize()) {
+                if (state.stale) {
+                    Text(
+                        stringResource(R.string.search_cached_offline),
+                        color = GlassColors.textTertiary,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+                    )
+                }
+                LazyColumn(
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    itemsIndexed(state.items, key = { _, item -> item.barcode.ifEmpty { item.name } }) { _, food ->
+                        SearchResultRow(food = food, onAdd = { onAdd(food) })
+                    }
                 }
             }
         }

@@ -230,6 +230,9 @@
     <string name="nav_meals">Meals</string>
     <string name="nav_profile">Profile</string>
 
+    <!-- Search -->
+    <string name="search_cached_offline">Cached results (offline)</string>
+
     <!-- Stats extras -->
     <string name="stats_title">Stats</string>
     <string name="stats_change_up">7d change: +%1$s kg</string>
