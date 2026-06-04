@@ -13,6 +13,7 @@
     <string name="action_save">Salvează</string>
     <string name="action_saved">Salvat</string>
     <string name="action_added">Adăugat</string>
+    <string name="recipe_portion_one">1 porție</string>
     <string name="action_continue">Continuă</string>
     <string name="action_retry">Reîncearcă</string>
     <string name="action_delete">Șterge</string>

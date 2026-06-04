@@ -14,6 +14,7 @@ import com.example.foodtracker.model.AppSettings
 import com.example.foodtracker.model.FoodItem
 import com.example.foodtracker.model.FoodLogCreateDto
 import com.example.foodtracker.model.FoodLogUpdateDto
+import com.example.foodtracker.model.toDto
 import com.example.foodtracker.model.HydrationUpdateDto
 import com.example.foodtracker.model.LoggedFood
 import com.example.foodtracker.model.NutritionGoals
@@ -433,6 +434,7 @@ class FoodViewModel(
                         protein100g = optimistic.food.protein100g,
                         carbs100g = optimistic.food.carbs100g,
                         fat100g = optimistic.food.fat100g,
+                        ingredients = optimistic.food.ingredients?.map { it.toDto() },
                     )
                 )
                 replaceByTempId(key, mealName, tempId) { it.copy(id = response.id, clientTempId = null) }

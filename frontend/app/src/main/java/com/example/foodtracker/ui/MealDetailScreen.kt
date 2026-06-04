@@ -490,7 +490,8 @@ fun LoggedFoodRow(
                 .padding(horizontal = 4.dp, vertical = 2.dp)
         ) {
             Text(
-                text = "${logged.grams}g",
+                text = if (logged.food.ingredients != null) stringResource(R.string.recipe_portion_one)
+                       else "${logged.grams}g",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = GlassColors.textSecondary

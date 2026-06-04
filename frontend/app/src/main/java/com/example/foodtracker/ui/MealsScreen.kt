@@ -39,6 +39,7 @@ import com.example.foodtracker.R
 import com.example.foodtracker.model.AppLanguage
 import com.example.foodtracker.util.AppLocale
 import com.example.foodtracker.util.LocalAppLanguage
+import com.example.foodtracker.model.FoodIngredient
 import com.example.foodtracker.model.FoodItem
 import com.example.foodtracker.model.LoggedFood
 import com.example.foodtracker.model.RecipeDto
@@ -65,20 +66,30 @@ private val backendMealToFoodVm = mapOf(
     "SNACKS" to "Snacks",
 )
 
-// A recipe is logged as a single 100g "portion", so its per-serving macros map
-// directly onto the per-100g fields the food log stores.
-private fun RecipeDto.toLoggedPortion(): LoggedFood = LoggedFood(
-    food = FoodItem(
-        barcode = "recipe",
-        name = title,
-        categories = listOf("recipe"),
-        per100g = kcalPerServing,
-        protein100g = proteinG.toFloat(),
-        carbs100g = carbsG.toFloat(),
-        fat100g = fatG.toFloat(),
-    ),
-    grams = 100,
-)
+// A recipe is logged as one encapsulated portion: grams = sum of ingredient grams,
+// per-100g macros derived from the totals so day aggregation stays consistent, and
+// the ingredient list carried along for the portion editor.
+private fun RecipeDto.toLoggedPortion(): LoggedFood {
+    val ings = ingredients.map {
+        FoodIngredient(it.name, it.grams, it.kcal100g, it.protein100g, it.carbs100g, it.fat100g)
+    }
+    val totalG = ings.sumOf { it.grams.toDouble() }.toFloat().coerceAtLeast(1f)
+    val totalKcal = ings.sumOf { it.kcal.toDouble() }
+    val totalP = ings.sumOf { it.protein.toDouble() }
+    val totalC = ings.sumOf { it.carbs.toDouble() }
+    val totalF = ings.sumOf { it.fat.toDouble() }
+    return LoggedFood(
+        food = FoodItem(
+            barcode = "recipe", name = title, categories = listOf("recipe"),
+            per100g = (totalKcal / totalG * 100).toInt(),
+            protein100g = (totalP / totalG * 100).toFloat(),
+            carbs100g = (totalC / totalG * 100).toFloat(),
+            fat100g = (totalF / totalG * 100).toFloat(),
+            ingredients = ings,
+        ),
+        grams = totalG.toInt(),
+    )
+}
 
 @Composable
 fun MealsScreen(
@@ -297,7 +308,7 @@ private fun SavedRecipeDialog(
             Text(stringResource(R.string.meals_ingredients), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = accent)
             Spacer(Modifier.height(6.dp))
             recipe.ingredients.forEach { ing ->
-                Text("• ${ing.name} — ${ing.quantity}", fontSize = 13.sp, color = GlassColors.textPrimary)
+                Text("• ${ing.name} — ${ing.grams.toInt()} g", fontSize = 13.sp, color = GlassColors.textPrimary)
                 Spacer(Modifier.height(2.dp))
             }
             Spacer(Modifier.height(16.dp))
@@ -376,7 +387,7 @@ private fun RecipeCard(
         Text(stringResource(R.string.meals_ingredients), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = accent)
         Spacer(Modifier.height(6.dp))
         recipe.ingredients.forEach { ing ->
-            Text("• ${ing.name} — ${ing.quantity}", fontSize = 13.sp, color = GlassColors.textPrimary)
+            Text("• ${ing.name} — ${ing.grams.toInt()} g", fontSize = 13.sp, color = GlassColors.textPrimary)
         }
         Spacer(Modifier.height(14.dp))
 

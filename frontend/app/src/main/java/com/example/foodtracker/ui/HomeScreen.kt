@@ -63,7 +63,8 @@ data class CalendarDay(
 data class MealEntry(
     val name: String,
     val grams: Int,
-    val calories: Int
+    val calories: Int,
+    val isRecipe: Boolean = false
 )
 
 data class MealSection(
@@ -179,7 +180,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
                 protein          = foods.sumOf { it.protein.toDouble() }.toInt(),
                 carbs            = foods.sumOf { it.carbs.toDouble() }.toInt(),
                 fat              = foods.sumOf { it.fat.toDouble() }.toInt(),
-                entries          = foods.map { MealEntry(it.food.name, it.grams, it.calories) },
+                entries          = foods.map { MealEntry(it.food.name, it.grams, it.calories, it.food.ingredients != null) },
                 accentColor      = color
             )
         }
@@ -709,7 +710,9 @@ fun MealEntryRow(entry: MealEntry, accentColor: Color, onEdit: () -> Unit) {
                 color = GlassColors.textPrimary,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Text("${entry.grams}g  ·  ${entry.calories} kcal",
+        Text(
+            if (entry.isRecipe) "${stringResource(R.string.recipe_portion_one)}  ·  ${entry.calories} kcal"
+            else "${entry.grams}g  ·  ${entry.calories} kcal",
             fontSize = 12.sp, color = GlassColors.textSecondary,
             maxLines = 1, softWrap = false)
     }

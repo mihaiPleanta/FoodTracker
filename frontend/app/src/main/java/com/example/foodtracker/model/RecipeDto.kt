@@ -4,7 +4,11 @@ import com.google.gson.annotations.SerializedName
 
 data class RecipeIngredientDto(
     val name: String,
-    val quantity: String,
+    val grams: Float,
+    @SerializedName("kcal_100g") val kcal100g: Float,
+    @SerializedName("protein_100g") val protein100g: Float,
+    @SerializedName("carbs_100g") val carbs100g: Float,
+    @SerializedName("fat_100g") val fat100g: Float,
 )
 
 data class RecipeDto(

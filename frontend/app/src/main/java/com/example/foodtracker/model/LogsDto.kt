@@ -2,8 +2,21 @@ package com.example.foodtracker.model
 
 import com.google.gson.annotations.SerializedName
 
+data class FoodLogIngredientDto(
+    val name: String,
+    val grams: Float,
+    @SerializedName("kcal_100g") val kcal100g: Float,
+    @SerializedName("protein_100g") val protein100g: Float,
+    @SerializedName("carbs_100g") val carbs100g: Float,
+    @SerializedName("fat_100g") val fat100g: Float,
+)
+
+fun FoodIngredient.toDto() = FoodLogIngredientDto(name, grams, kcal100g, protein100g, carbs100g, fat100g)
+fun FoodLogIngredientDto.toDomain() = FoodIngredient(name, grams, kcal100g, protein100g, carbs100g, fat100g)
+
 data class FoodLogUpdateDto(
     val grams: Int,
+    val ingredients: List<FoodLogIngredientDto>? = null,
 )
 
 data class FoodLogCreateDto(
@@ -19,6 +32,7 @@ data class FoodLogCreateDto(
     @SerializedName("protein_100g") val protein100g: Float,
     @SerializedName("carbs_100g") val carbs100g: Float,
     @SerializedName("fat_100g") val fat100g: Float,
+    val ingredients: List<FoodLogIngredientDto>? = null,
 )
 
 data class FoodLogDto(
@@ -35,6 +49,7 @@ data class FoodLogDto(
     @SerializedName("protein_100g") val protein100g: Float,
     @SerializedName("carbs_100g") val carbs100g: Float,
     @SerializedName("fat_100g") val fat100g: Float,
+    val ingredients: List<FoodLogIngredientDto>? = null,
 ) {
     fun toLogged(): LoggedFood = LoggedFood(
         food = FoodItem(
@@ -47,6 +62,7 @@ data class FoodLogDto(
             protein100g = protein100g,
             carbs100g = carbs100g,
             fat100g = fat100g,
+            ingredients = ingredients?.map { it.toDomain() },
         ),
         grams = grams,
         id = id,
