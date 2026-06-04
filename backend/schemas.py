@@ -126,6 +126,7 @@ class TopFood(BaseModel):
     protein_100g: float
     carbs_100g: float
     fat_100g: float
+    categories: List[str] = []
 
 
 class RecipeIngredient(BaseModel):
@@ -143,6 +144,7 @@ class RecipeDto(BaseModel):
     protein_g: int
     carbs_g: int
     fat_g: int
+    anchor: Optional[str] = None
 
     # Small LLMs frequently return macros as floats (e.g. protein_g: 12.5).
     # Round them to int so the wire stays integer (the Android DTO expects Int)
@@ -166,6 +168,7 @@ class RecipeDto(BaseModel):
 class RecipeGenerateRequest(BaseModel):
     meal_type: MealType
     language: Literal["ro", "en"] = "ro"
+    exclude_anchor: Optional[str] = None
 
 
 class SavedRecipeCreate(BaseModel):

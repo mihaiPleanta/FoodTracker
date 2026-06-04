@@ -12,10 +12,11 @@ _PROFILE_KW = dict(
 )
 
 
-def _log(name, grams):
+def _log(name, grams, categories=None, meal="BREAKFAST"):
     return FoodLog(
-        uid="u1", log_date=date.today(), meal="BREAKFAST", grams=grams,
-        barcode="000", name=name, brand=None, image_url=None, categories=[],
+        uid="u1", log_date=date.today(), meal=meal, grams=grams,
+        barcode="000", name=name, brand=None, image_url=None,
+        categories=categories or [],
         kcal_100g=100.0, protein_100g=5.0, carbs_100g=10.0, fat_100g=2.0,
     )
 
@@ -288,3 +289,104 @@ def test_delete_recipe_other_user_returns_403(http, mock_firebase_token):
     http.post("/profile", json=_PROFILE_BODY, headers=AUTH_HEADER)
     r = http.delete(f"/recipes/{rid}", headers=AUTH_HEADER)
     assert r.status_code == 403
+
+
+# ── Anchor variety + meal-fit ──────────────────────────────────────────────────
+
+def test_topfood_and_recipe_have_new_fields():
+    from schemas import TopFood, RecipeGenerateRequest, RecipeDto
+    tf = TopFood(name="Pui", kcal_100g=1, protein_100g=1, carbs_100g=1, fat_100g=1)
+    assert tf.categories == []
+    req = RecipeGenerateRequest(meal_type="LUNCH")
+    assert req.exclude_anchor is None
+    assert "anchor" in RecipeDto.model_json_schema()["properties"]
+
+
+def test_is_sweet_anchor_classifies():
+    from services.recipes import _is_sweet_anchor
+    from schemas import TopFood
+
+    def tf(name, cats=None):
+        return TopFood(name=name, kcal_100g=1, protein_100g=1, carbs_100g=1,
+                       fat_100g=1, categories=cats or [])
+
+    assert _is_sweet_anchor(tf("Banană")) is True
+    assert _is_sweet_anchor(tf("Banana")) is True
+    assert _is_sweet_anchor(tf("Iaurt", ["Fruits", "Desserts"])) is True
+    assert _is_sweet_anchor(tf("Pui")) is False
+    assert _is_sweet_anchor(tf("Piept de pui", ["Meat"])) is False
+    assert _is_sweet_anchor(tf("Orez")) is False
+
+
+async def test_get_top_foods_includes_categories():
+    async with SessionLocal() as db:
+        db.add(Profile(uid="u1", **_PROFILE_KW))
+        db.add_all([_log("Banană", 100, ["Fruits"]),
+                    _log("Banană", 100, ["Fruits"]),
+                    _log("Pui", 100, ["Meat"])])
+        await db.commit()
+        top = await get_top_foods(db, "u1")
+    banana = next(t for t in top if t.name == "Banană")
+    assert "Fruits" in banana.categories
+
+
+async def test_generate_skips_sweet_anchor_at_lunch():
+    fake = _FakeOllama(content=json.dumps(_RECIPE_JSON))
+    async with SessionLocal() as db:
+        db.add(_seed())
+        db.add_all([_log("Banană", 100, ["Fruits"]),
+                    _log("Pui", 100, ["Meat"]),
+                    _log("Orez", 100, ["Grains"])])
+        await db.commit()
+        for _ in range(10):
+            recipe = await generate_recipe(db, "u1", "LUNCH", fake)
+            assert recipe.anchor != "Banană"
+
+
+async def test_generate_allows_sweet_anchor_at_breakfast():
+    fake = _FakeOllama(content=json.dumps(_RECIPE_JSON))
+    async with SessionLocal() as db:
+        db.add(_seed())
+        db.add_all([_log("Banană", 100, ["Fruits"]),
+                    _log("Mar dulce", 100, ["Fruits"]),
+                    _log("Capsuni", 100, ["Fruits"])])
+        await db.commit()
+        recipe = await generate_recipe(db, "u1", "BREAKFAST", fake)
+    assert recipe.anchor in ("Banană", "Mar dulce", "Capsuni")
+
+
+async def test_generate_falls_back_when_all_sweet_at_lunch():
+    fake = _FakeOllama(content=json.dumps(_RECIPE_JSON))
+    async with SessionLocal() as db:
+        db.add(_seed())
+        db.add_all([_log("Banană", 100, ["Fruits"]),
+                    _log("Capsuni", 100, ["Fruits"]),
+                    _log("Zmeura", 100, ["Fruits"])])
+        await db.commit()
+        recipe = await generate_recipe(db, "u1", "LUNCH", fake)
+    assert recipe.anchor in ("Banană", "Capsuni", "Zmeura")
+
+
+async def test_generate_excludes_previous_anchor_when_alternative_exists():
+    fake = _FakeOllama(content=json.dumps(_RECIPE_JSON))
+    async with SessionLocal() as db:
+        db.add(_seed())
+        db.add_all([_log("Pui", 100, ["Meat"]),
+                    _log("Vita", 100, ["Meat"]),
+                    _log("Orez", 100, ["Grains"])])
+        await db.commit()
+        for _ in range(10):
+            recipe = await generate_recipe(db, "u1", "LUNCH", fake, exclude_anchor="Pui")
+            assert recipe.anchor != "Pui"
+
+
+async def test_generate_keeps_anchor_when_it_is_the_only_option():
+    fake = _FakeOllama(content=json.dumps(_RECIPE_JSON))
+    async with SessionLocal() as db:
+        db.add(_seed())
+        db.add_all([_log("Pui", 100, ["Meat"]),
+                    _log("Banană", 100, ["Fruits"]),
+                    _log("Capsuni", 100, ["Fruits"])])
+        await db.commit()
+        recipe = await generate_recipe(db, "u1", "LUNCH", fake, exclude_anchor="Pui")
+    assert recipe.anchor == "Pui"

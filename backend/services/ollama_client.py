@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import random
 
 from ollama import AsyncClient
 
@@ -31,7 +32,7 @@ class OllamaClient:
                 model=self._model,
                 messages=messages,
                 format="json",
-                options={"temperature": 0.7},
+                options={"temperature": 0.9, "seed": random.randint(0, 2_147_483_647)},
             )
         except Exception as exc:  # connection refused, timeout, etc.
             raise OllamaUnavailable(str(exc)) from exc

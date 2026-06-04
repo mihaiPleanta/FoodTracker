@@ -30,7 +30,9 @@ async def generate(
 ) -> RecipeDto:
     uid = token["uid"]
     try:
-        return await generate_recipe(db, uid, req.meal_type, ollama, req.language)
+        return await generate_recipe(
+            db, uid, req.meal_type, ollama, req.language, req.exclude_anchor
+        )
     except InsufficientData:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

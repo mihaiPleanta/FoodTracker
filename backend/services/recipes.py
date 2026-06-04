@@ -13,6 +13,26 @@ from schemas import RecipeDto, TopFood
 from services.nutrition import calculate_goals
 
 
+# Keywords (RO+EN) that mark a food as sweet/fruit — such anchors are skipped for
+# lunch/dinner so the model isn't forced into odd dishes (e.g. banana salad for lunch).
+# Ambiguous barewords (e.g. "măr" vs "mărar") are intentionally omitted; apples are
+# caught via the "fruits"/"fructe" category or the "apple" keyword.
+_SWEET_KEYWORDS = frozenset({
+    "banan", "fruct", "fruit", "berry", "berries", "strawberr", "căpșun", "capsun",
+    "zmeur", "raspberr", "afin", "blueberr", "struguri", "grape", "ananas",
+    "pineapple", "mango", "pepene", "melon", "cireș", "cires", "cherry",
+    "piersic", "peach", "miere", "honey", "ciocolat", "chocolate", "apple",
+    "desert", "dessert", "gem", "jam", "prăjitur", "prajitur", "biscuit",
+    "cookie", "smoothie", "dulce",
+})
+
+
+def _is_sweet_anchor(food) -> bool:
+    """True if the food's name or any category contains a sweet/fruit keyword."""
+    haystacks = [food.name.lower()] + [c.lower() for c in (food.categories or [])]
+    return any(kw in hay for hay in haystacks for kw in _SWEET_KEYWORDS)
+
+
 async def get_top_foods(
     db: AsyncSession, uid: str, *, days: int = 60, limit: int = 10
 ) -> list[TopFood]:
@@ -51,6 +71,7 @@ async def get_top_foods(
                 protein_100g=rep.protein_100g,
                 carbs_100g=rep.carbs_100g,
                 fat_100g=rep.fat_100g,
+                categories=rep.categories or [],
             )
         )
     return result
@@ -198,7 +219,8 @@ _MAX_PARSE_ATTEMPTS = 3
 
 
 async def generate_recipe(
-    db: AsyncSession, uid: str, meal_type: str, ollama, language: str = "ro"
+    db: AsyncSession, uid: str, meal_type: str, ollama, language: str = "ro",
+    exclude_anchor: str | None = None,
 ) -> RecipeDto:
     top = await get_top_foods(db, uid)
     if len(top) < 3:
@@ -209,10 +231,22 @@ async def generate_recipe(
     ).scalar_one()  # guaranteed: food_logs FK -> profiles
     goals = calculate_goals(profile)
 
-    # Pick a single anchor food, biased toward the more frequent ones (which sit
-    # first in `top`) but random so regenerating gives variety instead of always
-    # anchoring on the #1 food.
-    anchor = random.choices(top, weights=range(len(top), 0, -1), k=1)[0]
+    # Meal-fit: lunch/dinner skip sweet/fruit anchors (fallback to full list if that
+    # empties the pool). Breakfast/snacks allow them.
+    candidates = list(top)
+    if meal_type in ("LUNCH", "DINNER"):
+        savory = [f for f in candidates if not _is_sweet_anchor(f)]
+        if savory:
+            candidates = savory
+
+    # Variety: avoid repeating the previous anchor when an alternative exists.
+    if exclude_anchor:
+        pruned = [f for f in candidates if f.name != exclude_anchor]
+        if pruned:
+            candidates = pruned
+
+    # Uniform pick over the filtered pool — still a habitual food, but varied.
+    anchor = random.choice(candidates)
     messages = build_recipe_prompt(anchor, meal_type, goals, language)
 
     last_error: Exception | None = None
@@ -220,7 +254,9 @@ async def generate_recipe(
         content = await ollama.generate_json(messages)
         try:
             data = json.loads(content)
-            return RecipeDto.model_validate(data)
+            recipe = RecipeDto.model_validate(data)
+            recipe.anchor = anchor.name
+            return recipe
         except (json.JSONDecodeError, ValidationError, TypeError) as exc:
             last_error = exc
     raise RecipeParseError(str(last_error)) from last_error
