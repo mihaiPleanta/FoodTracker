@@ -11,6 +11,7 @@
     <string name="action_back">Înapoi</string>
     <string name="action_cancel">Anulează</string>
     <string name="action_save">Salvează</string>
+    <string name="action_saved">Salvat</string>
     <string name="action_continue">Continuă</string>
     <string name="action_retry">Reîncearcă</string>
     <string name="action_delete">Șterge</string>

@@ -8,6 +8,7 @@
     <string name="action_back">Back</string>
     <string name="action_cancel">Cancel</string>
     <string name="action_save">Save</string>
+    <string name="action_saved">Saved</string>
     <string name="action_continue">Continue</string>
     <string name="action_retry">Retry</string>
     <string name="action_delete">Delete</string>
