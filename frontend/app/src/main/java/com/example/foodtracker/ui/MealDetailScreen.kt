@@ -212,17 +212,35 @@ fun MealDetailScreen(
         }
 
         editTarget?.let { (index, logged) ->
-            AddFoodSheet(
-                target = logged.food,
-                accentColor = accentColor,
-                confirmLabel = stringResource(R.string.action_save),
-                initialGrams = logged.grams,
-                onDismiss = { editTarget = null },
-                onConfirm = { _, grams ->
-                    viewModel.updateFoodGrams(mealName, index, grams)
-                    editTarget = null
-                },
-            )
+            val recipeIngredients = logged.food.ingredients
+            if (recipeIngredients != null) {
+                RecipePortionEditor(
+                    recipeName = logged.food.name,
+                    accentColor = accentColor,
+                    initialIngredients = recipeIngredients,
+                    searchState = searchState,
+                    onSearch = { viewModel.searchFoods(it) },
+                    onClearSearch = { viewModel.clearSearch() },
+                    onDismiss = { editTarget = null; viewModel.clearSearch() },
+                    onSave = { updated ->
+                        viewModel.updateRecipeLog(mealName, index, updated)
+                        editTarget = null
+                        viewModel.clearSearch()
+                    },
+                )
+            } else {
+                AddFoodSheet(
+                    target = logged.food,
+                    accentColor = accentColor,
+                    confirmLabel = stringResource(R.string.action_save),
+                    initialGrams = logged.grams,
+                    onDismiss = { editTarget = null },
+                    onConfirm = { _, grams ->
+                        viewModel.updateFoodGrams(mealName, index, grams)
+                        editTarget = null
+                    },
+                )
+            }
         }
     }
 }

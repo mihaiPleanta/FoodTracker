@@ -11,6 +11,7 @@ import com.example.foodtracker.data.FoodRepository
 import com.example.foodtracker.data.MealLogTracker
 import com.example.foodtracker.data.SettingsRepository
 import com.example.foodtracker.model.AppSettings
+import com.example.foodtracker.model.FoodIngredient
 import com.example.foodtracker.model.FoodItem
 import com.example.foodtracker.model.FoodLogCreateDto
 import com.example.foodtracker.model.FoodLogUpdateDto
@@ -571,6 +572,59 @@ class FoodViewModel(
         val day = _foodsByDate.value[key] ?: return
         val list = mealList(day, mealName)
         val newList = list.map { if (it.id == id) it.copy(grams = oldGrams) else it }
+        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
+    }
+
+    /** Edit a recipe portion: recompute totals from the (possibly added/removed)
+     *  ingredients, optimistic-update in place, PATCH with ingredients, rollback on error. */
+    fun updateRecipeLog(mealName: String, index: Int, ingredients: List<FoodIngredient>) {
+        val key = dateKey(_selectedHomeDate.value)
+        val day = _foodsByDate.value[key] ?: return
+        val list = mealList(day, mealName)
+        if (index !in list.indices) return
+        val target = list[index]
+        val id = target.id ?: return          // încă în POST pending — edit indisponibil
+        if (ingredients.isEmpty()) return
+
+        val totalG = ingredients.sumOf { it.grams.toDouble() }.coerceAtLeast(1.0)
+        val totalKcal = ingredients.sumOf { it.kcal.toDouble() }
+        val totalP = ingredients.sumOf { it.protein.toDouble() }
+        val totalC = ingredients.sumOf { it.carbs.toDouble() }
+        val totalF = ingredients.sumOf { it.fat.toDouble() }
+        val newFood = target.food.copy(
+            per100g = (totalKcal / totalG * 100).toInt(),
+            protein100g = (totalP / totalG * 100).toFloat(),
+            carbs100g = (totalC / totalG * 100).toFloat(),
+            fat100g = (totalF / totalG * 100).toFloat(),
+            ingredients = ingredients,
+        )
+        val optimistic = target.copy(food = newFood, grams = totalG.toInt())
+        val newList = list.toMutableList().also { it[index] = optimistic }
+        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
+
+        viewModelScope.launch {
+            try {
+                logsApi.updateFoodLog(
+                    id,
+                    FoodLogUpdateDto(grams = totalG.toInt(), ingredients = ingredients.map { it.toDto() }),
+                )
+            } catch (e: java.io.IOException) {
+                restoreLog(key, mealName, id, target)
+                _toastEvents.tryEmit(ToastEvent(R.string.error_no_internet))
+            } catch (e: retrofit2.HttpException) {
+                restoreLog(key, mealName, id, target)
+                _toastEvents.tryEmit(ToastEvent(R.string.error_save, e.code()))
+            } catch (e: Throwable) {
+                restoreLog(key, mealName, id, target)
+                _toastEvents.tryEmit(ToastEvent(R.string.error_save))
+            }
+        }
+    }
+
+    private fun restoreLog(key: String, mealName: String, id: Long, original: LoggedFood) {
+        val day = _foodsByDate.value[key] ?: return
+        val list = mealList(day, mealName)
+        val newList = list.map { if (it.id == id) original else it }
         _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
     }
 

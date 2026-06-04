@@ -11,6 +11,8 @@
     <string name="action_saved">Saved</string>
     <string name="action_added">Added</string>
     <string name="recipe_portion_one">1 serving</string>
+    <string name="recipe_editor_add_ingredient">+ Add ingredient</string>
+    <string name="recipe_editor_search_hint">Search a food…</string>
     <string name="action_continue">Continue</string>
     <string name="action_retry">Retry</string>
     <string name="action_delete">Delete</string>

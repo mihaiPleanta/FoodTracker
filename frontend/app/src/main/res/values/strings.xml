@@ -14,6 +14,8 @@
     <string name="action_saved">Salvat</string>
     <string name="action_added">Adăugat</string>
     <string name="recipe_portion_one">1 porție</string>
+    <string name="recipe_editor_add_ingredient">+ Adaugă ingredient</string>
+    <string name="recipe_editor_search_hint">Caută un aliment…</string>
     <string name="action_continue">Continuă</string>
     <string name="action_retry">Reîncearcă</string>
     <string name="action_delete">Șterge</string>
