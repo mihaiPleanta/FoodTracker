@@ -37,7 +37,8 @@ def test_recipe_coerces_float_macros_to_int():
     recipe = RecipeDto.model_validate({
         "title": "Test",
         "description": "x",
-        "ingredients": [{"name": "Ou", "quantity": "2"}],
+        "ingredients": [{"name": "Ou", "grams": 100, "kcal_100g": 150,
+                         "protein_100g": 12, "carbs_100g": 1, "fat_100g": 10}],
         "steps": ["fa"],
         "servings": 1.0,
         "kcal_per_serving": 320.6,
@@ -75,8 +76,9 @@ _RECIPE_JSON = {
     "title": "Omletă cu brânză",
     "description": "Rapidă și bogată în proteine.",
     "ingredients": [
-        {"name": "Ouă", "quantity": "2 buc"},
-        {"name": "Brânză", "quantity": "50 g"},
+        # sums to the top-level totals below: 320 kcal / 24 P / 3 C / 22 F
+        {"name": "Ouă", "grams": 100, "kcal_100g": 200, "protein_100g": 14, "carbs_100g": 1, "fat_100g": 14},
+        {"name": "Brânză", "grams": 50, "kcal_100g": 240, "protein_100g": 20, "carbs_100g": 4, "fat_100g": 16},
     ],
     "steps": ["Bate ouăle.", "Adaugă brânza.", "Prăjește 5 minute."],
     "servings": 1,
@@ -378,6 +380,29 @@ async def test_generate_excludes_previous_anchor_when_alternative_exists():
         for _ in range(10):
             recipe = await generate_recipe(db, "u1", "LUNCH", fake, exclude_anchor="Pui")
             assert recipe.anchor != "Pui"
+
+
+def test_recipe_totals_recomputed_from_ingredients():
+    from services.recipes import _recipe_totals
+    from schemas import RecipeIngredient
+    ings = [
+        RecipeIngredient(name="Pui", grams=200, kcal_100g=165, protein_100g=31, carbs_100g=0, fat_100g=3.6),
+        RecipeIngredient(name="Orez", grams=150, kcal_100g=130, protein_100g=2.7, carbs_100g=28, fat_100g=0.3),
+    ]
+    kcal, p, c, f = _recipe_totals(ings)
+    assert kcal == round(165 * 2 + 130 * 1.5)   # 330 + 195 = 525
+    assert p == round(31 * 2 + 2.7 * 1.5)
+
+
+async def test_generate_recipe_sets_anchor_and_recomputed_totals():
+    fake = _FakeOllama(content=json.dumps(_RECIPE_JSON))
+    async with SessionLocal() as db:
+        db.add(_seed())
+        db.add_all([_log("Pui", 100), _log("Orez", 100), _log("Mar", 100)])
+        await db.commit()
+        recipe = await generate_recipe(db, "u1", "LUNCH", fake)
+    assert recipe.kcal_per_serving == 320  # recomputed from _RECIPE_JSON ingredients
+    assert recipe.anchor in ("Pui", "Orez", "Mar")
 
 
 async def test_generate_keeps_anchor_when_it_is_the_only_option():

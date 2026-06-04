@@ -103,6 +103,49 @@ def test_patch_food_log_updates_grams(client):
     assert body["kcal_100g"] == 539.0
 
 
+def test_foodlog_ingredient_and_update_shapes():
+    from schemas import FoodLogIngredient, FoodLogUpdate, FoodLogCreate
+    ing = FoodLogIngredient(name="Pui", grams=200, kcal_100g=165,
+                            protein_100g=31, carbs_100g=0, fat_100g=3.6)
+    assert ing.grams == 200
+    upd = FoodLogUpdate(grams=300, ingredients=[ing])
+    assert upd.ingredients[0].name == "Pui"
+    create = FoodLogCreate(
+        log_date="2026-06-04", meal="LUNCH", grams=450, barcode="recipe",
+        name="X", kcal_100g=150, protein_100g=10, carbs_100g=20, fat_100g=5,
+        ingredients=[ing],
+    )
+    assert create.ingredients[0].grams == 200
+
+
+def test_create_and_patch_recipe_log_recomputes(client):
+    _ensure_profile(client)
+    body = {
+        "log_date": "2026-06-04", "meal": "LUNCH", "grams": 350, "barcode": "recipe",
+        "name": "Pilaf", "categories": ["recipe"],
+        "kcal_100g": 150, "protein_100g": 10, "carbs_100g": 20, "fat_100g": 5,
+        "ingredients": [
+            {"name": "Pui", "grams": 200, "kcal_100g": 165, "protein_100g": 31, "carbs_100g": 0, "fat_100g": 3.6},
+            {"name": "Orez", "grams": 150, "kcal_100g": 130, "protein_100g": 2.7, "carbs_100g": 28, "fat_100g": 0.3},
+        ],
+    }
+    created = client.post("/food-logs", json=body, headers=AUTH_HEADER)
+    assert created.status_code == 201, created.text
+    lid = created.json()["id"]
+    assert len(created.json()["ingredients"]) == 2
+
+    patch_body = {"grams": 400, "ingredients": [
+        {"name": "Pui", "grams": 250, "kcal_100g": 165, "protein_100g": 31, "carbs_100g": 0, "fat_100g": 3.6},
+        {"name": "Orez", "grams": 150, "kcal_100g": 130, "protein_100g": 2.7, "carbs_100g": 28, "fat_100g": 0.3},
+    ]}
+    r = client.patch(f"/food-logs/{lid}", json=patch_body, headers=AUTH_HEADER)
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["grams"] == 400  # 250 + 150
+    # total kcal = 165*2.5 + 130*1.5 = 607.5; per100g = 607.5/400*100
+    assert abs(data["kcal_100g"] - (607.5 / 400 * 100)) < 0.5
+
+
 def test_patch_food_log_persists(client):
     _ensure_profile(client)
     created = client.post("/food-logs", json=_VALID_LOG, headers=AUTH_HEADER).json()

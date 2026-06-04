@@ -6,7 +6,7 @@ def _recipe(**overrides) -> RecipeDto:
     base = dict(
         title="Test",
         description="desc",
-        ingredients=[{"name": "ou", "quantity": "2 buc"}],
+        ingredients=[{"name": "ou", "grams": 100, "kcal_100g": 150, "protein_100g": 10, "carbs_100g": 1, "fat_100g": 10}],
         steps=["pas 1", "pas 2"],
         servings=1,
         kcal_per_serving=200,
@@ -44,7 +44,7 @@ def _valid_json(**overrides) -> str:
     base = dict(
         title="Omletă",
         description="Omletă cu legume.",
-        ingredients=[{"name": "ou", "quantity": "2 buc"}],
+        ingredients=[{"name": "ou", "grams": 100, "kcal_100g": 150, "protein_100g": 10, "carbs_100g": 1, "fat_100g": 10}],
         steps=["bate ouăle", "prăjește"],
         servings=1,
         kcal_per_serving=165,

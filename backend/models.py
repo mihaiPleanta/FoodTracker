@@ -51,6 +51,7 @@ class FoodLog(Base):
     protein_100g: Mapped[float] = mapped_column(Float, nullable=False)
     carbs_100g: Mapped[float] = mapped_column(Float, nullable=False)
     fat_100g: Mapped[float] = mapped_column(Float, nullable=False)
+    ingredients: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

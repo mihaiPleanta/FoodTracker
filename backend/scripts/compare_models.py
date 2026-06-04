@@ -227,7 +227,7 @@ def render_markdown(metrics, examples, runs: int, language: str) -> str:
                 f"- Macros: {recipe.kcal_per_serving} kcal · "
                 f"{recipe.protein_g}P / {recipe.carbs_g}C / {recipe.fat_g}G"
             )
-            ingr = "; ".join(f"{i.name} ({i.quantity})" for i in recipe.ingredients)
+            ingr = "; ".join(f"{i.name} ({i.grams:g} g)" for i in recipe.ingredients)
             lines.append(f"- Ingrediente: {ingr}")
             for idx, step in enumerate(recipe.steps, 1):
                 lines.append(f"  {idx}. {step}")

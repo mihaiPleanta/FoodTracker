@@ -52,6 +52,15 @@ class SearchResponseDto(BaseModel):
 _MEAL_VALUES = Literal["BREAKFAST", "LUNCH", "DINNER", "SNACKS"]
 
 
+class FoodLogIngredient(BaseModel):
+    name: str
+    grams: float = Field(gt=0)
+    kcal_100g: float = Field(ge=0)
+    protein_100g: float = Field(ge=0)
+    carbs_100g: float = Field(ge=0)
+    fat_100g: float = Field(ge=0)
+
+
 class FoodLogCreate(BaseModel):
     log_date: _date
     meal: _MEAL_VALUES
@@ -65,10 +74,12 @@ class FoodLogCreate(BaseModel):
     protein_100g: float = Field(ge=0)
     carbs_100g: float = Field(ge=0)
     fat_100g: float = Field(ge=0)
+    ingredients: Optional[List[FoodLogIngredient]] = None
 
 
 class FoodLogUpdate(BaseModel):
     grams: int = Field(gt=0)
+    ingredients: Optional[List[FoodLogIngredient]] = None
 
 
 class FoodLogDto(FoodLogCreate):
@@ -131,7 +142,11 @@ class TopFood(BaseModel):
 
 class RecipeIngredient(BaseModel):
     name: str
-    quantity: str
+    grams: float = Field(gt=0)
+    kcal_100g: float = Field(ge=0)
+    protein_100g: float = Field(ge=0)
+    carbs_100g: float = Field(ge=0)
+    fat_100g: float = Field(ge=0)
 
 
 class RecipeDto(BaseModel):

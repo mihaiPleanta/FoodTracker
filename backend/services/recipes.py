@@ -106,8 +106,10 @@ REGULI:
    Dacă ți se pare ciudat, ai greșit — alege un preparat clasic.
 5. Rețeta să fie potrivită pentru masa cerută (la mic dejun ceva ușor, la cină ceva consistent).
 6. Ține cont de obiectivul nutrițional al utilizatorului; porțiile să fie realiste.
-7. Scrie în limba română corectă. Cantitățile să fie concrete (ex: "150 g", "2 linguri").
-   Pașii de preparare clari și ordonați.
+7. Scrie în limba română corectă. Pașii de preparare clari și ordonați.
+8. Pentru FIECARE ingredient dă: numele, cantitatea în GRAME (număr, fără unități text)
+   și valorile nutriționale la 100 g (kcal, proteine, carbohidrați, grăsimi). Convertește
+   în grame orice cantitate (ex: "2 linguri ulei" → grams: 30). Estimează macros realiste.
 
 DESCRIEREA: maxim 12 cuvinte, spune doar ce conține preparatul, neutru și factual.
 Exemplu bun: "Fulgi de ovăz cu banană, lapte și nuci."
@@ -117,7 +119,9 @@ Răspunde DOAR cu un obiect JSON valid, fără text în plus, exact în această
 {
   "title": "string",
   "description": "string",
-  "ingredients": [{"name": "string", "quantity": "string"}],
+  "ingredients": [
+    {"name": "string", "grams": 0, "kcal_100g": 0, "protein_100g": 0, "carbs_100g": 0, "fat_100g": 0}
+  ],
   "steps": ["string"],
   "servings": 1,
   "kcal_per_serving": 0,
@@ -144,8 +148,10 @@ RULES:
    If it seems weird, you got it wrong — pick a classic dish.
 5. Make the recipe fit the requested meal (something light for breakfast, hearty for dinner).
 6. Respect the user's nutrition goal; portions must be realistic.
-7. Write in correct English. Quantities must be concrete (e.g. "150 g", "2 tablespoons").
-   Clear, ordered preparation steps.
+7. Write in correct English. Clear, ordered preparation steps.
+8. For EACH ingredient give: the name, the amount in GRAMS (a number, no text units)
+   and the nutrition per 100 g (kcal, protein, carbs, fat). Convert any quantity to grams
+   (e.g. "2 tablespoons oil" → grams: 30). Estimate realistic macros.
 
 THE DESCRIPTION: max 12 words, state only what the dish contains, neutral and factual.
 Good example: "Oatmeal with banana, milk and walnuts."
@@ -155,7 +161,9 @@ Respond ONLY with a valid JSON object, no extra text, in exactly this shape:
 {
   "title": "string",
   "description": "string",
-  "ingredients": [{"name": "string", "quantity": "string"}],
+  "ingredients": [
+    {"name": "string", "grams": 0, "kcal_100g": 0, "protein_100g": 0, "carbs_100g": 0, "fat_100g": 0}
+  ],
   "steps": ["string"],
   "servings": 1,
   "kcal_per_serving": 0,
@@ -164,6 +172,15 @@ Respond ONLY with a valid JSON object, no extra text, in exactly this shape:
   "fat_g": 0
 }
 """
+
+
+def _recipe_totals(ingredients) -> tuple[int, int, int, int]:
+    """Sum per-serving macros from per-100g ingredient macros × their grams."""
+    kcal = sum(i.kcal_100g * i.grams / 100 for i in ingredients)
+    p = sum(i.protein_100g * i.grams / 100 for i in ingredients)
+    c = sum(i.carbs_100g * i.grams / 100 for i in ingredients)
+    f = sum(i.fat_100g * i.grams / 100 for i in ingredients)
+    return round(kcal), round(p), round(c), round(f)
 
 
 class InsufficientData(Exception):
@@ -255,6 +272,8 @@ async def generate_recipe(
         try:
             data = json.loads(content)
             recipe = RecipeDto.model_validate(data)
+            kcal, p, c, f = _recipe_totals(recipe.ingredients)
+            recipe.kcal_per_serving, recipe.protein_g, recipe.carbs_g, recipe.fat_g = kcal, p, c, f
             recipe.anchor = anchor.name
             return recipe
         except (json.JSONDecodeError, ValidationError, TypeError) as exc:
