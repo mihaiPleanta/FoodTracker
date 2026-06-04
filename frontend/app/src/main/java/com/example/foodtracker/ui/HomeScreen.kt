@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -698,14 +699,19 @@ fun MealEntryRow(entry: MealEntry, accentColor: Color, onEdit: () -> Unit) {
             .padding(horizontal = 14.dp, vertical = 11.dp),
         Arrangement.SpaceBetween, Alignment.CenterVertically
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.weight(1f).padding(end = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Box(Modifier.size(6.dp).clip(CircleShape).background(accentColor))
             Spacer(Modifier.width(10.dp))
             Text(entry.name, fontSize = 14.sp, fontWeight = FontWeight.Medium,
-                color = GlassColors.textPrimary)
+                color = GlassColors.textPrimary,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Text("${entry.grams}g  ·  ${entry.calories} kcal",
-            fontSize = 12.sp, color = GlassColors.textSecondary)
+            fontSize = 12.sp, color = GlassColors.textSecondary,
+            maxLines = 1, softWrap = false)
     }
 }
 
