@@ -15,7 +15,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.remember
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -148,12 +151,21 @@ fun MealsScreen(
         }
 
         item {
+            val genInteraction = remember { MutableInteractionSource() }
+            val genHaptic = LocalHapticFeedback.current
+            val genEnabled = recipeState !is RecipeUiState.Loading
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .pressScale(genInteraction, enabled = genEnabled)
                     .clip(RoundedCornerShape(16.dp))
                     .background(accent)
-                    .clickable(enabled = recipeState !is RecipeUiState.Loading) {
+                    .clickable(
+                        interactionSource = genInteraction,
+                        indication = null,
+                        enabled = genEnabled,
+                    ) {
+                        genHaptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         viewModel.generate(recipeLanguage)
                     }
                     .padding(vertical = 16.dp),
@@ -336,6 +348,10 @@ private fun RecipeCard(
     onRegenerate: () -> Unit,
     onAddToJournal: () -> Unit,
 ) {
+    val haptic = LocalHapticFeedback.current
+    val addSrc = remember { MutableInteractionSource() }
+    val saveSrc = remember { MutableInteractionSource() }
+    val regenSrc = remember { MutableInteractionSource() }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -375,9 +391,13 @@ private fun RecipeCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .pressScale(addSrc)
                 .clip(RoundedCornerShape(12.dp))
                 .background(accent)
-                .clickable { onAddToJournal() }
+                .clickable(interactionSource = addSrc, indication = null) {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onAddToJournal()
+                }
                 .padding(vertical = 12.dp),
             contentAlignment = Alignment.Center,
         ) { Text(stringResource(R.string.meals_add_to_journal), fontWeight = FontWeight.Bold, color = Color.Black, fontSize = 14.sp) }
@@ -387,18 +407,26 @@ private fun RecipeCard(
             Box(
                 modifier = Modifier
                     .weight(1f)
+                    .pressScale(saveSrc)
                     .clip(RoundedCornerShape(12.dp))
                     .border(1.dp, GlassColors.cardBorder, RoundedCornerShape(12.dp))
-                    .clickable { onSave() }
+                    .clickable(interactionSource = saveSrc, indication = null) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onSave()
+                    }
                     .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center,
             ) { Text(stringResource(R.string.action_save), fontWeight = FontWeight.Bold, color = GlassColors.textPrimary, fontSize = 14.sp) }
             Box(
                 modifier = Modifier
                     .weight(1f)
+                    .pressScale(regenSrc)
                     .clip(RoundedCornerShape(12.dp))
                     .border(1.dp, GlassColors.cardBorder, RoundedCornerShape(12.dp))
-                    .clickable { onRegenerate() }
+                    .clickable(interactionSource = regenSrc, indication = null) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onRegenerate()
+                    }
                     .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center,
             ) { Text(stringResource(R.string.meals_regenerate), fontWeight = FontWeight.Bold, color = GlassColors.textPrimary, fontSize = 14.sp) }

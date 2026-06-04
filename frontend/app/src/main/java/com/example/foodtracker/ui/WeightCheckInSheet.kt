@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -18,6 +17,7 @@ import androidx.compose.ui.res.stringResource
 import com.example.foodtracker.R
 import com.example.foodtracker.util.AppLocale
 import com.example.foodtracker.util.LocalAppLanguage
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +40,14 @@ fun WeightCheckInSheet(
     val parsed = text.replace(",", ".").toFloatOrNull()
     val isValid = parsed != null && parsed in 30f..300f
 
+    var savingWeight by remember { mutableStateOf<Float?>(null) }
+    LaunchedEffect(savingWeight) {
+        savingWeight?.let { w ->
+            kotlinx.coroutines.delay(600)
+            onSave(w)
+        }
+    }
+
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
       AppLocale(LocalAppLanguage.current) {
         Column(
@@ -58,13 +66,14 @@ fun WeightCheckInSheet(
             if (!isValid && text.isNotBlank()) {
                 Text(stringResource(R.string.weight_sheet_range))
             }
-            Button(
-                onClick = { parsed?.let { onSave(it) } },
+            AnimatedActionButton(
+                label = stringResource(R.string.action_save),
+                successLabel = stringResource(R.string.action_saved),
+                phase = if (savingWeight != null) ActionPhase.Success else ActionPhase.Idle,
                 enabled = isValid,
                 modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.action_save))
-            }
+                onClick = { parsed?.let { savingWeight = it } },
+            )
             Spacer(modifier = Modifier.height(8.dp))
         }
       }

@@ -462,66 +462,16 @@ fun ProfileSaveButton(
     saveState: ProfileSaveState = ProfileSaveState.Idle,
     onClick: () -> Unit
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val haptic = LocalHapticFeedback.current
-
-    val isSaving = saveState is ProfileSaveState.Saving
-    val isSaved  = saveState is ProfileSaveState.Success
-    val isEnabled = !isSaving
-
-    val scale by animateFloatAsState(
-        targetValue = when {
-            isSaved  -> 1.04f
-            isPressed && isEnabled -> 0.92f
-            else     -> 1f
-        },
-        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium),
-        label = "saveScale"
-    )
-
-    Box(
-        modifier = modifier
-            .scale(scale)
-            .height(52.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(
-                Brush.horizontalGradient(
-                    listOf(GlassColors.accentGreen, GlassColors.accentGreenDim)
-                )
-            )
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                enabled = isEnabled
-            ) {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                onClick()
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        when {
-            isSaving -> CircularProgressIndicator(
-                modifier = Modifier.size(22.dp),
-                color = Color.Black,
-                strokeWidth = 2.5.dp
-            )
-            isSaved -> Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Default.Check,
-                    contentDescription = null,
-                    tint = Color.Black,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.profile_saved), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-            }
-            else -> Text(
-                stringResource(R.string.profile_save_button),
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black
-            )
-        }
+    val phase = when (saveState) {
+        is ProfileSaveState.Saving  -> ActionPhase.Loading
+        is ProfileSaveState.Success -> ActionPhase.Success
+        else                        -> ActionPhase.Idle
     }
+    AnimatedActionButton(
+        label = stringResource(R.string.profile_save_button),
+        successLabel = stringResource(R.string.profile_saved),
+        phase = phase,
+        modifier = modifier,
+        onClick = onClick,
+    )
 }

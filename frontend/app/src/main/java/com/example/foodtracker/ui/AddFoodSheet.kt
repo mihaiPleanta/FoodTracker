@@ -21,8 +21,10 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -58,6 +60,14 @@ fun AddFoodSheet(
     var grams by rememberSaveable(target.barcode) { mutableStateOf(initialGrams.toString()) }
     val gramsInt = parseGrams(grams)
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    var savingGrams by remember(target.barcode) { mutableStateOf<Int?>(null) }
+    LaunchedEffect(savingGrams) {
+        savingGrams?.let { g ->
+            kotlinx.coroutines.delay(600)
+            onConfirm(target, g)
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -98,11 +108,15 @@ fun AddFoodSheet(
                 accentColor = accentColor,
             )
             Spacer(Modifier.height(16.dp))
-            AddFoodSheetAddButton(
+            AnimatedActionButton(
                 label = confirmLabel,
+                successLabel = stringResource(R.string.action_saved),
+                phase = if (savingGrams != null) ActionPhase.Success else ActionPhase.Idle,
                 enabled = gramsInt != null,
-                accentColor = accentColor,
-                onClick = { gramsInt?.let { onConfirm(target, it) } },
+                accent = Brush.horizontalGradient(listOf(accentColor, accentColor)),
+                height = 54.dp,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { gramsInt?.let { savingGrams = it } },
             )
         }
       }
@@ -286,32 +300,3 @@ private fun AddFoodSheetPreview(
     }
 }
 
-@Composable
-private fun AddFoodSheetAddButton(
-    label: String,
-    enabled: Boolean,
-    accentColor: Color,
-    onClick: () -> Unit,
-) {
-    val gradient = if (enabled) {
-        Brush.horizontalGradient(listOf(accentColor, accentColor))
-    } else {
-        Brush.horizontalGradient(listOf(Color(0xFF3A3A3A), Color(0xFF3A3A3A)))
-    }
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(54.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(gradient)
-            .then(if (enabled) Modifier.clickable { onClick() } else Modifier),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = if (enabled) Color.Black else GlassColors.textSecondary,
-        )
-    }
-}

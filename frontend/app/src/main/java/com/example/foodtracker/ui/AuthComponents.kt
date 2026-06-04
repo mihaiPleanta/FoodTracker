@@ -81,32 +81,13 @@ fun AuthPrimaryButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    Box(
-        modifier
-            .height(52.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(
-                if (enabled && !isLoading)
-                    Brush.horizontalGradient(listOf(GlassColors.accentGreen, GlassColors.accentGreenDim))
-                else
-                    Brush.horizontalGradient(listOf(GlassColors.cardBackground, GlassColors.cardBackground))
-            )
-            .clickable(enabled = enabled && !isLoading) { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        if (isLoading) {
-            CircularProgressIndicator(
-                color = GlassColors.textSecondary,
-                modifier = Modifier.size(22.dp),
-                strokeWidth = 2.dp
-            )
-        } else {
-            Text(
-                text = text,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (enabled) Color.Black else GlassColors.textTertiary
-            )
-        }
-    }
+    AnimatedActionButton(
+        label = text,
+        phase = if (isLoading) ActionPhase.Loading else ActionPhase.Idle,
+        successLabel = null,
+        enabled = enabled,
+        contentColor = Color.Black,
+        modifier = modifier,
+        onClick = onClick,
+    )
 }
