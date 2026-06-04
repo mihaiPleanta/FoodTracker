@@ -17,11 +17,13 @@ data class RecipeDto(
     @SerializedName("protein_g") val proteinG: Int,
     @SerializedName("carbs_g") val carbsG: Int,
     @SerializedName("fat_g") val fatG: Int,
+    val anchor: String? = null,
 )
 
 data class RecipeGenerateRequest(
     @SerializedName("meal_type") val mealType: String,
     val language: String = "ro",
+    @SerializedName("exclude_anchor") val excludeAnchor: String? = null,
 )
 
 data class SavedRecipeCreate(

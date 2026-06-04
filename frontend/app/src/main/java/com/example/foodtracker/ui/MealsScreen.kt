@@ -199,7 +199,7 @@ fun MealsScreen(
                     recipe = s.recipe,
                     accent = accent,
                     onSave = { viewModel.saveCurrent() },
-                    onRegenerate = { viewModel.generate(recipeLanguage) },
+                    onRegenerate = { viewModel.generate(recipeLanguage, excludeAnchor = s.recipe.anchor) },
                     onAddToJournal = {
                         val mealName = backendMealToFoodVm[selectedMeal] ?: "Breakfast"
                         foodViewModel.addFoodToMeal(mealName, s.recipe.toLoggedPortion())
