@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -349,9 +351,15 @@ private fun RecipeCard(
     onAddToJournal: () -> Unit,
 ) {
     val haptic = LocalHapticFeedback.current
-    val addSrc = remember { MutableInteractionSource() }
     val saveSrc = remember { MutableInteractionSource() }
     val regenSrc = remember { MutableInteractionSource() }
+    var added by remember { mutableStateOf(false) }
+    LaunchedEffect(added) {
+        if (added) {
+            kotlinx.coroutines.delay(1200)
+            added = false
+        }
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -388,19 +396,18 @@ private fun RecipeCard(
         )
         Spacer(Modifier.height(16.dp))
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .pressScale(addSrc)
-                .clip(RoundedCornerShape(12.dp))
-                .background(accent)
-                .clickable(interactionSource = addSrc, indication = null) {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onAddToJournal()
-                }
-                .padding(vertical = 12.dp),
-            contentAlignment = Alignment.Center,
-        ) { Text(stringResource(R.string.meals_add_to_journal), fontWeight = FontWeight.Bold, color = Color.Black, fontSize = 14.sp) }
+        AnimatedActionButton(
+            label = stringResource(R.string.meals_add_to_journal),
+            successLabel = stringResource(R.string.action_added),
+            phase = if (added) ActionPhase.Success else ActionPhase.Idle,
+            accent = Brush.horizontalGradient(listOf(accent, accent)),
+            height = 48.dp,
+            modifier = Modifier.fillMaxWidth(),
+            onClick = {
+                added = true
+                onAddToJournal()
+            },
+        )
         Spacer(Modifier.height(10.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
