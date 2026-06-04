@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
@@ -67,6 +68,7 @@ fun StatsScreen(
     val hydrationLiters by viewModel.hydrationTodayLiters.collectAsState()
     val weightHistory by viewModel.weightHistory.collectAsState()
     val userProfile by viewModel.userProfile.collectAsState()
+    val loadingDay by viewModel.loadingDay.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.loadWeightHistory()
@@ -113,6 +115,11 @@ fun StatsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
         ) {
+            if (loadingDay) {
+                Spacer(Modifier.height(8.dp))
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+
             Spacer(Modifier.height(24.dp))
 
             Text(
@@ -140,7 +147,10 @@ fun StatsScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            if (totalCalories == 0) {
+            if (loadingDay) {
+                // Ziua se încarcă: bara de progres de sus comunică starea,
+                // nu arătăm nici empty-state, nici carduri cu zerouri.
+            } else if (totalCalories == 0) {
                 EmptyStateCard(
                     emoji = "🍽️",
                     title = stringResource(R.string.stats_empty_day_title),

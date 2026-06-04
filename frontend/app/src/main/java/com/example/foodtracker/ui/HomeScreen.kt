@@ -260,7 +260,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
 
             val dayIsEmpty = breakfastFoods.isEmpty() && lunchFoods.isEmpty() &&
                 dinnerFoods.isEmpty() && snacksFoods.isEmpty()
-            if (dayIsEmpty) {
+            if (!loadingDay && dayIsEmpty) {
                 EmptyStateCard(
                     emoji = "🍽️",
                     title = stringResource(R.string.home_empty_day_title),
