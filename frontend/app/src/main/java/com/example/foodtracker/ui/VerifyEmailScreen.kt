@@ -7,6 +7,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -47,7 +49,9 @@ fun VerifyEmailScreen(
 
     Box(Modifier.fillMaxSize().background(GlassColors.backgroundDark)) {
         Column(
-            Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 28.dp),
+            Modifier.fillMaxSize().statusBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(Modifier.height(100.dp))
