@@ -352,10 +352,11 @@ fun SettingsScreen(
 
     if (showDeleteDialog) {
         val isDeleting = deleteAccountState is DeleteAccountState.Deleting
+        val deleteRed = Color(0xFFFF4444)
         val errorRes = (deleteAccountState as? DeleteAccountState.Error)?.messageRes
-        val inlineError = when (errorRes) {
-            R.string.error_no_internet -> deleteNoInternetMsg
-            R.string.error_delete_account -> deleteErrorMsg
+        val inlineError = when (deleteAccountState) {
+            is DeleteAccountState.Error ->
+                if (errorRes == R.string.error_no_internet) deleteNoInternetMsg else deleteErrorMsg
             else -> null
         }
         AlertDialog(
@@ -373,7 +374,7 @@ fun SettingsScreen(
                         Spacer(Modifier.height(12.dp))
                         Text(
                             inlineError,
-                            color = Color(0xFFFF4444),
+                            color = deleteRed,
                             fontSize = 13.sp,
                         )
                     }
@@ -384,7 +385,6 @@ fun SettingsScreen(
                     enabled = !isDeleting,
                     onClick = {
                         authViewModel.deleteAccount {
-                            showDeleteDialog = false
                             onAccountDeleted()
                         }
                     }
@@ -393,12 +393,12 @@ fun SettingsScreen(
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,
-                            color = Color(0xFFFF4444),
+                            color = deleteRed,
                         )
                     } else {
                         Text(
                             deleteLabel,
-                            color = Color(0xFFFF4444),
+                            color = deleteRed,
                             fontWeight = FontWeight.Bold
                         )
                     }
