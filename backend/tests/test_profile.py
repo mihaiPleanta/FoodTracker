@@ -1,3 +1,6 @@
+from auth import get_user_deleter
+from main import app
+
 AUTH_HEADER = {"Authorization": "Bearer fake-test-token"}
 
 _VALID_PROFILE = {
@@ -41,3 +44,42 @@ def test_save_profile_upsert_updates_existing(client):
 def test_profile_requires_auth(client):
     response = client.get("/profile")
     assert response.status_code == 422
+
+
+def test_delete_profile_returns_204_and_removes_row(client):
+    deleted_uids = []
+    app.dependency_overrides[get_user_deleter] = lambda: deleted_uids.append
+    try:
+        client.post("/profile", json=_VALID_PROFILE, headers=AUTH_HEADER)
+        response = client.delete("/profile", headers=AUTH_HEADER)
+        assert response.status_code == 204
+        assert deleted_uids == ["test-uid-123"]
+        assert client.get("/profile", headers=AUTH_HEADER).status_code == 404
+    finally:
+        app.dependency_overrides.pop(get_user_deleter, None)
+
+
+def test_delete_profile_without_profile_still_204(client):
+    deleted_uids = []
+    app.dependency_overrides[get_user_deleter] = lambda: deleted_uids.append
+    try:
+        response = client.delete("/profile", headers=AUTH_HEADER)
+        assert response.status_code == 204
+        assert deleted_uids == ["test-uid-123"]
+    finally:
+        app.dependency_overrides.pop(get_user_deleter, None)
+
+
+def test_delete_profile_returns_502_when_firebase_fails(client):
+    def raising_deleter():
+        def _delete(uid: str) -> None:
+            raise RuntimeError("firebase down")
+        return _delete
+    app.dependency_overrides[get_user_deleter] = raising_deleter
+    try:
+        client.post("/profile", json=_VALID_PROFILE, headers=AUTH_HEADER)
+        response = client.delete("/profile", headers=AUTH_HEADER)
+        assert response.status_code == 502
+        assert client.get("/profile", headers=AUTH_HEADER).status_code == 200
+    finally:
+        app.dependency_overrides.pop(get_user_deleter, None)
