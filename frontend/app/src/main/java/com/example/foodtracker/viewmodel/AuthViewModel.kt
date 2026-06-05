@@ -50,6 +50,12 @@ sealed class PasswordResetState {
     data class Error(@StringRes val messageRes: Int) : PasswordResetState()
 }
 
+sealed class DeleteAccountState {
+    object Idle : DeleteAccountState()
+    object Deleting : DeleteAccountState()
+    data class Error(@StringRes val messageRes: Int) : DeleteAccountState()
+}
+
 data class VerifyEmailUiState(
     val isChecking: Boolean = false,
     val isResending: Boolean = false,
@@ -97,6 +103,42 @@ class AuthViewModel : ViewModel() {
     private val _passwordResetState = MutableStateFlow<PasswordResetState>(PasswordResetState.Idle)
     val passwordResetState: StateFlow<PasswordResetState> = _passwordResetState.asStateFlow()
     fun clearPasswordResetState() { _passwordResetState.value = PasswordResetState.Idle }
+
+    private val _deleteAccountState = MutableStateFlow<DeleteAccountState>(DeleteAccountState.Idle)
+    val deleteAccountState: StateFlow<DeleteAccountState> = _deleteAccountState.asStateFlow()
+    fun clearDeleteAccountState() { _deleteAccountState.value = DeleteAccountState.Idle }
+
+    /**
+     * Deletes the account: backend DELETE /profile (cascades DB data + deletes the
+     * Firebase Auth user via Admin SDK), then signs out locally and invokes [onDeleted]
+     * to navigate. On failure the state holds an error so the dialog can show it inline.
+     */
+    fun deleteAccount(onDeleted: () -> Unit) {
+        if (_deleteAccountState.value == DeleteAccountState.Deleting) return
+        _deleteAccountState.value = DeleteAccountState.Deleting
+        viewModelScope.launch {
+            try {
+                val response = profileApi.deleteAccount()
+                if (response.isSuccessful) {
+                    auth.signOut()
+                    _onboardingData.value = OnboardingData()
+                    _onboardingStep.value = 0
+                    _loadedProfile.value = null
+                    _deleteAccountState.value = DeleteAccountState.Idle
+                    onDeleted()
+                } else {
+                    _deleteAccountState.value =
+                        DeleteAccountState.Error(R.string.error_delete_account)
+                }
+            } catch (e: java.io.IOException) {
+                _deleteAccountState.value =
+                    DeleteAccountState.Error(R.string.error_no_internet)
+            } catch (e: Exception) {
+                _deleteAccountState.value =
+                    DeleteAccountState.Error(R.string.error_delete_account)
+            }
+        }
+    }
 
     private val _verifyEmailState = MutableStateFlow(VerifyEmailUiState())
     val verifyEmailState: StateFlow<VerifyEmailUiState> = _verifyEmailState.asStateFlow()
