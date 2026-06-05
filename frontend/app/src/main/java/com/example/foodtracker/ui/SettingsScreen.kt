@@ -34,11 +34,19 @@ import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.ui.theme.glassCard
 import androidx.compose.ui.res.stringResource
 import com.example.foodtracker.R
+import com.example.foodtracker.viewmodel.AuthViewModel
+import com.example.foodtracker.viewmodel.DeleteAccountState
 import com.example.foodtracker.viewmodel.FoodViewModel
 import kotlinx.coroutines.launch
 
 @Composable
-fun SettingsScreen(navController: NavController, viewModel: FoodViewModel, onLogout: () -> Unit) {
+fun SettingsScreen(
+    navController: NavController,
+    viewModel: FoodViewModel,
+    authViewModel: AuthViewModel,
+    onLogout: () -> Unit,
+    onAccountDeleted: () -> Unit,
+) {
     val settings by viewModel.appSettings.collectAsState()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -59,6 +67,7 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel, onLog
 
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    val deleteAccountState by authViewModel.deleteAccountState.collectAsState()
 
     Box(Modifier.fillMaxSize().background(GlassColors.backgroundDark)) {
         Column(
@@ -309,6 +318,8 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel, onLog
     val deleteConfirmMsg = stringResource(R.string.settings_delete_confirm)
     val deleteLabel = stringResource(R.string.action_delete)
     val cancelLabel = stringResource(R.string.action_cancel)
+    val deleteErrorMsg = stringResource(R.string.error_delete_account)
+    val deleteNoInternetMsg = stringResource(R.string.error_no_internet)
 
     if (showLogoutDialog) {
         AlertDialog(
@@ -340,26 +351,67 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel, onLog
     }
 
     if (showDeleteDialog) {
+        val isDeleting = deleteAccountState is DeleteAccountState.Deleting
+        val errorRes = (deleteAccountState as? DeleteAccountState.Error)?.messageRes
+        val inlineError = when (errorRes) {
+            R.string.error_no_internet -> deleteNoInternetMsg
+            R.string.error_delete_account -> deleteErrorMsg
+            else -> null
+        }
         AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
+            onDismissRequest = {
+                if (!isDeleting) {
+                    showDeleteDialog = false
+                    authViewModel.clearDeleteAccountState()
+                }
+            },
             title = { Text(deleteAccountLabel, color = GlassColors.textPrimary) },
-            text  = {
-                Text(
-                    deleteConfirmMsg,
-                    color = GlassColors.textSecondary
-                )
+            text = {
+                Column {
+                    Text(deleteConfirmMsg, color = GlassColors.textSecondary)
+                    if (inlineError != null) {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            inlineError,
+                            color = Color(0xFFFF4444),
+                            fontSize = 13.sp,
+                        )
+                    }
+                }
             },
             confirmButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
-                    Text(
-                        deleteLabel,
-                        color = Color(0xFFFF4444),
-                        fontWeight = FontWeight.Bold
-                    )
+                TextButton(
+                    enabled = !isDeleting,
+                    onClick = {
+                        authViewModel.deleteAccount {
+                            showDeleteDialog = false
+                            onAccountDeleted()
+                        }
+                    }
+                ) {
+                    if (isDeleting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = Color(0xFFFF4444),
+                        )
+                    } else {
+                        Text(
+                            deleteLabel,
+                            color = Color(0xFFFF4444),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
+                TextButton(
+                    enabled = !isDeleting,
+                    onClick = {
+                        showDeleteDialog = false
+                        authViewModel.clearDeleteAccountState()
+                    }
+                ) {
                     Text(cancelLabel, color = GlassColors.textSecondary)
                 }
             },
