@@ -46,6 +46,11 @@ def test_profile_requires_auth(client):
     assert response.status_code == 422
 
 
+def test_delete_profile_requires_auth(client):
+    response = client.delete("/profile")
+    assert response.status_code == 422
+
+
 def test_delete_profile_returns_204_and_removes_row(client):
     deleted_uids = []
     app.dependency_overrides[get_user_deleter] = lambda: deleted_uids.append

@@ -55,6 +55,8 @@ async def delete_profile(
     # Firebase first: if it fails, nothing is committed to the DB → consistent state.
     try:
         delete_user(uid)
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
