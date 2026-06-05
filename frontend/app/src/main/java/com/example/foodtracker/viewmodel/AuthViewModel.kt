@@ -251,6 +251,9 @@ class AuthViewModel : ViewModel() {
 
     fun resetState() { _uiState.value = AuthUiState.Idle }
 
+    /** Called by LoginScreen when the Google Sign-In intent fails (not a user cancel). */
+    fun reportGoogleSignInError() { _uiState.value = AuthUiState.Error(R.string.error_google_signin) }
+
     fun nextStep() { _onboardingStep.value = (_onboardingStep.value + 1).coerceAtMost(2) }
     fun prevStep() { _onboardingStep.value = (_onboardingStep.value - 1).coerceAtLeast(0) }
 

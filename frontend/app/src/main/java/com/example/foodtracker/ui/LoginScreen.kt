@@ -1,6 +1,5 @@
 package com.example.foodtracker.ui
 
-import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -28,7 +27,9 @@ import com.example.foodtracker.viewmodel.AuthUiState
 import com.example.foodtracker.viewmodel.AuthViewModel
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes
 import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.api.CommonStatusCodes
 
 @Composable
 fun LoginScreen(
@@ -60,12 +61,23 @@ fun LoginScreen(
     val googleLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            try {
-                val account = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-                    .getResult(ApiException::class.java)
-                account.idToken?.let { authViewModel.signInWithGoogle(it) }
-            } catch (_: ApiException) { /* user cancelled */ }
+        // Procesăm rezultatul indiferent de resultCode: la eșec (ex. SHA-1
+        // neînregistrat) activitatea întoarce RESULT_CANCELED, dar detaliul erorii
+        // e tot în intent, expus prin ApiException.statusCode.
+        try {
+            val account = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+                .getResult(ApiException::class.java)
+            val idToken = account.idToken
+            if (idToken != null) authViewModel.signInWithGoogle(idToken)
+            else authViewModel.reportGoogleSignInError()
+        } catch (e: ApiException) {
+            // Doar anularea explicită a userului e silențioasă; orice altă eroare
+            // (ex. SHA-1 neînregistrat / config OAuth) se afișează.
+            if (e.statusCode != GoogleSignInStatusCodes.SIGN_IN_CANCELLED &&
+                e.statusCode != CommonStatusCodes.CANCELED
+            ) {
+                authViewModel.reportGoogleSignInError()
+            }
         }
     }
 

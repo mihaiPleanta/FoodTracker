@@ -244,6 +244,8 @@
     <string name="error_delete">Eroare la ștergere</string>
 <string name="error_db_busy">Baza de date e ocupată, încearcă din nou</string>
     <string name="error_email_in_use">Acest email este deja folosit</string>
+    <string name="error_account_exists_other_method">Există deja un cont cu acest email. Conectează-te cu parola.</string>
+    <string name="error_google_signin">Conectarea cu Google a eșuat. Încearcă din nou.</string>
     <string name="error_bad_credentials">Email sau parolă incorectă</string>
     <string name="error_invalid_email">Email invalid</string>
     <string name="error_weak_password">Parola trebuie să aibă minim 6 caractere</string>

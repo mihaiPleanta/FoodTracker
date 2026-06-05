@@ -7,6 +7,11 @@ import com.example.foodtracker.R
 fun mapFirebaseError(exception: Exception): Int {
     val msg = exception.message ?: ""
     return when {
+        // Google Sign-In pe un email care are deja cont email/parolă (Firebase
+        // "one account per email" → colision pe credențiale).
+        msg.contains("different sign-in credentials") ||
+        msg.contains("ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL") ->
+            R.string.error_account_exists_other_method
         msg.contains("already in use")            -> R.string.error_email_in_use
         // Verificat înaintea "password is invalid" (bad credentials): mesajul de
         // parolă slabă conține tot "password is invalid", dar "at least 6" e specific.
