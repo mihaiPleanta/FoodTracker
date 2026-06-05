@@ -50,6 +50,24 @@
     <string name="register_passwords_mismatch">Parolele nu coincid</string>
     <string name="register_have_account">Ai deja cont? </string>
 
+    <!-- Forgot password -->
+    <string name="login_forgot_password">Ai uitat parola?</string>
+    <string name="forgot_title">Resetează parola</string>
+    <string name="forgot_subtitle">Îți trimitem un link de resetare pe email</string>
+    <string name="forgot_send_button">Trimite link de resetare</string>
+    <string name="forgot_sent_title">Email trimis</string>
+    <string name="forgot_sent_message">Ți-am trimis un email la %1$s. Verifică inbox-ul și urmează linkul.</string>
+    <string name="forgot_back_to_login">Înapoi la login</string>
+
+    <!-- Email verification -->
+    <string name="verify_title">Verifică-ți emailul</string>
+    <string name="verify_message">Ți-am trimis un link de confirmare la %1$s. Deschide-l, apoi revino aici.</string>
+    <string name="verify_checked_button">Am verificat</string>
+    <string name="verify_resend_button">Retrimite emailul</string>
+    <string name="verify_resend_cooldown">Retrimite (%1$ds)</string>
+    <string name="verify_not_yet">Emailul încă nu e confirmat. Verifică inbox-ul.</string>
+    <string name="verify_use_other_account">Folosește alt cont</string>
+
     <!-- Onboarding -->
     <string name="onboarding_welcome">Bun venit! 👋</string>
     <string name="onboarding_name_q">Cum te numești?</string>

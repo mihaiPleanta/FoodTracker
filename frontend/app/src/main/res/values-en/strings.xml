@@ -47,6 +47,24 @@
     <string name="register_passwords_mismatch">Passwords do not match</string>
     <string name="register_have_account">Already have an account? </string>
 
+    <!-- Forgot password -->
+    <string name="login_forgot_password">Forgot password?</string>
+    <string name="forgot_title">Reset password</string>
+    <string name="forgot_subtitle">We\'ll send a reset link to your email</string>
+    <string name="forgot_send_button">Send reset link</string>
+    <string name="forgot_sent_title">Email sent</string>
+    <string name="forgot_sent_message">We sent an email to %1$s. Check your inbox and follow the link.</string>
+    <string name="forgot_back_to_login">Back to login</string>
+
+    <!-- Email verification -->
+    <string name="verify_title">Verify your email</string>
+    <string name="verify_message">We sent a confirmation link to %1$s. Open it, then come back here.</string>
+    <string name="verify_checked_button">I\'ve verified</string>
+    <string name="verify_resend_button">Resend email</string>
+    <string name="verify_resend_cooldown">Resend (%1$ds)</string>
+    <string name="verify_not_yet">Email not confirmed yet. Check your inbox.</string>
+    <string name="verify_use_other_account">Use another account</string>
+
     <!-- Onboarding -->
     <string name="onboarding_welcome">Welcome! 👋</string>
     <string name="onboarding_name_q">What\'s your name?</string>
