@@ -260,8 +260,14 @@ class MainActivity : ComponentActivity() {
                                     SettingsScreen(
                                         navController = navController,
                                         viewModel = viewModel,
+                                        authViewModel = authViewModel,
                                         onLogout = {
                                             authViewModel.logout()
+                                            navController.navigate("login") {
+                                                popUpTo(0) { inclusive = true }
+                                            }
+                                        },
+                                        onAccountDeleted = {
                                             navController.navigate("login") {
                                                 popUpTo(0) { inclusive = true }
                                             }
