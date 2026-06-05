@@ -167,6 +167,11 @@ class MainActivity : ComponentActivity() {
                                             navController.navigate("onboarding") {
                                                 popUpTo("splash") { inclusive = true }
                                             }
+                                        },
+                                        onNavigateVerifyEmail = {
+                                            navController.navigate("verify-email") {
+                                                popUpTo("splash") { inclusive = true }
+                                            }
                                         }
                                     )
                                 }
@@ -174,6 +179,7 @@ class MainActivity : ComponentActivity() {
                                     LoginScreen(
                                         authViewModel        = authViewModel,
                                         onNavigateRegister   = { navController.navigate("register") },
+                                        onNavigateForgot     = { navController.navigate("forgot-password") },
                                         onNavigateHome       = {
                                             navController.navigate("home") {
                                                 popUpTo("login") { inclusive = true }
@@ -183,18 +189,49 @@ class MainActivity : ComponentActivity() {
                                             navController.navigate("onboarding") {
                                                 popUpTo("login") { inclusive = true }
                                             }
+                                        },
+                                        onNavigateVerifyEmail = {
+                                            navController.navigate("verify-email") {
+                                                popUpTo("login") { inclusive = true }
+                                            }
                                         }
                                     )
                                 }
                                 composable("register") {
                                     RegisterScreen(
-                                        authViewModel        = authViewModel,
-                                        onNavigateLogin      = { navController.popBackStack() },
-                                        onNavigateOnboarding = {
-                                            navController.navigate("onboarding") {
+                                        authViewModel         = authViewModel,
+                                        onNavigateLogin       = { navController.popBackStack() },
+                                        onNavigateVerifyEmail = {
+                                            navController.navigate("verify-email") {
                                                 popUpTo("login") { inclusive = true }
                                             }
                                         }
+                                    )
+                                }
+                                composable("verify-email") {
+                                    VerifyEmailScreen(
+                                        authViewModel     = authViewModel,
+                                        onNavigateHome    = {
+                                            navController.navigate("home") {
+                                                popUpTo("verify-email") { inclusive = true }
+                                            }
+                                        },
+                                        onNavigateOnboarding = {
+                                            navController.navigate("onboarding") {
+                                                popUpTo("verify-email") { inclusive = true }
+                                            }
+                                        },
+                                        onLoggedOut       = {
+                                            navController.navigate("login") {
+                                                popUpTo("verify-email") { inclusive = true }
+                                            }
+                                        }
+                                    )
+                                }
+                                composable("forgot-password") {
+                                    ForgotPasswordScreen(
+                                        authViewModel = authViewModel,
+                                        onBack        = { navController.popBackStack() }
                                     )
                                 }
                                 composable("onboarding") {
