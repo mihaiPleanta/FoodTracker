@@ -8,6 +8,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
@@ -46,7 +48,9 @@ fun ForgotPasswordScreen(
 
     Box(Modifier.fillMaxSize().background(GlassColors.backgroundDark)) {
         Column(
-            Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 28.dp),
+            Modifier.fillMaxSize().statusBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(Modifier.height(20.dp))
@@ -81,6 +85,7 @@ fun ForgotPasswordScreen(
             } else {
                 Text(stringResource(R.string.forgot_title), fontSize = 28.sp,
                     fontWeight = FontWeight.ExtraBold, color = GlassColors.textPrimary)
+                Spacer(Modifier.height(8.dp))
                 Text(stringResource(R.string.forgot_subtitle), fontSize = 13.sp,
                     color = GlassColors.textSecondary)
                 Spacer(Modifier.height(32.dp))
@@ -106,6 +111,7 @@ fun ForgotPasswordScreen(
                     onClick = { authViewModel.sendPasswordReset(email) }
                 )
             }
+            Spacer(Modifier.height(40.dp))
         }
     }
 }
