@@ -15,14 +15,14 @@ import com.example.foodtracker.model.toUserProfile
 import com.example.foodtracker.util.mapFirebaseError
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -214,12 +214,18 @@ class AuthViewModel : ViewModel() {
             _uiState.value = AuthUiState.Loading
             try {
                 auth.createUserWithEmailAndPassword(email, password).await()
-                auth.currentUser?.sendEmailVerification()?.await()
-                startResendCooldown(60)
-                _uiState.value = AuthUiState.NavigateVerifyEmail
             } catch (e: Exception) {
                 _uiState.value = AuthUiState.Error(mapFirebaseError(e))
+                return@launch
             }
+            // Contul e creat; emailul de verificare e best-effort (resend din ecran).
+            try {
+                auth.currentUser?.sendEmailVerification()?.await()
+                startResendCooldown(60)
+            } catch (_: Exception) {
+                // userul poate retrimite din VerifyEmailScreen
+            }
+            _uiState.value = AuthUiState.NavigateVerifyEmail
         }
     }
 
