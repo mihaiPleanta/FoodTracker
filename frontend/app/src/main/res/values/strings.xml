@@ -241,6 +241,7 @@
     <string name="error_weight_history">Eroare la istoricul greutății</string>
     <string name="error_weight_checkin">Eroare la check-in greutate</string>
     <string name="error_save">Eroare la salvare</string>
+    <string name="error_delete_account">Nu am putut șterge contul. Încearcă din nou.</string>
     <string name="error_delete">Eroare la ștergere</string>
 <string name="error_db_busy">Baza de date e ocupată, încearcă din nou</string>
     <string name="error_email_in_use">Acest email este deja folosit</string>
