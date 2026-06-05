@@ -121,6 +121,9 @@ class AuthViewModel : ViewModel() {
                 val response = profileApi.deleteAccount()
                 if (response.isSuccessful) {
                     auth.signOut()
+                    // Reset uiState so LoginScreen's LaunchedEffect(uiState) doesn't bounce
+                    // back to Home on the stale NavigateHome value (same as logout()).
+                    _uiState.value = AuthUiState.NavigateLogin
                     _onboardingData.value = OnboardingData()
                     _onboardingStep.value = 0
                     _loadedProfile.value = null
