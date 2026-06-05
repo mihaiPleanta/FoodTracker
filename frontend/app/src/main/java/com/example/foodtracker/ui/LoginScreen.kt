@@ -34,8 +34,10 @@ import com.google.android.gms.common.api.ApiException
 fun LoginScreen(
     authViewModel: AuthViewModel,
     onNavigateRegister: () -> Unit,
+    onNavigateForgot: () -> Unit,
     onNavigateHome: () -> Unit,
-    onNavigateOnboarding: () -> Unit
+    onNavigateOnboarding: () -> Unit,
+    onNavigateVerifyEmail: () -> Unit
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -69,9 +71,10 @@ fun LoginScreen(
 
     LaunchedEffect(uiState) {
         when (uiState) {
-            is AuthUiState.NavigateHome       -> onNavigateHome()
-            is AuthUiState.NavigateOnboarding -> onNavigateOnboarding()
-            else                              -> Unit
+            is AuthUiState.NavigateHome        -> onNavigateHome()
+            is AuthUiState.NavigateOnboarding  -> onNavigateOnboarding()
+            is AuthUiState.NavigateVerifyEmail -> onNavigateVerifyEmail()
+            else                               -> Unit
         }
     }
 
@@ -111,6 +114,20 @@ fun LoginScreen(
                 passwordVisible = passwordVisible,
                 onTogglePasswordVisibility = { passwordVisible = !passwordVisible }
             )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Text(
+                    stringResource(R.string.login_forgot_password),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = GlassColors.accentGreen,
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .clickable {
+                            authViewModel.setResetEmailPrefill(email)
+                            onNavigateForgot()
+                        }
+                )
+            }
 
             AnimatedVisibility(
                 visible = errorMessage != null,
