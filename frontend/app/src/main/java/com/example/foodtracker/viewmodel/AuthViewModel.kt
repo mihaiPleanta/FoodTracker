@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -38,7 +40,22 @@ sealed class AuthUiState {
     object NavigateLogin : AuthUiState()
     object NavigateHome : AuthUiState()
     object NavigateOnboarding : AuthUiState()
+    object NavigateVerifyEmail : AuthUiState()
 }
+
+sealed class PasswordResetState {
+    object Idle : PasswordResetState()
+    object Sending : PasswordResetState()
+    object Sent : PasswordResetState()
+    data class Error(@StringRes val messageRes: Int) : PasswordResetState()
+}
+
+data class VerifyEmailUiState(
+    val isChecking: Boolean = false,
+    val isResending: Boolean = false,
+    val resendCooldownSec: Int = 0,
+    val notYetVerified: Boolean = false
+)
 
 data class OnboardingData(
     val name: String = "",
@@ -77,12 +94,90 @@ class AuthViewModel : ViewModel() {
 
     fun clearProfileSaveState() { _profileSaveState.value = ProfileSaveState.Idle }
 
+    private val _passwordResetState = MutableStateFlow<PasswordResetState>(PasswordResetState.Idle)
+    val passwordResetState: StateFlow<PasswordResetState> = _passwordResetState.asStateFlow()
+    fun clearPasswordResetState() { _passwordResetState.value = PasswordResetState.Idle }
+
+    private val _verifyEmailState = MutableStateFlow(VerifyEmailUiState())
+    val verifyEmailState: StateFlow<VerifyEmailUiState> = _verifyEmailState.asStateFlow()
+    fun resetVerifyEmailState() { _verifyEmailState.value = VerifyEmailUiState() }
+
+    private val _resetEmailPrefill = MutableStateFlow("")
+    val resetEmailPrefill: StateFlow<String> = _resetEmailPrefill.asStateFlow()
+    fun setResetEmailPrefill(email: String) { _resetEmailPrefill.value = email }
+
+    val currentUserEmail: String? get() = auth.currentUser?.email
+
+    private var cooldownJob: Job? = null
+    private fun startResendCooldown(seconds: Int = 60) {
+        cooldownJob?.cancel()
+        _verifyEmailState.value = _verifyEmailState.value.copy(resendCooldownSec = seconds)
+        cooldownJob = viewModelScope.launch {
+            var remaining = seconds
+            while (remaining > 0) {
+                delay(1000)
+                remaining--
+                _verifyEmailState.value = _verifyEmailState.value.copy(resendCooldownSec = remaining)
+            }
+        }
+    }
+
+    fun sendPasswordReset(email: String) {
+        viewModelScope.launch {
+            _passwordResetState.value = PasswordResetState.Sending
+            try {
+                auth.sendPasswordResetEmail(email.trim()).await()
+                _passwordResetState.value = PasswordResetState.Sent
+            } catch (e: Exception) {
+                _passwordResetState.value = PasswordResetState.Error(mapFirebaseError(e))
+            }
+        }
+    }
+
+    fun resendVerificationEmail() {
+        val s = _verifyEmailState.value
+        if (s.resendCooldownSec > 0 || s.isResending) return
+        viewModelScope.launch {
+            _verifyEmailState.value = _verifyEmailState.value.copy(isResending = true)
+            try {
+                auth.currentUser?.sendEmailVerification()?.await()
+                startResendCooldown(60)
+            } catch (_: Exception) {
+                // userul poate reîncerca
+            } finally {
+                _verifyEmailState.value = _verifyEmailState.value.copy(isResending = false)
+            }
+        }
+    }
+
+    fun checkEmailVerified() {
+        viewModelScope.launch {
+            _verifyEmailState.value = _verifyEmailState.value.copy(isChecking = true, notYetVerified = false)
+            try {
+                auth.currentUser?.reload()?.await()
+                if (auth.currentUser?.isEmailVerified == true) {
+                    resolvePostAuth()
+                } else {
+                    _verifyEmailState.value = _verifyEmailState.value.copy(notYetVerified = true)
+                }
+            } catch (_: Exception) {
+                _verifyEmailState.value = _verifyEmailState.value.copy(notYetVerified = true)
+            } finally {
+                _verifyEmailState.value = _verifyEmailState.value.copy(isChecking = false)
+            }
+        }
+    }
+
     /** Called by SplashScreen on startup. */
     fun checkAuthState() {
         viewModelScope.launch {
             val user = auth.currentUser
             if (user == null) {
                 _uiState.value = AuthUiState.NavigateLogin
+                return@launch
+            }
+            if (!user.isEmailVerified) {
+                _uiState.value = AuthUiState.NavigateVerifyEmail
                 return@launch
             }
             _uiState.value = AuthUiState.Loading
@@ -103,7 +198,11 @@ class AuthViewModel : ViewModel() {
             _uiState.value = AuthUiState.Loading
             try {
                 auth.signInWithEmailAndPassword(email, password).await()
-                resolvePostAuth()
+                if (auth.currentUser?.isEmailVerified == false) {
+                    _uiState.value = AuthUiState.NavigateVerifyEmail
+                } else {
+                    resolvePostAuth()
+                }
             } catch (e: Exception) {
                 _uiState.value = AuthUiState.Error(mapFirebaseError(e))
             }
@@ -115,7 +214,9 @@ class AuthViewModel : ViewModel() {
             _uiState.value = AuthUiState.Loading
             try {
                 auth.createUserWithEmailAndPassword(email, password).await()
-                _uiState.value = AuthUiState.NavigateOnboarding
+                auth.currentUser?.sendEmailVerification()?.await()
+                startResendCooldown(60)
+                _uiState.value = AuthUiState.NavigateVerifyEmail
             } catch (e: Exception) {
                 _uiState.value = AuthUiState.Error(mapFirebaseError(e))
             }
