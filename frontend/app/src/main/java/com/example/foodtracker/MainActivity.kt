@@ -257,7 +257,16 @@ class MainActivity : ComponentActivity() {
                                     ProfileScreen(viewModel, authViewModel)
                                 }
                                 composable("settings") {
-                                    SettingsScreen(navController, viewModel)
+                                    SettingsScreen(
+                                        navController = navController,
+                                        viewModel = viewModel,
+                                        onLogout = {
+                                            authViewModel.logout()
+                                            navController.navigate("login") {
+                                                popUpTo(0) { inclusive = true }
+                                            }
+                                        }
+                                    )
                                 }
                                 composable("meal/{mealName}/{mealIcon}/{accentColor}") { entry ->
                                     val mealName    = entry.arguments?.getString("mealName") ?: ""

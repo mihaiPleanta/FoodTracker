@@ -38,7 +38,7 @@ import com.example.foodtracker.viewmodel.FoodViewModel
 import kotlinx.coroutines.launch
 
 @Composable
-fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
+fun SettingsScreen(navController: NavController, viewModel: FoodViewModel, onLogout: () -> Unit) {
     val settings by viewModel.appSettings.collectAsState()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -321,7 +321,7 @@ fun SettingsScreen(navController: NavController, viewModel: FoodViewModel) {
                 )
             },
             confirmButton = {
-                TextButton(onClick = { showLogoutDialog = false }) {
+                TextButton(onClick = { showLogoutDialog = false; onLogout() }) {
                     Text(
                         logoutLabel,
                         color = GlassColors.accentOrange,
