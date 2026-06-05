@@ -5,6 +5,7 @@ import com.example.foodtracker.model.ProfileDto
 import com.example.foodtracker.model.TdeeResponseDto
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
 
@@ -20,4 +21,7 @@ interface ProfileApi {
 
     @GET("goals")
     suspend fun getGoals(): Response<GoalsDto>
+
+    @DELETE("profile")
+    suspend fun deleteAccount(): Response<Unit>
 }
