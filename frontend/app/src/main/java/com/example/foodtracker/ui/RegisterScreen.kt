@@ -32,7 +32,7 @@ import com.example.foodtracker.viewmodel.AuthViewModel
 fun RegisterScreen(
     authViewModel: AuthViewModel,
     onNavigateLogin: () -> Unit,
-    onNavigateOnboarding: () -> Unit
+    onNavigateVerifyEmail: () -> Unit
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -50,7 +50,7 @@ fun RegisterScreen(
     val strPasswordsMismatch = stringResource(R.string.register_passwords_mismatch)
 
     LaunchedEffect(uiState) {
-        if (uiState is AuthUiState.NavigateOnboarding) onNavigateOnboarding()
+        if (uiState is AuthUiState.NavigateVerifyEmail) onNavigateVerifyEmail()
     }
 
     Box(Modifier.fillMaxSize().background(GlassColors.backgroundDark)) {

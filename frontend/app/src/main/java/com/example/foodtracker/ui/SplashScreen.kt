@@ -25,7 +25,8 @@ fun SplashScreen(
     authViewModel: AuthViewModel,
     onNavigateLogin: () -> Unit,
     onNavigateHome: () -> Unit,
-    onNavigateOnboarding: () -> Unit
+    onNavigateOnboarding: () -> Unit,
+    onNavigateVerifyEmail: () -> Unit
 ) {
     var visible by remember { mutableStateOf(false) }
     val alpha by animateFloatAsState(if (visible) 1f else 0f, tween(600), label = "splashAlpha")
@@ -41,10 +42,11 @@ fun SplashScreen(
 
     LaunchedEffect(uiState) {
         when (uiState) {
-            is AuthUiState.NavigateLogin      -> onNavigateLogin()
-            is AuthUiState.NavigateHome       -> onNavigateHome()
-            is AuthUiState.NavigateOnboarding -> onNavigateOnboarding()
-            else                              -> Unit
+            is AuthUiState.NavigateLogin       -> onNavigateLogin()
+            is AuthUiState.NavigateHome        -> onNavigateHome()
+            is AuthUiState.NavigateOnboarding  -> onNavigateOnboarding()
+            is AuthUiState.NavigateVerifyEmail -> onNavigateVerifyEmail()
+            else                               -> Unit
         }
     }
 
