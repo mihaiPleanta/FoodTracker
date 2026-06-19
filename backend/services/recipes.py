@@ -98,18 +98,19 @@ binecunoscută, exact cum ar găti-o un om acasă, în care acel ingredient e el
 REGULI:
 1. Construiește rețeta în jurul ingredientului-vedetă cerut.
 2. Dacă ingredientul-vedetă este un fruct (banană, măr, fructe de pădure, căpșuni), fă un
-   preparat DULCE potrivit pentru el: fulgi de ovăz, clătite, smoothie bowl, salată de fructe
-   cu iaurt, budincă de chia sau pancakes. Alege unul singur și fă-l ca la carte.
+   preparat DULCE potrivit pentru el: fulgi de ovăz, clătite americane, smoothie bowl,
+   salată de fructe cu iaurt sau budincă de chia. Alege unul singur și fă-l ca la carte.
 3. Completează cu ingrediente obișnuite de cămară care merg NATURAL cu felul ales
    (legume, brânză, lactate, condimente, ulei, orez, paste, verdețuri etc.).
 4. Rezultatul trebuie să fie un fel de mâncare real, recognoscibil dintr-o carte de bucate.
    Dacă ți se pare ciudat, ai greșit — alege un preparat clasic.
-5. Rețeta să fie potrivită pentru masa cerută (la mic dejun ceva ușor, la cină ceva consistent).
-6. Ține cont de obiectivul nutrițional al utilizatorului; porțiile să fie realiste.
+5. Rețeta să fie potrivită pentru masa cerută și să se încadreze în bugetul caloric indicat.
+6. Scrie TITLUL și toate numele de ingrediente în limba română. Fără cuvinte în engleză.
 7. Scrie în limba română corectă. Pașii de preparare clari și ordonați.
-8. Pentru FIECARE ingredient dă: numele, cantitatea în GRAME (număr, fără unități text)
+8. Pentru FIECARE ingredient dă: numele, cantitatea în GRAME (număr întreg, fără unități text)
    și valorile nutriționale la 100 g (kcal, proteine, carbohidrați, grăsimi). Convertește
-   în grame orice cantitate (ex: "2 linguri ulei" → grams: 30). Estimează macros realiste.
+   în grame orice cantitate (ex: "2 linguri ulei" → grams: 30; "2 ouă" → grams: 100;
+   "1 cană lapte" → grams: 240). Estimează macros realiste.
 
 DESCRIEREA: maxim 12 cuvinte, spune doar ce conține preparatul, neutru și factual.
 Exemplu bun: "Fulgi de ovăz cu banană, lapte și nuci."
@@ -140,18 +141,18 @@ exactly how someone would cook it at home, in which that ingredient is the main 
 RULES:
 1. Build the recipe around the requested star ingredient.
 2. If the star ingredient is a fruit (banana, apple, berries, strawberries), make a SWEET
-   dish suited to it: oatmeal, pancakes, smoothie bowl, fruit salad with yogurt, chia
-   pudding. Pick a single one and make it properly.
+   dish suited to it: oatmeal, American pancakes, smoothie bowl, fruit salad with yogurt
+   or chia pudding. Pick a single one and make it properly.
 3. Complete it with common pantry ingredients that go NATURALLY with the chosen dish
    (vegetables, cheese, dairy, spices, oil, rice, pasta, greens, etc.).
 4. The result must be a real dish, recognizable from a cookbook.
    If it seems weird, you got it wrong — pick a classic dish.
-5. Make the recipe fit the requested meal (something light for breakfast, hearty for dinner).
-6. Respect the user's nutrition goal; portions must be realistic.
-7. Write in correct English. Clear, ordered preparation steps.
-8. For EACH ingredient give: the name, the amount in GRAMS (a number, no text units)
+5. Make the recipe fit the requested meal and stay within the indicated calorie budget.
+6. Write in correct English. Clear, ordered preparation steps.
+7. For EACH ingredient give: the name, the amount in GRAMS (a whole number, no text units)
    and the nutrition per 100 g (kcal, protein, carbs, fat). Convert any quantity to grams
-   (e.g. "2 tablespoons oil" → grams: 30). Estimate realistic macros.
+   (e.g. "2 tablespoons oil" → grams: 30; "2 eggs" → grams: 100;
+   "1 cup milk" → grams: 240). Estimate realistic macros.
 
 THE DESCRIPTION: max 12 words, state only what the dish contains, neutral and factual.
 Good example: "Oatmeal with banana, milk and walnuts."
@@ -191,6 +192,15 @@ class RecipeParseError(Exception):
     """Ollama returned content that isn't a valid recipe."""
 
 
+# Fraction of daily calories allocated per meal type.
+_MEAL_KCAL_RATIO = {
+    "BREAKFAST": 0.25,
+    "LUNCH":     0.35,
+    "DINNER":    0.30,
+    "SNACKS":    0.10,
+}
+
+
 def build_recipe_prompt(anchor, meal_type, goals, language: str = "ro") -> list[dict]:
     """Build the chat prompt around a single anchor food. Showing the model only
     ONE of the user's frequent foods (instead of the whole list) is what keeps
@@ -201,14 +211,16 @@ def build_recipe_prompt(anchor, meal_type, goals, language: str = "ro") -> list[
     `language` ("ro"/"en") follows the in-app language so the generated recipe text
     matches the rest of the UI."""
     anchor_line = anchor.name + (f" ({anchor.brand})" if anchor.brand else "")
+    meal_kcal = round(goals.calorie_goal * _MEAL_KCAL_RATIO.get(meal_type, 0.25))
     if language == "en":
         meal_label = _MEAL_LABELS_EN.get(meal_type, "meal")
         system_prompt = _SYSTEM_PROMPT_EN
         user_content = (
             f"Meal: {meal_label}.\n"
-            f"Nutrition goal: {goals.mode}, {goals.calorie_goal} kcal/day "
-            f"(protein {goals.protein_goal_g}g, carbs {goals.carbs_goal_g}g, "
-            f"fat {goals.fat_goal_g}g).\n\n"
+            f"Calorie budget for this meal: approximately {meal_kcal} kcal "
+            f"(daily goal: {goals.mode}, {goals.calorie_goal} kcal/day).\n"
+            f"Macro targets/day: protein {goals.protein_goal_g}g, "
+            f"carbs {goals.carbs_goal_g}g, fat {goals.fat_goal_g}g.\n\n"
             f"Star ingredient (frequently eaten by the user): {anchor_line}.\n\n"
             f"Make a classic {meal_label} recipe with this main ingredient."
         )
@@ -217,9 +229,10 @@ def build_recipe_prompt(anchor, meal_type, goals, language: str = "ro") -> list[
         system_prompt = _SYSTEM_PROMPT
         user_content = (
             f"Masa: {meal_label}.\n"
-            f"Obiectiv nutrițional: {goals.mode}, {goals.calorie_goal} kcal/zi "
-            f"(proteine {goals.protein_goal_g}g, carbohidrați {goals.carbs_goal_g}g, "
-            f"grăsimi {goals.fat_goal_g}g).\n\n"
+            f"Buget caloric pentru această masă: aproximativ {meal_kcal} kcal "
+            f"(obiectiv zilnic: {goals.mode}, {goals.calorie_goal} kcal/zi).\n"
+            f"Macros țintă/zi: proteine {goals.protein_goal_g}g, "
+            f"carbohidrați {goals.carbs_goal_g}g, grăsimi {goals.fat_goal_g}g.\n\n"
             f"Ingredient-vedetă (consumat des de utilizator): {anchor_line}.\n\n"
             f"Fă o rețetă clasică pentru {meal_label} cu acest ingredient principal."
         )
