@@ -391,7 +391,7 @@ private fun MealDistributionCard(meals: List<MealSplit>, totalCalories: Int) {
                 )
                 Spacer(Modifier.size(8.dp))
                 Text(
-                    text = meal.name,
+                    text = stringResource(mealLabelRes(meal.name)),
                     fontSize = 12.sp,
                     color = GlassColors.textSecondary,
                     modifier = Modifier.weight(1f)
