@@ -41,6 +41,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import com.example.foodtracker.util.AppLocale
+import com.example.foodtracker.util.LocalAppLanguage
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -108,6 +110,7 @@ fun RecipePortionEditor(
         containerColor = GlassColors.cardBackgroundAlt,
         dragHandle = null,
     ) {
+      AppLocale(LocalAppLanguage.current) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -198,6 +201,7 @@ fun RecipePortionEditor(
                 onClick = { saving = true },
             )
         }
+      }
     }
 }
 
