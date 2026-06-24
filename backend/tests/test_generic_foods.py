@@ -78,3 +78,19 @@ def test_default_client_loads_bundled_dataset():
     from services.generic_foods import get_generic_client
     res = get_generic_client().search("piept de pui", 20)
     assert any("pui" in r.name.lower() for r in res)
+
+
+def test_potato_variants_in_bundled_dataset():
+    # Raw, baked and fried potato must be searchable in the real dataset,
+    # including the no-diacritics spelling a user is likely to type.
+    from services.generic_foods import GenericFoodsClient, _load_dataset
+    client = GenericFoodsClient(_load_dataset())
+    assert any(r.name == "Cartof crud" for r in client.search("cartof crud", 20))
+    assert any(r.name == "Cartof crud" for r in client.search("cartof simplu", 20))
+    assert any(r.name == "Cartof copt" for r in client.search("cartof copt", 20))
+    assert any(r.name == "Cartof copt" for r in client.search("cartof la cuptor", 20))
+    assert any(r.name == "Cartof prăjit" for r in client.search("cartof prajit", 20))
+    assert any(r.name == "Cartof prăjit" for r in client.search("cartofi prajiti", 20))
+    # The bare "cartof" query still surfaces them alongside boiled/sweet.
+    names = {r.name for r in client.search("cartof", 20)}
+    assert {"Cartof crud", "Cartof copt", "Cartof prăjit"}.issubset(names)
