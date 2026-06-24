@@ -94,6 +94,45 @@ private class FakeLogsApi : LogsApi {
         throw UnsupportedOperationException()
 }
 
+/**
+ * A LogsApi whose getDay response can be swapped at runtime, to simulate switching
+ * accounts (account A logs in, logs out, account B logs in on the same process).
+ */
+private class SwitchableLogsApi(initial: DayResponseDto) : LogsApi {
+    var day: DayResponseDto = initial
+
+    override suspend fun getDay(date: String): DayResponseDto = day
+    override suspend fun createFoodLog(body: FoodLogCreateDto): FoodLogDto =
+        throw UnsupportedOperationException()
+    override suspend fun updateFoodLog(id: Long, body: FoodLogUpdateDto): FoodLogDto =
+        throw UnsupportedOperationException()
+    override suspend fun deleteFoodLog(id: Long): retrofit2.Response<Unit> =
+        retrofit2.Response.success(null)
+    override suspend fun putHydration(date: String, body: HydrationUpdateDto): HydrationDto =
+        throw UnsupportedOperationException()
+    override suspend fun postWeightCheckIn(body: WeightCheckInCreateDto): WeightCheckInDto =
+        throw UnsupportedOperationException()
+    override suspend fun getWeightCheckIns(from: String, to: String): WeightCheckInListDto =
+        throw UnsupportedOperationException()
+}
+
+private fun dayWithOneBreakfast() = DayResponseDto(
+    foodsByMeal = mapOf(
+        "breakfast" to listOf(
+            FoodLogDto(
+                id = 1L, logDate = "2026-06-24", meal = "BREAKFAST", grams = 100,
+                barcode = "111", name = "Oats", brand = null, imageUrl = null,
+                categories = emptyList(), kcal100g = 100f, protein100g = 5f,
+                carbs100g = 10f, fat100g = 2f,
+            )
+        )
+    ),
+    hydrationLiters = 0f,
+    weightCheckIn = null,
+)
+
+private fun emptyDay() = DayResponseDto(emptyMap(), 0f, null)
+
 private fun pagedDto(barcode: String) = FoodItemDto(
     barcode = barcode, name = "Food $barcode", kcal100g = 100f,
     protein100g = 5f, carbs100g = 10f, fat100g = 2f,
@@ -221,6 +260,62 @@ class FoodViewModelTest {
         assertEquals(1, foods.size)                     // still one item, in place
         assertEquals(175, foods[0].grams)               // grams updated
         assertEquals(42L to 175, fakeLogs.lastUpdate)   // PATCH sent id + new grams
+        job.cancel()
+    }
+
+    @Test
+    fun resetUserState_clearsProfileAndLoggedMeals() = runTest(testDispatcher) {
+        val store = PreferenceDataStoreFactory.create(
+            produceFile = { File(tempFolder.newFolder("trackerReset"), "meal_log_tracker.preferences_pb") }
+        )
+        val vm = FoodViewModel(
+            settingsRepository = FakeSettingsRepository(),
+            mealLogTracker = MealLogTracker(store),
+            foodRepository = FoodRepository(NoOpFoodApi, NoOpCache),
+            logsApi = SwitchableLogsApi(dayWithOneBreakfast()),
+        )
+        var foods: List<LoggedFood> = emptyList()
+        val job = launch { vm.getFoodsFlow("Breakfast").collect { foods = it } }
+        vm.updateUserProfile(UserProfile(name = "Ana", age = 25))
+        advanceUntilIdle()   // init loadDay(today) → account A's one breakfast item
+        assertEquals(1, foods.size)
+        assertEquals("Ana", vm.userProfile.value.name)
+
+        vm.resetUserState()
+        advanceUntilIdle()
+
+        assertEquals(0, foods.size)                 // logged meals cleared
+        assertEquals(UserProfile(), vm.userProfile.value)   // profile cleared
+        job.cancel()
+    }
+
+    @Test
+    fun resetUserState_clearsLoadedDates_soNextLoadRefetches() = runTest(testDispatcher) {
+        // Regression: account A's logged day must not leak into account B after logout.
+        val logs = SwitchableLogsApi(dayWithOneBreakfast())
+        val store = PreferenceDataStoreFactory.create(
+            produceFile = { File(tempFolder.newFolder("trackerReset2"), "meal_log_tracker.preferences_pb") }
+        )
+        val vm = FoodViewModel(
+            settingsRepository = FakeSettingsRepository(),
+            mealLogTracker = MealLogTracker(store),
+            foodRepository = FoodRepository(NoOpFoodApi, NoOpCache),
+            logsApi = logs,
+        )
+        var foods: List<LoggedFood> = emptyList()
+        val job = launch { vm.getFoodsFlow("Breakfast").collect { foods = it } }
+        advanceUntilIdle()   // account A logged in → one breakfast item for today
+        assertEquals(1, foods.size)
+
+        // Logout + a different account whose same day is empty.
+        vm.resetUserState()
+        logs.day = emptyDay()
+        vm.setSelectedHomeDate(java.util.Date())   // what HomeScreen does on entry
+        advanceUntilIdle()
+
+        // Without clearing _loadedDates, loadDay() short-circuits and account A's
+        // stale item stays on screen. After reset it must re-fetch → empty.
+        assertEquals(0, foods.size)
         job.cancel()
     }
 

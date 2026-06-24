@@ -263,11 +263,13 @@ class MainActivity : ComponentActivity() {
                                         authViewModel = authViewModel,
                                         onLogout = {
                                             authViewModel.logout()
+                                            viewModel.resetUserState()
                                             navController.navigate("login") {
                                                 popUpTo(0) { inclusive = true }
                                             }
                                         },
                                         onAccountDeleted = {
+                                            viewModel.resetUserState()
                                             navController.navigate("login") {
                                                 popUpTo(0) { inclusive = true }
                                             }

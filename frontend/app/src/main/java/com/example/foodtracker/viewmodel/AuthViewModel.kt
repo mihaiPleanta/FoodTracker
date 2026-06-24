@@ -292,6 +292,7 @@ class AuthViewModel : ViewModel() {
         _uiState.value = AuthUiState.NavigateLogin
         _onboardingData.value = OnboardingData()
         _onboardingStep.value = 0
+        _loadedProfile.value = null   // don't let the previous user's profile leak to the next login
     }
 
     fun resetState() { _uiState.value = AuthUiState.Idle }

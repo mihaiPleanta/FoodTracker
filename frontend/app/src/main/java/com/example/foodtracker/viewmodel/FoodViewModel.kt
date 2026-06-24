@@ -639,6 +639,31 @@ class FoodViewModel(
     fun getTotalCarbs()    = listOf("Breakfast","Lunch","Dinner","Snacks").sumOf { getMealCarbs(it).toDouble() }.toInt()
     fun getTotalFat()      = listOf("Breakfast","Lunch","Dinner","Snacks").sumOf { getMealFat(it).toDouble() }.toInt()
 
+    /**
+     * Wipes every piece of per-user state so a different account that logs in on the
+     * same process starts clean. The ViewModel is scoped to [MainActivity] and survives
+     * logout, so without this the previous user's meals, profile and the [_loadedDates]
+     * guard would leak into the next account (the day would never be re-fetched).
+     *
+     * App-level state (theme/language/notifications in [appSettings]) is intentionally
+     * left untouched — those are device preferences, not user data.
+     */
+    fun resetUserState() {
+        _searchQuery.value = ""
+        currentQuery = ""
+        currentPage = 1
+        _searchState.value = SearchUiState.Idle
+        _showMealSelector.value = false
+        _userProfile.value = UserProfile()
+        _nutritionGoals.value = null
+        _loadedDates.clear()
+        _loadingDay.value = false
+        _selectedHomeDate.value = Date()
+        _foodsByDate.value = emptyMap()
+        _hydrationByDate.value = emptyMap()
+        _weightHistory.value = emptyList()
+    }
+
     init {
         viewModelScope.launch { loadDay(Date()) }
         loadGoals()
