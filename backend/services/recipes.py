@@ -201,6 +201,24 @@ _MEAL_KCAL_RATIO = {
 }
 
 
+def _meal_kcal_budget(goals, meal_type: str) -> int:
+    """Calorie budget for one meal = a fixed fraction of the user's daily goal."""
+    return round(goals.calorie_goal * _MEAL_KCAL_RATIO.get(meal_type, 0.25))
+
+
+def _scale_to_budget(ingredients, budget_kcal: int) -> None:
+    """Shrink ingredient grams in place so the whole recipe is a single serving that
+    fits the meal budget. Small models list multi-portion quantities but still say
+    "1 serving", so an unscaled recipe reads as one enormous portion. Only scales
+    DOWN — a dish already within budget is left untouched; each gram stays >= 1."""
+    total_kcal = sum(i.kcal_100g * i.grams / 100 for i in ingredients)
+    if total_kcal <= budget_kcal or total_kcal <= 0:
+        return
+    factor = budget_kcal / total_kcal
+    for ing in ingredients:
+        ing.grams = max(1.0, round(ing.grams * factor)) if ing.grams >= 1 else ing.grams
+
+
 def build_recipe_prompt(anchor, meal_type, goals, language: str = "ro") -> list[dict]:
     """Build the chat prompt around a single anchor food. Showing the model only
     ONE of the user's frequent foods (instead of the whole list) is what keeps
@@ -211,7 +229,7 @@ def build_recipe_prompt(anchor, meal_type, goals, language: str = "ro") -> list[
     `language` ("ro"/"en") follows the in-app language so the generated recipe text
     matches the rest of the UI."""
     anchor_line = anchor.name + (f" ({anchor.brand})" if anchor.brand else "")
-    meal_kcal = round(goals.calorie_goal * _MEAL_KCAL_RATIO.get(meal_type, 0.25))
+    meal_kcal = _meal_kcal_budget(goals, meal_type)
     if language == "en":
         meal_label = _MEAL_LABELS_EN.get(meal_type, "meal")
         system_prompt = _SYSTEM_PROMPT_EN
@@ -285,6 +303,11 @@ async def generate_recipe(
         try:
             data = json.loads(content)
             recipe = RecipeDto.model_validate(data)
+            # Make the recipe a single serving that fits the meal budget, then derive
+            # the macros from the (possibly scaled) ingredients — the model's own
+            # per-serving numbers are unreliable on small models.
+            _scale_to_budget(recipe.ingredients, _meal_kcal_budget(goals, meal_type))
+            recipe.servings = 1
             kcal, p, c, f = _recipe_totals(recipe.ingredients)
             recipe.kcal_per_serving, recipe.protein_g, recipe.carbs_g, recipe.fat_g = kcal, p, c, f
             recipe.anchor = anchor.name

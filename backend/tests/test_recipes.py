@@ -405,6 +405,45 @@ async def test_generate_recipe_sets_anchor_and_recomputed_totals():
     assert recipe.anchor in ("Pui", "Orez", "Mar")
 
 
+async def test_generate_recipe_scales_oversized_recipe_to_meal_budget():
+    # A dish whose ingredients blow past the lunch budget must be scaled down so the
+    # whole recipe is a single serving that fits the budget (user chose 1-portion).
+    big = {
+        "title": "Tocană uriașă", "description": "x",
+        "ingredients": [
+            {"name": "Cartofi", "grams": 1000, "kcal_100g": 100, "protein_100g": 2, "carbs_100g": 20, "fat_100g": 0},
+            {"name": "Brânză", "grams": 200, "kcal_100g": 300, "protein_100g": 20, "carbs_100g": 2, "fat_100g": 24},
+        ],
+        "steps": ["fa"], "servings": 1, "kcal_per_serving": 0,
+        "protein_g": 0, "carbs_g": 0, "fat_g": 0,
+    }
+    fake = _FakeOllama(content=json.dumps(big))
+    async with SessionLocal() as db:
+        db.add(_seed())
+        db.add_all([_log("Pui", 100), _log("Orez", 100), _log("Mar", 100)])
+        await db.commit()
+        recipe = await generate_recipe(db, "u1", "LUNCH", fake)
+
+    # The whole recipe (originally 1600 kcal) is one serving near the ~802 kcal lunch budget.
+    assert recipe.servings == 1
+    assert recipe.kcal_per_serving <= 810
+    assert recipe.kcal_per_serving >= 750
+    assert recipe.ingredients[0].grams < 1000   # potatoes scaled down
+
+
+async def test_generate_recipe_leaves_within_budget_recipe_unscaled():
+    # _RECIPE_JSON totals 320 kcal, well under the lunch budget → no scaling, servings 1.
+    fake = _FakeOllama(content=json.dumps(_RECIPE_JSON))
+    async with SessionLocal() as db:
+        db.add(_seed())
+        db.add_all([_log("Pui", 100), _log("Orez", 100), _log("Mar", 100)])
+        await db.commit()
+        recipe = await generate_recipe(db, "u1", "LUNCH", fake)
+    assert recipe.servings == 1
+    assert recipe.kcal_per_serving == 320
+    assert recipe.ingredients[0].grams == 100   # unchanged
+
+
 async def test_generate_keeps_anchor_when_it_is_the_only_option():
     fake = _FakeOllama(content=json.dumps(_RECIPE_JSON))
     async with SessionLocal() as db:
