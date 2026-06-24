@@ -107,6 +107,10 @@ fun MealsScreen(
     val savedForMeal = saved.filter { it.mealType == selectedMeal }
     var openedRecipe by remember { mutableStateOf<SavedRecipeDto?>(null) }
 
+    // The ViewModel is Activity-scoped (survives logout), so refresh the saved list
+    // for the *current* account every time the screen opens.
+    LaunchedEffect(Unit) { viewModel.loadSaved() }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()

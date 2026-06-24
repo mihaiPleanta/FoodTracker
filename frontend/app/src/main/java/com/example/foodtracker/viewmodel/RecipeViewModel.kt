@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.foodtracker.R
+import com.example.foodtracker.api.RecipeApi
 import com.example.foodtracker.api.RetrofitInstance
 import com.example.foodtracker.model.RecipeDto
 import com.example.foodtracker.model.RecipeGenerateRequest
@@ -26,9 +27,9 @@ sealed interface RecipeUiState {
     data class Error(@StringRes val messageRes: Int, val arg: Int? = null) : RecipeUiState
 }
 
-class RecipeViewModel : ViewModel() {
-
-    private val api = RetrofitInstance.recipeApi
+class RecipeViewModel(
+    private val api: RecipeApi = RetrofitInstance.recipeApi,
+) : ViewModel() {
 
     // Generated recipe is kept per meal type, so switching meals preserves each
     // meal's last result instead of discarding it.
@@ -113,5 +114,18 @@ class RecipeViewModel : ViewModel() {
                 // leave existing list; saved recipes are non-critical on load
             }
         }
+    }
+
+    /**
+     * Wipes per-user recipe state on logout. This ViewModel outlives a logout (its
+     * back-stack entry is retained by the bottom bar's saveState/restoreState), so
+     * without this the previous account's saved recipes and generated cards would
+     * leak into the next account. The new account's list is re-fetched by
+     * [MealsScreen] when it next opens (it calls [loadSaved] on entry).
+     */
+    fun resetUserState() {
+        _savedRecipes.value = emptyList()
+        _recipeStates.value = emptyMap()
+        _selectedMealType.value = "BREAKFAST"
     }
 }

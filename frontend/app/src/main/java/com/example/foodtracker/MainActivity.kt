@@ -39,6 +39,7 @@ import com.example.foodtracker.util.AppLocale
 import com.example.foodtracker.viewmodel.AuthViewModel
 import com.example.foodtracker.viewmodel.FoodViewModel
 import com.example.foodtracker.viewmodel.FoodViewModelFactory
+import com.example.foodtracker.viewmodel.RecipeViewModel
 import java.net.URLDecoder
 import java.net.URLEncoder
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -71,6 +72,9 @@ class MainActivity : ComponentActivity() {
             }
             val viewModel: FoodViewModel = viewModel(factory = foodViewModelFactory)
             val authViewModel: AuthViewModel = viewModel()
+            // Activity-scoped so logout can reset it (see resetUserState); otherwise the
+            // bottom bar's saveState/restoreState keeps the previous account's recipes.
+            val recipeViewModel: RecipeViewModel = viewModel()
             val appSettings by viewModel.appSettings.collectAsState()
             // enableEdgeToEdge()'s auto() follows the *system* dark mode; keep the
             // status/nav bar icon contrast in sync with the in-app theme toggle.
@@ -251,7 +255,7 @@ class MainActivity : ComponentActivity() {
                                     StatsScreen(viewModel)
                                 }
                                 composable("meals") {
-                                    MealsScreen(foodViewModel = viewModel)
+                                    MealsScreen(foodViewModel = viewModel, viewModel = recipeViewModel)
                                 }
                                 composable("profile") {
                                     ProfileScreen(viewModel, authViewModel)
@@ -264,12 +268,14 @@ class MainActivity : ComponentActivity() {
                                         onLogout = {
                                             authViewModel.logout()
                                             viewModel.resetUserState()
+                                            recipeViewModel.resetUserState()
                                             navController.navigate("login") {
                                                 popUpTo(0) { inclusive = true }
                                             }
                                         },
                                         onAccountDeleted = {
                                             viewModel.resetUserState()
+                                            recipeViewModel.resetUserState()
                                             navController.navigate("login") {
                                                 popUpTo(0) { inclusive = true }
                                             }
