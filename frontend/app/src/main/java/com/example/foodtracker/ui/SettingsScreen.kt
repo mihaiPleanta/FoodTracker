@@ -72,7 +72,9 @@ fun SettingsScreen(
     Box(Modifier.fillMaxSize().background(GlassColors.backgroundDark)) {
         Column(
             Modifier
+                .widthIn(max = ContentMaxWidth)
                 .fillMaxSize()
+                .align(Alignment.TopCenter)
                 .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
         ) {

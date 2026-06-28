@@ -111,10 +111,16 @@ fun MealsScreen(
     // for the *current* account every time the screen opens.
     LaunchedEffect(Unit) { viewModel.loadSaved() }
 
-    LazyColumn(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(GlassColors.backgroundDark)
+            .background(GlassColors.backgroundDark),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+    LazyColumn(
+        modifier = Modifier
+            .widthIn(max = ContentMaxWidth)
+            .fillMaxSize()
             .padding(horizontal = 20.dp),
         contentPadding = PaddingValues(top = 24.dp, bottom = 120.dp),
     ) {
@@ -266,6 +272,7 @@ fun MealsScreen(
             )
             Spacer(Modifier.height(10.dp))
         }
+    }
     }
 
     openedRecipe?.let { opened ->

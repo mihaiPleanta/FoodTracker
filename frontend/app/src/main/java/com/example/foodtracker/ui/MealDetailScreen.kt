@@ -110,7 +110,13 @@ fun MealDetailScreen(
     val totalFat      = loggedFoods.sumOf { it.fat.toDouble() }.toFloat()
 
     Box(Modifier.fillMaxSize().background(GlassColors.backgroundDark)) {
-        Column(Modifier.fillMaxSize().statusBarsPadding()) {
+        Column(
+            Modifier
+                .widthIn(max = ContentMaxWidth)
+                .fillMaxSize()
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+        ) {
             MealDetailHeader(
                 mealName    = mealName,
                 mealIcon    = mealIcon,

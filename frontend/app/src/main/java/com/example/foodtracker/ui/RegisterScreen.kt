@@ -56,7 +56,9 @@ fun RegisterScreen(
     Box(Modifier.fillMaxSize().background(GlassColors.backgroundDark)) {
         Column(
             Modifier
-                .fillMaxSize()
+                .align(Alignment.Center)
+                .widthIn(max = ContentMaxWidth)
+                .fillMaxWidth()
                 .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 28.dp),

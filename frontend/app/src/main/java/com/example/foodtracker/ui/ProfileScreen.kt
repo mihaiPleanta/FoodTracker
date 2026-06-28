@@ -106,7 +106,9 @@ fun ProfileScreen(viewModel: FoodViewModel, authViewModel: AuthViewModel) {
         ) {
             Column(
                 Modifier
+                    .widthIn(max = ContentMaxWidth)
                     .fillMaxSize()
+                    .align(Alignment.TopCenter)
                     .statusBarsPadding()
                     .verticalScroll(rememberScrollState())
             ) {

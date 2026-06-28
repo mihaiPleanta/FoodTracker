@@ -48,7 +48,9 @@ fun OnboardingScreen(
     Box(Modifier.fillMaxSize().background(GlassColors.backgroundDark)) {
         Column(
             Modifier
+                .widthIn(max = ContentMaxWidth)
                 .fillMaxSize()
+                .align(Alignment.TopCenter)
                 .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp)

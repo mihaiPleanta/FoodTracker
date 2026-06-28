@@ -85,6 +85,7 @@ fun AppBottomBar(
         // ── Bar pill ──────────────────────────────────────────────────────────
         Row(
             modifier = Modifier
+                .widthIn(max = ContentMaxWidth)
                 .fillMaxWidth()
                 .height(64.dp)
                 .clip(RoundedCornerShape(32.dp))

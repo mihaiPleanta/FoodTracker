@@ -49,7 +49,11 @@ fun VerifyEmailScreen(
 
     Box(Modifier.fillMaxSize().background(GlassColors.backgroundDark)) {
         Column(
-            Modifier.fillMaxSize().statusBarsPadding()
+            Modifier
+                .align(Alignment.Center)
+                .widthIn(max = ContentMaxWidth)
+                .fillMaxWidth()
+                .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally
