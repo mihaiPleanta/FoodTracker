@@ -72,6 +72,7 @@ fun AddFoodSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
+        sheetMaxWidth = ContentMaxWidth,
         containerColor = GlassColors.cardBackgroundAlt,
         dragHandle = null,
     ) {

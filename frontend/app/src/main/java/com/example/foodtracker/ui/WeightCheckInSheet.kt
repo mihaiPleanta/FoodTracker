@@ -48,7 +48,11 @@ fun WeightCheckInSheet(
         }
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        sheetMaxWidth = ContentMaxWidth,
+    ) {
       AppLocale(LocalAppLanguage.current) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(24.dp),

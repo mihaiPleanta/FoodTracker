@@ -301,8 +301,10 @@ private fun SavedRecipeDialog(
     val recipe = item.recipe
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
       AppLocale(LocalAppLanguage.current) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             modifier = Modifier
+                .widthIn(max = ContentMaxWidth)
                 .fillMaxWidth()
                 .padding(20.dp)
                 .clip(RoundedCornerShape(20.dp))
@@ -359,6 +361,7 @@ private fun SavedRecipeDialog(
                     .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center,
             ) { Text(stringResource(R.string.meals_close), fontWeight = FontWeight.Bold, color = GlassColors.textPrimary, fontSize = 14.sp) }
+        }
         }
       }
     }
