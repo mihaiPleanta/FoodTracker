@@ -324,6 +324,7 @@ fun MealSelectorOverlay(
     ) {
         Column(
             modifier = Modifier
+                .widthIn(max = ContentMaxWidth)
                 .fillMaxWidth()
                 .graphicsLayer { translationY = sheetTranslation }
                 .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
