@@ -22,6 +22,12 @@ import java.util.Locale
  */
 val LocalAppLanguage = compositionLocalOf { AppLanguage.ROMANIAN }
 
+/** [java.util.Locale] corespunzător limbii din aplicație — pentru formatarea datelor/numerelor. */
+fun AppLanguage.toLocale(): Locale = when (this) {
+    AppLanguage.ROMANIAN -> Locale("ro")
+    AppLanguage.ENGLISH -> Locale.ENGLISH
+}
+
 /**
  * Overrides the Compose locale so stringResource() resolves to the in-app
  * language choice without recreating the Activity. Base resources are Romanian;

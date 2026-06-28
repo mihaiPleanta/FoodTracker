@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.sp
 import com.example.foodtracker.model.NutritionGoals
 import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.ui.theme.glassCard
+import com.example.foodtracker.util.LocalAppLanguage
+import com.example.foodtracker.util.toLocale
 import com.example.foodtracker.viewmodel.FoodViewModel
 import com.example.foodtracker.viewmodel.WeightCheckIn
 import java.text.SimpleDateFormat
@@ -100,8 +102,9 @@ fun StatsScreen(
         )
     }
 
-    val dateLabel = remember(selectedDate) {
-        SimpleDateFormat("EEEE, d MMM yyyy", Locale.ENGLISH).format(selectedDate)
+    val appLocale = LocalAppLanguage.current.toLocale()
+    val dateLabel = remember(selectedDate, appLocale) {
+        SimpleDateFormat("EEEE, d MMM yyyy", appLocale).format(selectedDate)
     }
 
     Box(

@@ -45,6 +45,8 @@ import com.example.foodtracker.ui.theme.FoodTrackerTheme
 import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.ui.theme.accentCard
 import com.example.foodtracker.ui.theme.glassCard
+import com.example.foodtracker.util.LocalAppLanguage
+import com.example.foodtracker.util.toLocale
 import com.example.foodtracker.viewmodel.FoodViewModel
 import com.example.foodtracker.viewmodel.WeightCheckIn
 import java.net.URLEncoder
@@ -90,7 +92,8 @@ private fun goalsModeRes(mode: GoalsMode): Int = when (mode) {
 
 @Composable
 fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
-    val calendarDays = remember { generateCalendarDays() }
+    val appLocale = LocalAppLanguage.current.toLocale()
+    val calendarDays = remember(appLocale) { generateCalendarDays(appLocale) }
     val todayIndex = calendarDays.indexOfFirst { it.isToday }
     val selectedDate by viewModel.selectedHomeDate.collectAsState()
 
@@ -117,13 +120,13 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
     }
 
     val todayLabel = stringResource(R.string.home_today)
-    val headerTitle = remember(selectedDate, todayLabel) {
+    val headerTitle = remember(selectedDate, todayLabel, appLocale) {
         val cal = Calendar.getInstance().apply { time = selectedDate }
         if (isSameDay(cal, Calendar.getInstance())) todayLabel
-        else SimpleDateFormat("EEEE", Locale.ENGLISH).format(selectedDate)
+        else SimpleDateFormat("EEEE", appLocale).format(selectedDate)
     }
-    val headerSubtitle = remember(selectedDate) {
-        SimpleDateFormat("d MMMM yyyy", Locale.ENGLISH).format(selectedDate)
+    val headerSubtitle = remember(selectedDate, appLocale) {
+        SimpleDateFormat("d MMMM yyyy", appLocale).format(selectedDate)
     }
 
     val goals = viewModel.nutritionGoals.collectAsState().value ?: NutritionGoals()
@@ -879,12 +882,12 @@ fun WeightMiniWidget(
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
-fun generateCalendarDays(): List<CalendarDay> {
+fun generateCalendarDays(locale: Locale): List<CalendarDay> {
     val days = mutableListOf<CalendarDay>()
     val cal  = Calendar.getInstance()
     val today = Calendar.getInstance()
     cal.add(Calendar.DAY_OF_YEAR, -3)
-    val fmt = SimpleDateFormat("EEE", Locale.ENGLISH)
+    val fmt = SimpleDateFormat("EEE", locale)
     repeat(14) {
         val date = cal.time
         days.add(CalendarDay(date, cal.get(Calendar.DAY_OF_MONTH),
