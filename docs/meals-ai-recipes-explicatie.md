@@ -35,8 +35,8 @@ Noi îi cerem: *„uite ce mănâncă userul, scrie-i o rețetă"* → el răspu
 
 ### Problema: nu vrem să depindem de un serviciu plătit din cloud
 ChatGPT (OpenAI) este un serviciu online: trimiți datele pe internet, plătești per cerere,
-ai nevoie de cont/API key, iar datele utilizatorului ies din aplicație. Pentru o lucrare
-de licență asta e incomod (cost, confidențialitate, dependență de internet).
+ai nevoie de cont/API key, iar datele utilizatorului ies din aplicație. Pentru acest
+proiect asta e incomod (cost, confidențialitate, dependență de internet).
 
 ### Soluția: Ollama
 **Ollama** este un program care îți permite să rulezi modele AI **local, pe propriul
@@ -247,12 +247,12 @@ are un mesaj clar:
 | AI a dat JSON stricat (după 3 retry) | 502 | „Răspuns AI invalid, încearcă din nou" |
 | Fără internet la telefon | — | „Verifică conexiunea la internet" |
 
-Asta e important de menționat la prezentare: **degradare grațioasă** = aplicația rămâne
+Asta e important: **degradare grațioasă** = aplicația rămâne
 utilizabilă și explică problema, în loc să arate un ecran alb.
 
 ---
 
-## 7. De ce e relevant pentru lucrare (puncte de discuție)
+## 7. Decizii de design relevante
 
 - **AI local vs. cloud:** alegerea Ollama în loc de OpenAI arată conștientizarea
   costurilor, a confidențialității datelor și a independenței de servicii plătite.

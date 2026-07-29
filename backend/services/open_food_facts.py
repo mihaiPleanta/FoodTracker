@@ -7,7 +7,7 @@ import httpx
 from schemas import FoodItemDto
 from services.text_match import relevance
 
-USER_AGENT = "FoodTracker-Licenta/0.1 (mihaipleanta@gmail.com)"
+USER_AGENT = "FoodTracker/1.0 (mihaipleanta@gmail.com)"
 SEARCH_URL = "https://world.openfoodfacts.org/cgi/search.pl"
 PRODUCT_URL = "https://world.openfoodfacts.org/api/v2/product/{barcode}"
 FIELDS = "code,product_name,product_name_ro,brands,image_small_url,categories_tags,nutriments"
