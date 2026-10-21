@@ -166,6 +166,13 @@
     <string name="meal_detail_no_results">Niciun produs găsit</string>
     <string name="meal_detail_total">Total</string>
     <string name="meal_detail_save_meal">Salvează masa</string>
+    <string name="quick_tab_recent">Recente</string>
+    <string name="quick_tab_favorites">Favorite</string>
+    <string name="quick_recent_last_grams">ultima dată: %1$d g</string>
+    <string name="quick_recent_empty">Nu ai încă alimente recente. Caută un aliment mai sus.</string>
+    <string name="quick_favorites_empty">Niciun favorit încă. Ține apăsat pe un aliment sau apasă ☆ când îl adaugi.</string>
+    <string name="favorite_add">Adaugă la favorite</string>
+    <string name="favorite_remove">Scoate din favorite</string>
 
     <!-- Add food sheet -->
     <string name="add_food_quantity">CANTITATE</string>

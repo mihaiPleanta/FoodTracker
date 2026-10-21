@@ -39,6 +39,7 @@ import com.example.foodtracker.util.AppLocale
 import com.example.foodtracker.viewmodel.AuthViewModel
 import com.example.foodtracker.viewmodel.FoodViewModel
 import com.example.foodtracker.viewmodel.FoodViewModelFactory
+import com.example.foodtracker.viewmodel.QuickPicksViewModel
 import com.example.foodtracker.viewmodel.RecipeViewModel
 import java.net.URLDecoder
 import java.net.URLEncoder
@@ -75,6 +76,8 @@ class MainActivity : ComponentActivity() {
             // Activity-scoped so logout can reset it (see resetUserState); otherwise the
             // bottom bar's saveState/restoreState keeps the previous account's recipes.
             val recipeViewModel: RecipeViewModel = viewModel()
+            // Activity-scoped like recipeViewModel; reset on logout so lists never leak between accounts.
+            val quickPicksViewModel: QuickPicksViewModel = viewModel()
             val appSettings by viewModel.appSettings.collectAsState()
             // enableEdgeToEdge()'s auto() follows the *system* dark mode; keep the
             // status/nav bar icon contrast in sync with the in-app theme toggle.
@@ -269,6 +272,7 @@ class MainActivity : ComponentActivity() {
                                             authViewModel.logout()
                                             viewModel.resetUserState()
                                             recipeViewModel.resetUserState()
+                                            quickPicksViewModel.resetUserState()
                                             navController.navigate("login") {
                                                 popUpTo(0) { inclusive = true }
                                             }
@@ -276,6 +280,7 @@ class MainActivity : ComponentActivity() {
                                         onAccountDeleted = {
                                             viewModel.resetUserState()
                                             recipeViewModel.resetUserState()
+                                            quickPicksViewModel.resetUserState()
                                             navController.navigate("login") {
                                                 popUpTo(0) { inclusive = true }
                                             }
@@ -292,7 +297,8 @@ class MainActivity : ComponentActivity() {
                                         mealIcon      = mealIcon,
                                         accentColor   = accentColor,
                                         navController = navController,
-                                        viewModel     = viewModel
+                                        viewModel     = viewModel,
+                                        quickPicks    = quickPicksViewModel,
                                     )
                                 }
                             }

@@ -16,7 +16,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -56,8 +61,10 @@ fun AddFoodSheet(
     onDismiss: () -> Unit,
     onConfirm: (FoodItem, Int) -> Unit,
     initialGrams: Int = 100,
+    isFavorite: Boolean? = null,          // null => no star (edit flows)
+    onToggleFavorite: () -> Unit = {},
 ) {
-    var grams by rememberSaveable(target.barcode) { mutableStateOf(initialGrams.toString()) }
+    var grams by rememberSaveable(target.barcode, initialGrams) { mutableStateOf(initialGrams.toString()) }
     val gramsInt = parseGrams(grams)
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -86,7 +93,12 @@ fun AddFoodSheet(
         ) {
             AddFoodSheetGrabber()
             Spacer(Modifier.height(8.dp))
-            AddFoodSheetHeader(food = target)
+            AddFoodSheetHeader(
+                food = target,
+                isFavorite = isFavorite,
+                onToggleFavorite = onToggleFavorite,
+                accentColor = accentColor,
+            )
             Spacer(Modifier.height(18.dp))
             AddFoodSheetGramsField(
                 grams = grams,
@@ -141,7 +153,12 @@ private fun AddFoodSheetGrabber() {
 }
 
 @Composable
-private fun AddFoodSheetHeader(food: FoodItem) {
+private fun AddFoodSheetHeader(
+    food: FoodItem,
+    isFavorite: Boolean?,
+    onToggleFavorite: () -> Unit,
+    accentColor: Color,
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         ProductThumbnail(food = food, size = 44.dp)
         Spacer(Modifier.width(12.dp))
@@ -160,6 +177,17 @@ private fun AddFoodSheetHeader(food: FoodItem) {
                 color = GlassColors.textTertiary,
                 maxLines = 1,
             )
+        }
+        if (isFavorite != null) {
+            IconButton(onClick = onToggleFavorite) {
+                Icon(
+                    imageVector = if (isFavorite) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                    contentDescription = stringResource(
+                        if (isFavorite) R.string.favorite_remove else R.string.favorite_add
+                    ),
+                    tint = if (isFavorite) accentColor else GlassColors.textTertiary,
+                )
+            }
         }
     }
 }

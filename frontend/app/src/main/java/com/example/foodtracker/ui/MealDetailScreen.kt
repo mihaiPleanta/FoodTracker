@@ -6,7 +6,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -26,7 +28,11 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -61,6 +67,7 @@ import com.example.foodtracker.util.CategoryEmojiMapper
 import com.example.foodtracker.util.findActivity
 import com.example.foodtracker.util.scaleNutrition
 import com.example.foodtracker.viewmodel.FoodViewModel
+import com.example.foodtracker.viewmodel.QuickPicksViewModel
 import kotlinx.coroutines.launch
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -71,10 +78,16 @@ fun MealDetailScreen(
     mealIcon: String,
     accentColor: Color,
     navController: NavController,
-    viewModel: FoodViewModel
+    viewModel: FoodViewModel,
+    quickPicks: QuickPicksViewModel,
 ) {
     val loggedFoods by viewModel.getFoodsFlow(mealName).collectAsState()
     val searchState by viewModel.searchState.collectAsState()
+    val recent by quickPicks.recent.collectAsState()
+    val favorites by quickPicks.favorites.collectAsState()
+    val favoriteBarcodes by quickPicks.favoriteBarcodes.collectAsState()
+
+    LaunchedEffect(mealName) { quickPicks.load(mealName) }
 
     val goBackToHome = {
         navController.navigate("home") {
@@ -92,9 +105,12 @@ fun MealDetailScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    var sheetTarget by remember { mutableStateOf<FoodItem?>(null) }
+    var sheetTarget by remember { mutableStateOf<Pair<FoodItem, Int>?>(null) }
     var editTarget by remember { mutableStateOf<Pair<Int, LoggedFood>?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(Unit) {
+        quickPicks.toastEvents.collect { res -> snackbarHostState.showSnackbar(context.getString(res)) }
+    }
 
     LaunchedEffect(searchQuery) {
         viewModel.searchFoods(searchQuery)
@@ -157,14 +173,31 @@ fun MealDetailScreen(
                 )
             }
 
+            val showQuickPicks = searchActive && searchQuery.isBlank() &&
+                searchState is FoodViewModel.SearchUiState.Idle
+            // Re-fetch recents each time the panel reappears, so a food just added shows up.
+            LaunchedEffect(showQuickPicks) { if (showQuickPicks) quickPicks.refreshRecent() }
+
             Box(Modifier.weight(1f)) {
-                if (searchActive && (searchQuery.isNotBlank() || searchState !is FoodViewModel.SearchUiState.Idle)) {
+                if (showQuickPicks) {
+                    QuickPicksView(
+                        recent = recent,
+                        favorites = favorites,
+                        favoriteBarcodes = favoriteBarcodes,
+                        accentColor = accentColor,
+                        onPick = { food, grams -> sheetTarget = food to grams },
+                        onToggleFavorite = { quickPicks.toggleFavorite(it) },
+                        onRetry = { quickPicks.load(mealName) },
+                    )
+                } else if (searchActive && (searchQuery.isNotBlank() || searchState !is FoodViewModel.SearchUiState.Idle)) {
                     SearchResultsView(
                         state       = searchState,
                         accentColor = accentColor,
-                        onAdd       = { food -> sheetTarget = food },
+                        onAdd       = { food -> sheetTarget = food to 100 },
                         onRetry     = { viewModel.searchFoods(searchQuery) },
                         onLoadMore  = { viewModel.loadMore() },
+                        favoriteBarcodes = favoriteBarcodes,
+                        onToggleFavorite = { quickPicks.toggleFavorite(it) },
                     )
                 } else {
                     LoggedFoodsList(
@@ -192,9 +225,12 @@ fun MealDetailScreen(
                 .navigationBarsPadding(),
         )
 
-        sheetTarget?.let { food ->
+        sheetTarget?.let { (food, initialGrams) ->
             AddFoodSheet(
                 target = food,
+                initialGrams = initialGrams,
+                isFavorite = food.barcode in favoriteBarcodes,
+                onToggleFavorite = { quickPicks.toggleFavorite(food) },
                 accentColor = accentColor,
                 confirmLabel = stringResource(R.string.meal_detail_add_to, mealName),
                 onDismiss = { sheetTarget = null },
@@ -583,6 +619,8 @@ fun SearchResultsView(
     onAdd: (FoodItem) -> Unit,
     onRetry: () -> Unit,
     onLoadMore: () -> Unit,
+    favoriteBarcodes: Set<String> = emptySet(),
+    onToggleFavorite: ((FoodItem) -> Unit)? = null,
 ) {
     when (state) {
         FoodViewModel.SearchUiState.Idle -> {
@@ -661,7 +699,12 @@ fun SearchResultsView(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     itemsIndexed(state.items, key = { _, item -> item.barcode.ifEmpty { item.name } }) { _, food ->
-                        SearchResultRow(food = food, onAdd = { onAdd(food) })
+                        SearchResultRow(
+                            food = food,
+                            onAdd = { onAdd(food) },
+                            isFavorite = food.barcode in favoriteBarcodes,
+                            onToggleFavorite = onToggleFavorite?.let { { it(food) } },
+                        )
                     }
                     if (state.loadingMore) {
                         item {
@@ -684,8 +727,16 @@ fun SearchResultsView(
 
 // ── Search result row ─────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun SearchResultRow(food: FoodItem, onAdd: () -> Unit) {
+fun SearchResultRow(
+    food: FoodItem,
+    onAdd: () -> Unit,
+    subtitleExtra: String? = null,
+    isFavorite: Boolean = false,
+    onToggleFavorite: (() -> Unit)? = null,
+) {
+    var menuOpen by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -694,54 +745,74 @@ fun SearchResultRow(food: FoodItem, onAdd: () -> Unit) {
         label = "rowScale",
     )
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .scale(scale)
-            .clip(RoundedCornerShape(14.dp))
-            .background(GlassColors.cardBackground)
-            .border(1.dp, GlassColors.cardBorder, RoundedCornerShape(14.dp))
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        ProductThumbnail(food = food, size = 36.dp)
-        Spacer(Modifier.width(12.dp))
-
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = food.name,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = GlassColors.textPrimary,
-                maxLines = 1,
-            )
-            val subtitlePrefix = if (food.brand.isNullOrBlank()) "" else "${food.brand} · "
-            Text(
-                text = "${subtitlePrefix}per 100g · ${food.per100g} kcal · P${food.protein100g.toInt()} C${food.carbs100g.toInt()} F${food.fat100g.toInt()}",
-                fontSize = 11.sp,
-                color = GlassColors.textTertiary,
-                maxLines = 1,
-            )
-        }
-
-        Spacer(Modifier.width(10.dp))
-
-        Box(
+    Box {
+        Row(
             modifier = Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.linearGradient(listOf(GlassColors.accentGreen, GlassColors.accentGreenDim))
+                .fillMaxWidth()
+                .scale(scale)
+                .clip(RoundedCornerShape(14.dp))
+                .combinedClickable(
+                    onClick = onAdd,
+                    onLongClick = onToggleFavorite?.let { { menuOpen = true } },
                 )
-                .clickable(interactionSource = interactionSource, indication = null) { onAdd() },
-            contentAlignment = Alignment.Center,
+                .background(GlassColors.cardBackground)
+                .border(1.dp, GlassColors.cardBorder, RoundedCornerShape(14.dp))
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = stringResource(R.string.action_add),
-                tint = Color.Black,
-                modifier = Modifier.size(18.dp),
-            )
+            ProductThumbnail(food = food, size = 36.dp)
+            Spacer(Modifier.width(12.dp))
+
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = food.name,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = GlassColors.textPrimary,
+                    maxLines = 1,
+                )
+                val subtitlePrefix = if (food.brand.isNullOrBlank()) "" else "${food.brand} · "
+                Text(
+                    text = "${subtitlePrefix}per 100g · ${food.per100g} kcal · P${food.protein100g.toInt()} C${food.carbs100g.toInt()} F${food.fat100g.toInt()}",
+                    fontSize = 11.sp,
+                    color = GlassColors.textTertiary,
+                    maxLines = 1,
+                )
+                if (subtitleExtra != null) {
+                    Text(subtitleExtra, fontSize = 11.sp, color = GlassColors.textSecondary, maxLines = 1)
+                }
+            }
+
+            Spacer(Modifier.width(10.dp))
+
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.linearGradient(listOf(GlassColors.accentGreen, GlassColors.accentGreenDim))
+                    )
+                    .clickable(interactionSource = interactionSource, indication = null) { onAdd() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = stringResource(R.string.action_add),
+                    tint = Color.Black,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+        if (onToggleFavorite != null) {
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(if (isFavorite) R.string.favorite_remove else R.string.favorite_add)) },
+                    leadingIcon = {
+                        Icon(if (isFavorite) Icons.Rounded.StarBorder else Icons.Rounded.Star, contentDescription = null)
+                    },
+                    onClick = { menuOpen = false; onToggleFavorite() },
+                )
+            }
         }
     }
 }

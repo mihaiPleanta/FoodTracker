@@ -163,6 +163,13 @@
     <string name="meal_detail_no_results">No product found</string>
     <string name="meal_detail_total">Total</string>
     <string name="meal_detail_save_meal">Save meal</string>
+    <string name="quick_tab_recent">Recent</string>
+    <string name="quick_tab_favorites">Favorites</string>
+    <string name="quick_recent_last_grams">last time: %1$d g</string>
+    <string name="quick_recent_empty">No recent foods yet. Search for a food above.</string>
+    <string name="quick_favorites_empty">No favorites yet. Long-press a food or tap ☆ when adding it.</string>
+    <string name="favorite_add">Add to favorites</string>
+    <string name="favorite_remove">Remove from favorites</string>
 
     <!-- Add food sheet -->
     <string name="add_food_quantity">QUANTITY</string>
