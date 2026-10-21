@@ -250,6 +250,7 @@
     <string name="error_invalid_email">Email invalid</string>
     <string name="error_weak_password">Parola trebuie să aibă minim 6 caractere</string>
     <string name="error_generic">A apărut o eroare. Încearcă din nou.</string>
+    <string name="error_favorite_update">Nu am putut actualiza favoritele</string>
     <string name="error_profile_save">Nu s-a putut salva profilul</string>
 
     <!-- Bottom nav -->

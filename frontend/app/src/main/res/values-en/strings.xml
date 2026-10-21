@@ -247,6 +247,7 @@
     <string name="error_invalid_email">Invalid email</string>
     <string name="error_weak_password">Password must be at least 6 characters</string>
     <string name="error_generic">An error occurred. Try again.</string>
+    <string name="error_favorite_update">Couldn\'t update favorites</string>
     <string name="error_profile_save">Could not save profile</string>
 
     <!-- Bottom nav -->
