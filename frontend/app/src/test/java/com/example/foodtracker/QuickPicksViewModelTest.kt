@@ -258,4 +258,40 @@ class QuickPicksViewModelTest {
         val items = (vm.recent.value as QuickListState.Loaded).items
         assertEquals("dinner", items.single().food.barcode)
     }
+
+    @Test
+    fun recordAdded_movesFoodFirstWithGramsAndDedups() = runTest(testDispatcher) {
+        val api = FakeQuickPicksApi().apply {
+            recent = listOf(RecentFoodDto(food("a").toDto(), 100), RecentFoodDto(food("b").toDto(), 50))
+        }
+        val vm = QuickPicksViewModel(api)
+        vm.load("Breakfast")
+        advanceUntilIdle()
+        vm.recordAdded(food("b"), 230)
+        val items = (vm.recent.value as QuickListState.Loaded).items
+        assertEquals(listOf("b", "a"), items.map { it.food.barcode })
+        assertEquals(230, items.first().lastGrams)
+    }
+
+    @Test
+    fun recordAdded_whileLoading_staysLoading() = runTest(testDispatcher) {
+        val vm = QuickPicksViewModel(FakeQuickPicksApi())
+        vm.recordAdded(food("a"), 100)
+        assertEquals(QuickListState.Loading, vm.recent.value)
+    }
+
+    @Test
+    fun recordAdded_capsListAt20() = runTest(testDispatcher) {
+        val api = FakeQuickPicksApi().apply {
+            recent = (1..20).map { RecentFoodDto(food("f$it").toDto(), 100) }
+        }
+        val vm = QuickPicksViewModel(api)
+        vm.load("Breakfast")
+        advanceUntilIdle()
+        vm.recordAdded(food("new"), 10)
+        val items = (vm.recent.value as QuickListState.Loaded).items
+        assertEquals(20, items.size)
+        assertEquals("new", items.first().food.barcode)
+        assertTrue(items.none { it.food.barcode == "f20" })
+    }
 }

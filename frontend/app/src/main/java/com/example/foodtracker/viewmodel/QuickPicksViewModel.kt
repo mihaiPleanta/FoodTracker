@@ -76,6 +76,17 @@ class QuickPicksViewModel(
         recentJob = viewModelScope.launch { fetchRecent(meal) }
     }
 
+    /** Moves a just-added food to the top of Recents locally (the log POST may not have landed yet). */
+    fun recordAdded(food: FoodItem, grams: Int) {
+        if (food.ingredients != null) return
+        _recent.update { state ->
+            if (state !is QuickListState.Loaded) state
+            else QuickListState.Loaded(
+                (listOf(RecentFood(food, grams)) + state.items.filterNot { it.food.barcode == food.barcode }).take(20)
+            )
+        }
+    }
+
     fun toggleFavorite(food: FoodItem) {
         val previous = _favorites.value
         val current = (previous as? QuickListState.Loaded)?.items

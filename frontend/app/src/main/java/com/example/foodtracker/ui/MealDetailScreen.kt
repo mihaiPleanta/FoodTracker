@@ -237,6 +237,7 @@ fun MealDetailScreen(
                 onConfirm = { confirmedFood, grams ->
                     val newLogged = LoggedFood(confirmedFood, grams)
                     val newIndex = viewModel.addFoodToMealReturningIndex(mealName, newLogged)
+                    quickPicks.recordAdded(confirmedFood, grams)
                     sheetTarget = null
                     val scaled = scaleNutrition(confirmedFood, grams)
                     coroutineScope.launch {
