@@ -47,6 +47,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -102,6 +103,7 @@ fun MealDetailScreen(
 
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
+    BackHandler(enabled = searchActive) { searchQuery = ""; searchActive = false; focusManager.clearFocus() }
     val context = androidx.compose.ui.platform.LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -151,6 +153,8 @@ fun MealDetailScreen(
                     query          = searchQuery,
                     onQueryChange  = { searchQuery = it; if (!searchActive) searchActive = true },
                     onClear        = { searchQuery = ""; searchActive = false; focusManager.clearFocus() },
+                    onFocused      = { searchActive = true },
+                    showClear      = searchActive,
                     accentColor    = accentColor,
                     focusRequester = focusRequester,
                     modifier       = Modifier.weight(1f),
@@ -360,6 +364,8 @@ fun SearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
     onClear: () -> Unit,
+    onFocused: () -> Unit,
+    showClear: Boolean,
     accentColor: Color,
     focusRequester: FocusRequester,
     modifier: Modifier = Modifier
@@ -393,7 +399,8 @@ fun SearchBar(
             onValueChange = onQueryChange,
             modifier = Modifier
                 .weight(1f)
-                .focusRequester(focusRequester),
+                .focusRequester(focusRequester)
+                .onFocusChanged { if (it.isFocused) onFocused() },
             textStyle = TextStyle(
                 color     = GlassColors.textPrimary,
                 fontSize  = 15.sp,
@@ -415,7 +422,7 @@ fun SearchBar(
             }
         )
 
-        if (query.isNotEmpty()) {
+        if (showClear || query.isNotEmpty()) {
             Icon(
                 imageVector = Icons.Default.Close,
                 contentDescription = stringResource(R.string.meal_detail_clear),
