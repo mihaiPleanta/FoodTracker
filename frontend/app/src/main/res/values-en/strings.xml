@@ -96,7 +96,6 @@
 
     <!-- Home -->
     <string name="home_today">Today</string>
-    <string name="home_see_all">See all</string>
     <string name="home_recommended">Recommended: %1$s kcal</string>
     <string name="home_tap_to_add">Tap + to add food</string>
     <string name="home_meals">Meals</string>

@@ -99,7 +99,6 @@
 
     <!-- Home -->
     <string name="home_today">Astăzi</string>
-    <string name="home_see_all">Vezi tot</string>
     <string name="home_recommended">Recomandat: %1$s kcal</string>
     <string name="home_tap_to_add">Apasă + pentru a adăuga</string>
     <string name="home_meals">Mese</string>

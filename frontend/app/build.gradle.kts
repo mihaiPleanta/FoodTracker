@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,6 +7,12 @@ plugins {
     id("com.google.gms.google-services")
     alias(libs.plugins.ksp)
 }
+
+// URL-ul backend-ului: implicit emulatorul (10.0.2.2 = localhost-ul gazdei). Pentru un
+// dispozitiv fizic, pune `backend.url=http://<IP-LAN>:8000/` în local.properties (gitignored).
+val backendUrl: String = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+}.getProperty("backend.url", "http://10.0.2.2:8000/")
 
 android {
     namespace = "com.example.foodtracker"
@@ -18,6 +26,8 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "BASE_URL", "\"$backendUrl\"")
     }
 
     buildTypes {
@@ -43,6 +53,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {

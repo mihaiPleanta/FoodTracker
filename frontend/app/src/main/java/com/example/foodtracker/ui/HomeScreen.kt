@@ -254,15 +254,8 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
 
             Spacer(Modifier.height(28.dp))
 
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-                Arrangement.SpaceBetween, Alignment.CenterVertically
-            ) {
-                Text(stringResource(R.string.home_meals), fontSize = 18.sp, fontWeight = FontWeight.Bold,
-                    color = GlassColors.textPrimary)
-                Text(stringResource(R.string.home_see_all), fontSize = 13.sp, fontWeight = FontWeight.Medium,
-                    color = GlassColors.accentGreen)
-            }
+            Text(stringResource(R.string.home_meals), fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                color = GlassColors.textPrimary, modifier = Modifier.padding(horizontal = 20.dp))
             Spacer(Modifier.height(12.dp))
 
             val dayIsEmpty = breakfastFoods.isEmpty() && lunchFoods.isEmpty() &&
