@@ -11,6 +11,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -118,4 +119,33 @@ class SavedRecipe(Base):
 
     __table_args__ = (
         Index("idx_saved_recipes_uid", "uid"),
+    )
+
+
+class FavoriteFood(Base):
+    __tablename__ = "favorite_foods"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    uid: Mapped[str] = mapped_column(
+        String, ForeignKey("profiles.uid", ondelete="CASCADE"), nullable=False
+    )
+    barcode: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    brand: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    image_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    categories: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    kcal_100g: Mapped[float] = mapped_column(Float, nullable=False)
+    protein_100g: Mapped[float] = mapped_column(Float, nullable=False)
+    carbs_100g: Mapped[float] = mapped_column(Float, nullable=False)
+    fat_100g: Mapped[float] = mapped_column(Float, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint("uid", "barcode", name="uq_favorite_foods_uid_barcode"),
+        CheckConstraint("kcal_100g >= 0", name="ck_favorite_foods_kcal_nonneg"),
+        CheckConstraint("protein_100g >= 0", name="ck_favorite_foods_protein_nonneg"),
+        CheckConstraint("carbs_100g >= 0", name="ck_favorite_foods_carbs_nonneg"),
+        CheckConstraint("fat_100g >= 0", name="ck_favorite_foods_fat_nonneg"),
     )
