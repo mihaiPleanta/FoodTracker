@@ -11,6 +11,7 @@ import com.example.foodtracker.model.RecentFood
 import com.example.foodtracker.model.mealKeyToBackend
 import com.example.foodtracker.model.toDto
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
 import java.io.IOException
@@ -52,20 +54,26 @@ class QuickPicksViewModel(
     val toastEvents: SharedFlow<Int> = _toastEvents.asSharedFlow()
 
     private var lastMeal: String? = null
+    private var recentJob: Job? = null
+    private var favoritesJob: Job? = null
+    private val toggleJobs = mutableSetOf<Job>()
 
     /** Shows Loading first so a previous meal's / account's lists never flash. */
     fun load(meal: String) {
         lastMeal = meal
         _recent.value = QuickListState.Loading
         _favorites.value = QuickListState.Loading
-        viewModelScope.launch { fetchRecent(meal) }
-        viewModelScope.launch { fetchFavorites() }
+        recentJob?.cancel()
+        favoritesJob?.cancel()
+        recentJob = viewModelScope.launch { fetchRecent(meal) }
+        favoritesJob = viewModelScope.launch { fetchFavorites() }
     }
 
     /** Re-fetches recents for the last loaded meal without a Loading flash. */
     fun refreshRecent() {
         val meal = lastMeal ?: return
-        viewModelScope.launch { fetchRecent(meal) }
+        recentJob?.cancel()
+        recentJob = viewModelScope.launch { fetchRecent(meal) }
     }
 
     fun toggleFavorite(food: FoodItem) {
@@ -79,7 +87,8 @@ class QuickPicksViewModel(
         _favorites.value = QuickListState.Loaded(
             if (wasFavorite) current.filterNot { it.barcode == food.barcode } else listOf(food) + current
         )
-        viewModelScope.launch {
+        lateinit var job: Job
+        job = viewModelScope.launch {
             try {
                 if (wasFavorite) {
                     val response = api.removeFavorite(food.barcode)
@@ -90,13 +99,26 @@ class QuickPicksViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _favorites.value = previous
+                _favorites.update { state ->
+                    if (state !is QuickListState.Loaded) state
+                    else if (wasFavorite) {
+                        if (state.items.any { it.barcode == food.barcode }) state
+                        else QuickListState.Loaded(listOf(food) + state.items)
+                    } else QuickListState.Loaded(state.items.filterNot { it.barcode == food.barcode })
+                }
                 _toastEvents.tryEmit(R.string.error_favorite_update)
+            } finally {
+                toggleJobs.remove(job)
             }
         }
+        toggleJobs.add(job)
     }
 
     fun resetUserState() {
+        recentJob?.cancel()
+        favoritesJob?.cancel()
+        toggleJobs.toList().forEach { it.cancel() }
+        toggleJobs.clear()
         lastMeal = null
         _recent.value = QuickListState.Loading
         _favorites.value = QuickListState.Loading

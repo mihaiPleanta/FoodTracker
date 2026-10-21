@@ -7,6 +7,7 @@ import com.example.foodtracker.model.RecentFoodDto
 import com.example.foodtracker.model.toDto
 import com.example.foodtracker.viewmodel.QuickListState
 import com.example.foodtracker.viewmodel.QuickPicksViewModel
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -37,18 +38,24 @@ private class FakeQuickPicksApi : QuickPicksApi {
     val requestedMeals = mutableListOf<String>()
     val added = mutableListOf<String>()
     val removed = mutableListOf<String>()
+    var favoritesGate: CompletableDeferred<Unit>? = null
+    val recentGates = mutableMapOf<String, CompletableDeferred<Unit>>()
+    val recentByMeal = mutableMapOf<String, List<RecentFoodDto>>()
+    val failBarcodes = mutableSetOf<String>()
 
     override suspend fun getRecent(meal: String): List<RecentFoodDto> {
         requestedMeals += meal
+        recentGates[meal]?.await()
         if (failRecent) throw IOException("offline")
-        return recent
+        return recentByMeal[meal] ?: recent
     }
     override suspend fun getFavorites(): List<FoodItemDto> {
+        favoritesGate?.await()
         if (failFavorites) throw IOException("offline")
         return favorites
     }
     override suspend fun addFavorite(barcode: String, food: FoodItemDto): FoodItemDto {
-        if (failWrites) throw IOException("offline")
+        if (failWrites || barcode in failBarcodes) throw IOException("offline")
         added += barcode
         return food
     }
@@ -200,5 +207,55 @@ class QuickPicksViewModelTest {
         assertTrue(vm.favoriteBarcodes.value.isEmpty())
         vm.refreshRecent(); advanceUntilIdle()
         assertEquals(listOf("LUNCH"), api.requestedMeals)          // last meal forgotten
+    }
+
+    @Test
+    fun resetUserState_whileFetchesInFlight_neverResurrectsOldData() = runTest(testDispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        val api = FakeQuickPicksApi().apply {
+            favorites = listOf(food("old").toDto())
+            recent = listOf(RecentFoodDto(food("oldr").toDto(), 10))
+            favoritesGate = gate
+            recentGates["LUNCH"] = gate
+        }
+        val vm = QuickPicksViewModel(api)
+        vm.load("Lunch")
+        advanceUntilIdle()
+        vm.resetUserState()
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(QuickListState.Loading, vm.favorites.value)
+        assertEquals(QuickListState.Loading, vm.recent.value)
+    }
+
+    @Test
+    fun failedToggle_rollsBackOnlyThatBarcode() = runTest(testDispatcher) {
+        val api = FakeQuickPicksApi().apply { failBarcodes += "a" }
+        val vm = QuickPicksViewModel(api)
+        vm.load("Lunch")
+        advanceUntilIdle()
+        vm.toggleFavorite(food("a"))
+        vm.toggleFavorite(food("b"))
+        advanceUntilIdle()
+        assertEquals(setOf("b"), favCodes(vm))
+    }
+
+    @Test
+    fun load_ignoresStaleResponseFromPreviousMeal() = runTest(testDispatcher) {
+        val lunchGate = CompletableDeferred<Unit>()
+        val api = FakeQuickPicksApi().apply {
+            recentGates["LUNCH"] = lunchGate
+            recentByMeal["LUNCH"] = listOf(RecentFoodDto(food("lunch").toDto(), 1))
+            recentByMeal["DINNER"] = listOf(RecentFoodDto(food("dinner").toDto(), 2))
+        }
+        val vm = QuickPicksViewModel(api)
+        vm.load("Lunch")
+        advanceUntilIdle()
+        vm.load("Dinner")
+        advanceUntilIdle()
+        lunchGate.complete(Unit)
+        advanceUntilIdle()
+        val items = (vm.recent.value as QuickListState.Loaded).items
+        assertEquals("dinner", items.single().food.barcode)
     }
 }
