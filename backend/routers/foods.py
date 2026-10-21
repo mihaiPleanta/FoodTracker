@@ -1,16 +1,23 @@
 import re
+from typing import List
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth import verify_token
-from schemas import FoodItemDto, SearchResponseDto
+from database import get_db
+from models import FoodLog
+from schemas import FoodItemDto, MealValue, RecentFoodDto, SearchResponseDto
+from services.recent_foods import pick_recent
 from services.generic_foods import GenericFoodsClient, get_generic_client
 from services.open_food_facts import OpenFoodFactsClient, get_off_client
 
 router = APIRouter(prefix="/foods", tags=["foods"])
 
 _BARCODE_RE = re.compile(r"^\d{8,13}$")
+_RECENT_SCAN_ROWS = 300
 
 
 def _translate_off_error(exc: httpx.HTTPStatusError) -> HTTPException:
@@ -65,6 +72,28 @@ async def search_foods(
     items = prefix + off_items
     has_more = page * page_size < off_total
     return SearchResponseDto(items=items, count=len(items), has_more=has_more)
+
+
+@router.get("/recent", response_model=List[RecentFoodDto])
+async def recent_foods(
+    meal: MealValue = Query(...),
+    token: dict = Depends(verify_token),
+    db: AsyncSession = Depends(get_db),
+) -> List[RecentFoodDto]:
+    result = await db.execute(
+        select(FoodLog)
+        .where(FoodLog.uid == token["uid"])
+        .order_by(FoodLog.created_at.desc(), FoodLog.id.desc())
+        .limit(_RECENT_SCAN_ROWS)
+    )
+    rows = result.scalars().all()
+    return [
+        RecentFoodDto(
+            food=FoodItemDto.model_validate(row, from_attributes=True),
+            last_grams=row.grams,
+        )
+        for row in pick_recent(rows, meal)
+    ]
 
 
 @router.get("/barcode/{barcode}", response_model=FoodItemDto)

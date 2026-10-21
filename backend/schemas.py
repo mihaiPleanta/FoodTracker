@@ -49,7 +49,13 @@ class SearchResponseDto(BaseModel):
     has_more: bool = False
 
 
+class RecentFoodDto(BaseModel):
+    food: FoodItemDto
+    last_grams: int
+
+
 _MEAL_VALUES = Literal["BREAKFAST", "LUNCH", "DINNER", "SNACKS"]
+MealValue = _MEAL_VALUES
 
 
 class FoodLogIngredient(BaseModel):
