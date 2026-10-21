@@ -205,7 +205,7 @@ _PROFILE_BODY = {
 
 def _log_body(name):
     return {
-        "log_date": "2026-06-01", "meal": "BREAKFAST", "grams": 100,
+        "log_date": date.today().isoformat(), "meal": "BREAKFAST", "grams": 100,
         "barcode": "000", "name": name, "categories": [],
         "kcal_100g": 100.0, "protein_100g": 5.0, "carbs_100g": 10.0, "fat_100g": 2.0,
     }
