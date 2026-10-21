@@ -15,6 +15,7 @@ import com.example.foodtracker.model.FoodIngredient
 import com.example.foodtracker.model.FoodItem
 import com.example.foodtracker.model.FoodLogCreateDto
 import com.example.foodtracker.model.FoodLogUpdateDto
+import com.example.foodtracker.model.mealKeyToBackend
 import com.example.foodtracker.model.toDto
 import com.example.foodtracker.model.HydrationUpdateDto
 import com.example.foodtracker.model.LoggedFood
@@ -269,14 +270,6 @@ class FoodViewModel(
                 _toastEvents.tryEmit(ToastEvent(R.string.error_save_hydration))
             }
         }
-    }
-
-    private fun mealKeyToBackend(meal: String): String = when (meal) {
-        "Breakfast" -> "BREAKFAST"
-        "Lunch"     -> "LUNCH"
-        "Dinner"    -> "DINNER"
-        "Snacks"    -> "SNACKS"
-        else        -> "BREAKFAST"
     }
 
     private fun sameDay(a: Date, b: Date): Boolean = dateKey(a) == dateKey(b)
