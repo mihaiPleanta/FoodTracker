@@ -3,6 +3,7 @@ package com.example.foodtracker
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.example.foodtracker.api.FoodApi
 import com.example.foodtracker.api.LogsApi
+import com.example.foodtracker.api.ProfileApi
 import com.example.foodtracker.data.FakeSettingsRepository
 import com.example.foodtracker.data.FoodRepository
 import com.example.foodtracker.data.MealLogTracker
@@ -15,7 +16,10 @@ import com.example.foodtracker.model.FoodItemDto
 import com.example.foodtracker.model.LoggedFood
 import com.example.foodtracker.model.SearchResponseDto
 import com.example.foodtracker.viewmodel.FoodViewModel
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -148,6 +152,21 @@ private fun dayWithOneBreakfast() = DayResponseDto(
 
 private fun emptyDay() = DayResponseDto(emptyMap(), 0f, null)
 
+/**
+ * Keeps FoodViewModel's init loadGoals() off the network: the real ProfileApi goes through
+ * AuthInterceptor -> FirebaseAuth on an OkHttp thread and leaks an uncaught exception
+ * into the next test (UncaughtExceptionsBeforeTest).
+ */
+private object NoOpProfileApi : ProfileApi {
+    override suspend fun getProfile(): retrofit2.Response<ProfileDto> = throw UnsupportedOperationException()
+    override suspend fun saveProfile(profile: ProfileDto): retrofit2.Response<ProfileDto> =
+        throw UnsupportedOperationException()
+    override suspend fun calculateTdee(profile: ProfileDto): retrofit2.Response<TdeeResponseDto> =
+        throw UnsupportedOperationException()
+    override suspend fun getGoals(): retrofit2.Response<GoalsDto> = retrofit2.Response.success(null)
+    override suspend fun deleteAccount(): retrofit2.Response<Unit> = throw UnsupportedOperationException()
+}
+
 private fun pagedDto(barcode: String) = FoodItemDto(
     barcode = barcode, name = "Food $barcode", kcal100g = 100f,
     protein100g = 5f, carbs100g = 10f, fat100g = 2f,
@@ -166,6 +185,10 @@ private object PagingFoodApi : FoodApi {
 class FoodViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
+    // DataStore defaults to Dispatchers.IO; a write finishing after resetMain() would resume a
+    // viewModelScope coroutine on a missing Main dispatcher and fail the next test
+    // (UncaughtExceptionsBeforeTest). Keep it on the test dispatcher and cancel it in tearDown.
+    private val dataStoreScope = CoroutineScope(testDispatcher + SupervisorJob())
     private lateinit var viewModel: FoodViewModel
 
     @get:Rule
@@ -175,17 +198,21 @@ class FoodViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         val trackerStore = PreferenceDataStoreFactory.create(
+            scope = dataStoreScope,
             produceFile = { File(tempFolder.newFolder("tracker"), "meal_log_tracker.preferences_pb") }
         )
         viewModel = FoodViewModel(
             settingsRepository = FakeSettingsRepository(),
             mealLogTracker = MealLogTracker(trackerStore),
             foodRepository = FoodRepository(NoOpFoodApi, NoOpCache),
+            logsApi = SwitchableLogsApi(emptyDay()),
+            profileApi = NoOpProfileApi,
         )
     }
 
     @After
     fun tearDown() {
+        dataStoreScope.cancel()
         Dispatchers.resetMain()
     }
 
@@ -228,12 +255,15 @@ class FoodViewModelTest {
     @Test
     fun loadMore_appendsNextPage_andUpdatesHasMore() = runTest(testDispatcher) {
         val store = PreferenceDataStoreFactory.create(
+            scope = dataStoreScope,
             produceFile = { File(tempFolder.newFolder("tracker2"), "meal_log_tracker.preferences_pb") }
         )
         val vm = FoodViewModel(
             settingsRepository = FakeSettingsRepository(),
             mealLogTracker = MealLogTracker(store),
             foodRepository = FoodRepository(PagingFoodApi, NoOpCache),
+            logsApi = SwitchableLogsApi(emptyDay()),
+            profileApi = NoOpProfileApi,
         )
 
         vm.searchFoods("banana")
@@ -253,6 +283,7 @@ class FoodViewModelTest {
     fun updateFoodPortion_updatesGramsInPlace() = runTest(testDispatcher) {
         val fakeLogs = FakeLogsApi()
         val store = PreferenceDataStoreFactory.create(
+            scope = dataStoreScope,
             produceFile = { File(tempFolder.newFolder("tracker3"), "meal_log_tracker.preferences_pb") }
         )
         val vm = FoodViewModel(
@@ -260,6 +291,7 @@ class FoodViewModelTest {
             mealLogTracker = MealLogTracker(store),
             foodRepository = FoodRepository(NoOpFoodApi, NoOpCache),
             logsApi = fakeLogs,
+            profileApi = NoOpProfileApi,
         )
         // Capture latest emission (WhileSubscribed needs an active collector).
         var foods: List<LoggedFood> = emptyList()
@@ -283,11 +315,13 @@ class FoodViewModelTest {
         settingsRepository = FakeSettingsRepository(),
         mealLogTracker = MealLogTracker(
             PreferenceDataStoreFactory.create(
+            scope = dataStoreScope,
                 produceFile = { File(tempFolder.newFolder(folder), "meal_log_tracker.preferences_pb") }
             )
         ),
         foodRepository = FoodRepository(NoOpFoodApi, NoOpCache),
         logsApi = fake,
+        profileApi = NoOpProfileApi,
     )
 
     @Test
@@ -349,6 +383,7 @@ class FoodViewModelTest {
     @Test
     fun resetUserState_clearsProfileAndLoggedMeals() = runTest(testDispatcher) {
         val store = PreferenceDataStoreFactory.create(
+            scope = dataStoreScope,
             produceFile = { File(tempFolder.newFolder("trackerReset"), "meal_log_tracker.preferences_pb") }
         )
         val vm = FoodViewModel(
@@ -356,6 +391,7 @@ class FoodViewModelTest {
             mealLogTracker = MealLogTracker(store),
             foodRepository = FoodRepository(NoOpFoodApi, NoOpCache),
             logsApi = SwitchableLogsApi(dayWithOneBreakfast()),
+            profileApi = NoOpProfileApi,
         )
         var foods: List<LoggedFood> = emptyList()
         val job = launch { vm.getFoodsFlow("Breakfast").collect { foods = it } }
@@ -377,6 +413,7 @@ class FoodViewModelTest {
         // Regression: account A's logged day must not leak into account B after logout.
         val logs = SwitchableLogsApi(dayWithOneBreakfast())
         val store = PreferenceDataStoreFactory.create(
+            scope = dataStoreScope,
             produceFile = { File(tempFolder.newFolder("trackerReset2"), "meal_log_tracker.preferences_pb") }
         )
         val vm = FoodViewModel(
@@ -384,6 +421,7 @@ class FoodViewModelTest {
             mealLogTracker = MealLogTracker(store),
             foodRepository = FoodRepository(NoOpFoodApi, NoOpCache),
             logsApi = logs,
+            profileApi = NoOpProfileApi,
         )
         var foods: List<LoggedFood> = emptyList()
         val job = launch { vm.getFoodsFlow("Breakfast").collect { foods = it } }

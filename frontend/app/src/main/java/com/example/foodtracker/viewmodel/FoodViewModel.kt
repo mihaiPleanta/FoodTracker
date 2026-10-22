@@ -61,6 +61,7 @@ class FoodViewModel(
     private val mealLogTracker: MealLogTracker,
     private val foodRepository: FoodRepository,
     private val logsApi: LogsApi = RetrofitInstance.retrofit.create(LogsApi::class.java),
+    private val profileApi: ProfileApi = RetrofitInstance.retrofit.create(ProfileApi::class.java),
 ) : ViewModel() {
 
     // ── Search state ──────────────────────────────────────────────────────────
@@ -79,8 +80,6 @@ class FoodViewModel(
 
     /** A localizable snackbar message; [code] (HTTP status) is appended in the UI when present. */
     data class ToastEvent(@StringRes val messageRes: Int, val code: Int? = null)
-
-    private val profileApi: ProfileApi = RetrofitInstance.retrofit.create(ProfileApi::class.java)
 
     private val _searchState = MutableStateFlow<SearchUiState>(SearchUiState.Idle)
     val searchState: StateFlow<SearchUiState> = _searchState.asStateFlow()
