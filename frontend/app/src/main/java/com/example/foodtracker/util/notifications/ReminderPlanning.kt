@@ -1,6 +1,7 @@
 package com.example.foodtracker.util.notifications
 
 import com.example.foodtracker.model.AppSettings
+import com.example.foodtracker.model.MealReminder
 import com.example.foodtracker.util.notifications.MealReminderScheduler.Meal
 
 /** minuteOfDay scheduled per meal; `null` = not scheduled. Always holds all four meals. */
@@ -37,3 +38,10 @@ fun reconcile(desired: ReminderSchedule, scheduled: ReminderSchedule): Map<Meal,
             else                      -> ReminderAction.Schedule(want)
         }
     }
+
+fun AppSettings.withReminder(meal: Meal, reminder: MealReminder): AppSettings = when (meal) {
+    Meal.BREAKFAST -> copy(breakfastReminder = reminder)
+    Meal.LUNCH     -> copy(lunchReminder = reminder)
+    Meal.SNACKS    -> copy(snacksReminder = reminder)
+    Meal.DINNER    -> copy(dinnerReminder = reminder)
+}

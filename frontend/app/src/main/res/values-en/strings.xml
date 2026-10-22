@@ -201,6 +201,7 @@
     <string name="settings_title">Settings</string>
     <string name="settings_notifications">NOTIFICATIONS</string>
     <string name="settings_meal_reminders">Meal reminders</string>
+    <string name="settings_reminder_time_title">Reminder time</string>
     <string name="settings_appearance">APPEARANCE</string>
     <string name="settings_theme_dark">Dark theme</string>
     <string name="settings_language">LANGUAGE</string>

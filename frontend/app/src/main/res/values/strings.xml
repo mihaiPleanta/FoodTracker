@@ -204,6 +204,7 @@
     <string name="settings_title">Setări</string>
     <string name="settings_notifications">NOTIFICĂRI</string>
     <string name="settings_meal_reminders">Remindere mese</string>
+    <string name="settings_reminder_time_title">Ora reminderului</string>
     <string name="settings_appearance">ASPECT</string>
     <string name="settings_theme_dark">Temă întunecată</string>
     <string name="settings_language">LIMBĂ</string>

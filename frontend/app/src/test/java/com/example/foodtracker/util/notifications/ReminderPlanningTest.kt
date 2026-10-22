@@ -69,4 +69,11 @@ class ReminderPlanningTest {
         assertEquals(ReminderAction.Schedule(960), actions[Meal.SNACKS])
         assertEquals(ReminderAction.Schedule(1140), actions[Meal.DINNER])
     }
+
+    @Test
+    fun withReminder_replacesOnlyThatMeal() {
+        val updated = AppSettings().withReminder(Meal.SNACKS, MealReminder(enabled = false, minuteOfDay = 990))
+        assertEquals(MealReminder(enabled = false, minuteOfDay = 990), updated.snacksReminder)
+        assertEquals(AppSettings().copy(snacksReminder = updated.snacksReminder), updated)
+    }
 }
