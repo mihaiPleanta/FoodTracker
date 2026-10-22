@@ -274,4 +274,88 @@
     <string name="stats_change_up">Variație 7z: +%1$s kg</string>
     <string name="stats_change_down">Variație 7z: %1$s kg</string>
     <string name="stats_change_stable">Variație 7z: stabil</string>
+
+    <string name="portion_text_format">%1$s · %2$d g</string>
+    <string name="portion_grams_row">grame</string>
+    <string name="portion_new_unit">Unitate nouă</string>
+    <string name="portion_approx_prefix">≈</string>
+    <string name="portion_unit_edit_title">Editează unitatea</string>
+    <string name="portion_unit_name_label">Nume</string>
+    <string name="portion_unit_grams_label">Grame per unitate</string>
+    <string name="portion_unit_exists_error">Există deja o unitate cu numele ăsta</string>
+    <string name="portion_presets_edit_title">Gramaje rapide</string>
+    <string name="portion_presets_label">Grame (separate prin virgulă)</string>
+    <string name="portion_save">Salvează</string>
+    <string name="portion_delete">Șterge</string>
+    <string name="portion_reset_presets">Revino la propuse</string>
+    <plurals name="portion_unit_tsp">
+        <item quantity="one">%s linguriță</item>
+        <item quantity="few">%s lingurițe</item>
+        <item quantity="other">%s de lingurițe</item>
+    </plurals>
+    <plurals name="portion_unit_tbsp">
+        <item quantity="one">%s lingură</item>
+        <item quantity="few">%s linguri</item>
+        <item quantity="other">%s de linguri</item>
+    </plurals>
+    <plurals name="portion_unit_slice">
+        <item quantity="one">%s felie</item>
+        <item quantity="few">%s felii</item>
+        <item quantity="other">%s de felii</item>
+    </plurals>
+    <plurals name="portion_unit_piece">
+        <item quantity="one">%s bucată</item>
+        <item quantity="few">%s bucăți</item>
+        <item quantity="other">%s de bucăți</item>
+    </plurals>
+    <plurals name="portion_unit_piece_small">
+        <item quantity="one">%s bucată mică</item>
+        <item quantity="few">%s bucăți mici</item>
+        <item quantity="other">%s de bucăți mici</item>
+    </plurals>
+    <plurals name="portion_unit_piece_medium">
+        <item quantity="one">%s bucată medie</item>
+        <item quantity="few">%s bucăți medii</item>
+        <item quantity="other">%s de bucăți medii</item>
+    </plurals>
+    <plurals name="portion_unit_piece_large">
+        <item quantity="one">%s bucată mare</item>
+        <item quantity="few">%s bucăți mari</item>
+        <item quantity="other">%s de bucăți mari</item>
+    </plurals>
+    <plurals name="portion_unit_serving">
+        <item quantity="one">%s porție</item>
+        <item quantity="few">%s porții</item>
+        <item quantity="other">%s de porții</item>
+    </plurals>
+    <plurals name="portion_unit_package">
+        <item quantity="one">%s pachet</item>
+        <item quantity="few">%s pachete</item>
+        <item quantity="other">%s de pachete</item>
+    </plurals>
+    <plurals name="portion_unit_cup">
+        <item quantity="one">%s cană</item>
+        <item quantity="few">%s căni</item>
+        <item quantity="other">%s de căni</item>
+    </plurals>
+    <plurals name="portion_unit_glass">
+        <item quantity="one">%s pahar</item>
+        <item quantity="few">%s pahare</item>
+        <item quantity="other">%s de pahare</item>
+    </plurals>
+    <plurals name="portion_unit_bowl">
+        <item quantity="one">%s castron</item>
+        <item quantity="few">%s castroane</item>
+        <item quantity="other">%s de castroane</item>
+    </plurals>
+    <plurals name="portion_unit_handful">
+        <item quantity="one">%s pumn</item>
+        <item quantity="few">%s pumni</item>
+        <item quantity="other">%s de pumni</item>
+    </plurals>
+    <plurals name="portion_unit_ml">
+        <item quantity="one">%s ml</item>
+        <item quantity="few">%s ml</item>
+        <item quantity="other">%s ml</item>
+    </plurals>
 </resources>

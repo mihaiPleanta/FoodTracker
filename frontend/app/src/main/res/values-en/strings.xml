@@ -271,4 +271,74 @@
     <string name="stats_change_up">7d change: +%1$s kg</string>
     <string name="stats_change_down">7d change: %1$s kg</string>
     <string name="stats_change_stable">7d change: stable</string>
+
+    <string name="portion_text_format">%1$s · %2$d g</string>
+    <string name="portion_grams_row">grams</string>
+    <string name="portion_new_unit">New unit</string>
+    <string name="portion_approx_prefix">≈</string>
+    <string name="portion_unit_edit_title">Edit unit</string>
+    <string name="portion_unit_name_label">Name</string>
+    <string name="portion_unit_grams_label">Grams per unit</string>
+    <string name="portion_unit_exists_error">A unit with this name already exists</string>
+    <string name="portion_presets_edit_title">Quick amounts</string>
+    <string name="portion_presets_label">Grams (comma separated)</string>
+    <string name="portion_save">Save</string>
+    <string name="portion_delete">Delete</string>
+    <string name="portion_reset_presets">Back to suggested</string>
+    <plurals name="portion_unit_tsp">
+        <item quantity="one">%s teaspoon</item>
+        <item quantity="other">%s teaspoons</item>
+    </plurals>
+    <plurals name="portion_unit_tbsp">
+        <item quantity="one">%s tablespoon</item>
+        <item quantity="other">%s tablespoons</item>
+    </plurals>
+    <plurals name="portion_unit_slice">
+        <item quantity="one">%s slice</item>
+        <item quantity="other">%s slices</item>
+    </plurals>
+    <plurals name="portion_unit_piece">
+        <item quantity="one">%s piece</item>
+        <item quantity="other">%s pieces</item>
+    </plurals>
+    <plurals name="portion_unit_piece_small">
+        <item quantity="one">%s small piece</item>
+        <item quantity="other">%s small pieces</item>
+    </plurals>
+    <plurals name="portion_unit_piece_medium">
+        <item quantity="one">%s medium piece</item>
+        <item quantity="other">%s medium pieces</item>
+    </plurals>
+    <plurals name="portion_unit_piece_large">
+        <item quantity="one">%s large piece</item>
+        <item quantity="other">%s large pieces</item>
+    </plurals>
+    <plurals name="portion_unit_serving">
+        <item quantity="one">%s serving</item>
+        <item quantity="other">%s servings</item>
+    </plurals>
+    <plurals name="portion_unit_package">
+        <item quantity="one">%s package</item>
+        <item quantity="other">%s packages</item>
+    </plurals>
+    <plurals name="portion_unit_cup">
+        <item quantity="one">%s cup</item>
+        <item quantity="other">%s cups</item>
+    </plurals>
+    <plurals name="portion_unit_glass">
+        <item quantity="one">%s glass</item>
+        <item quantity="other">%s glasses</item>
+    </plurals>
+    <plurals name="portion_unit_bowl">
+        <item quantity="one">%s bowl</item>
+        <item quantity="other">%s bowls</item>
+    </plurals>
+    <plurals name="portion_unit_handful">
+        <item quantity="one">%s handful</item>
+        <item quantity="other">%s handfuls</item>
+    </plurals>
+    <plurals name="portion_unit_ml">
+        <item quantity="one">%s ml</item>
+        <item quantity="other">%s ml</item>
+    </plurals>
 </resources>
