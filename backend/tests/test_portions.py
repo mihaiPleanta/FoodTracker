@@ -253,3 +253,18 @@ def test_portions_unknown_id(client, fake_off):
     assert body["units"] == []
     assert body["gram_presets"] == [50, 100, 150, 200, 250]
     assert fake_off.calls == []
+
+
+def test_portions_off_non_json_still_200(client, fake_off):
+    _ensure_profile(client)
+    fake_off.error = ValueError("Expecting value: line 1 column 1 (char 0)")
+    body = _get_portions(client)
+    assert body["units"] == []
+    assert body["gram_presets"] == [50, 100, 150, 200, 250]
+
+
+def test_portions_volume_package_marked_estimate(client, fake_off):
+    _ensure_profile(client)
+    fake_off.info = ProductPortionInfo([], None, 1000, package_is_volume=True)
+    body = _get_portions(client)
+    assert body["units"] == [{"unit": "package", "grams": 1000.0, "source": "estimate"}]

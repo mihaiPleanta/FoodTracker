@@ -231,3 +231,30 @@ async def test_portion_info_missing_unit_drops_package():
     client = _portion_client({"product_quantity": "6"})
     info = await client.get_portion_info("123")
     assert info.package_g is None
+
+
+@pytest.mark.asyncio
+async def test_portion_info_volume_units_set_flag():
+    for unit, qty, grams in (("ml", "750", 750.0), ("l", "1", 1000.0), ("L", "1", 1000.0)):
+        client = _portion_client({"product_quantity": qty, "product_quantity_unit": unit})
+        info = await client.get_portion_info("123")
+        assert info.package_g == grams
+        assert info.package_is_volume is True
+
+
+@pytest.mark.asyncio
+async def test_portion_info_mass_units_not_volume():
+    client = _portion_client({"product_quantity": "500", "product_quantity_unit": "g"})
+    info = await client.get_portion_info("123")
+    assert info.package_g == 500.0
+    assert info.package_is_volume is False
+
+
+@pytest.mark.asyncio
+async def test_portion_info_non_finite_quantities_dropped():
+    client = _portion_client({
+        "serving_quantity": "nan", "product_quantity": "inf", "product_quantity_unit": "g",
+    })
+    info = await client.get_portion_info("123")
+    assert info.serving_g is None
+    assert info.package_g is None

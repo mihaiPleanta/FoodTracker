@@ -106,3 +106,25 @@ def test_real_table_loads():
     assert [(u.unit, u.grams) for u in units] == [("tsp", 7), ("tbsp", 21)]
     egg, _ = t.lookup(["eggs"], "usda-egg-whole-raw")
     assert {u.unit: u.grams for u in egg} == {"piece_small": 38, "piece_medium": 44, "piece_large": 50}
+
+
+def test_label_units_volume_package_is_estimate():
+    vol = ProductPortionInfo(categories=[], serving_g=None, package_g=1000, package_is_volume=True)
+    assert label_units(vol) == [UnitOption("package", 1000, "estimate")]
+    mass = ProductPortionInfo(categories=[], serving_g=None, package_g=1000)
+    assert label_units(mass) == [UnitOption("package", 1000, "label")]
+
+
+def test_real_table_dry_rice_pasta_vs_cooked_generics():
+    t = load_table()
+    for cat, serving in (("rices", 75), ("pastas", 80)):
+        units, presets = t.lookup([cat], None)
+        assert {u.unit: u.grams for u in units} == {"serving": serving}
+        assert presets == [50, 75, 100, 125, 150]
+    for gid, cats, bowl in (
+        ("usda-rice-white-cooked", ["cereals", "rices"], 180),
+        ("usda-rice-brown-cooked", ["cereals", "rices"], 180),
+        ("usda-pasta-cooked", ["pastas"], 200),
+    ):
+        units, _ = t.lookup(cats, gid)
+        assert {u.unit: u.grams for u in units}.get("bowl") == bowl

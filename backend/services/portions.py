@@ -32,6 +32,7 @@ class ProductPortionInfo:
     categories: List[str]  # full list, no "xx:" prefix, general -> specific
     serving_g: Optional[float]
     package_g: Optional[float]
+    package_is_volume: bool = False  # package_g converted from ml/l (1 ml ~ 1 g)
 
 
 @dataclass(frozen=True)
@@ -79,7 +80,7 @@ def label_units(info: ProductPortionInfo) -> List[UnitOption]:
     if s is not None and s > 0 and s != 100 and (p is None or s < p):
         out.append(UnitOption("serving", s, "label"))
     if p is not None and p > 0:
-        out.append(UnitOption("package", p, "label"))
+        out.append(UnitOption("package", p, "estimate" if info.package_is_volume else "label"))
     return out
 
 

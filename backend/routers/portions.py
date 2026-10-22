@@ -50,7 +50,8 @@ async def get_portions(
     if _BARCODE_RE.match(barcode):
         try:
             info = await off.get_portion_info(barcode)
-        except httpx.HTTPError:
+        except (httpx.HTTPError, ValueError):
+            # ValueError: OFF answered 200 with a non-JSON body. Never 5xx here.
             info = None
     else:
         food = generic.get(barcode)

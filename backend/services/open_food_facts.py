@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 
 import httpx
 
@@ -14,13 +15,16 @@ PRODUCT_URL = "https://world.openfoodfacts.org/api/v2/product/{barcode}"
 FIELDS = "code,product_name,product_name_ro,brands,image_small_url,categories_tags,nutriments"
 PORTION_FIELDS = "categories_tags,serving_quantity,product_quantity,product_quantity_unit"
 _UNIT_TO_G = {"g": 1.0, "kg": 1000.0, "ml": 1.0, "l": 1000.0}
+_VOLUME_UNITS = frozenset({"ml", "l"})  # 1 ml ~ 1 g: an estimate, not a label value
 
 
 def _to_float(value) -> float | None:
     try:
-        return float(value)
+        result = float(value)
     except (TypeError, ValueError):
         return None
+    # "inf"/"nan" parse fine but cannot be serialized to JSON.
+    return result if math.isfinite(result) else None
 
 
 class OpenFoodFactsClient:
@@ -106,6 +110,7 @@ class OpenFoodFactsClient:
             categories=categories,
             serving_g=_to_float(product.get("serving_quantity")),
             package_g=package_g,
+            package_is_volume=package_g is not None and unit in _VOLUME_UNITS,
         )
 
     def _normalize(self, product: dict) -> FoodItemDto | None:
