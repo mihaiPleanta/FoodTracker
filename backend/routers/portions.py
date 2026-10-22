@@ -4,7 +4,7 @@ from typing import Optional
 
 import httpx
 from fastapi import APIRouter, Depends, Response, status
-from sqlalchemy import JSON, delete, or_, select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth import verify_token
@@ -82,13 +82,14 @@ async def get_portions(
             .where(
                 FoodLog.uid == uid,
                 FoodLog.barcode == barcode,
-                # JSON None is stored as JSON 'null' (not SQL NULL) unless none_as_null
-                or_(FoodLog.ingredients.is_(None), FoodLog.ingredients == JSON.NULL),
             )
             .order_by(FoodLog.created_at.desc(), FoodLog.id.desc())
             .limit(_HISTORY_LIMIT)
         )
     ).scalars().all()
+    # Recipe logs are dropped in Python: JSON None may be stored as JSON 'null'
+    # and `json = json` is not valid on PostgreSQL (same approach as recent_foods).
+    history = [h for h in history if h.ingredients is None]
 
     presets = compose_presets(
         [(h.grams, h.log_date) for h in history], category_presets, custom, date.today()
