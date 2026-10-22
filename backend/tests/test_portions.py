@@ -120,3 +120,136 @@ def test_uid_fk_cascades_on_profile_delete():
         fk = next(iter(model.__table__.c.uid.foreign_keys))
         assert fk.column.table.name == "profiles"
         assert fk.ondelete == "CASCADE"
+
+
+# ---------- GET /portions/{barcode} ----------
+
+from datetime import date
+
+import httpx
+import pytest
+
+from main import app
+from services.generic_foods import GenericFoodsClient, get_generic_client
+from services.open_food_facts import get_off_client
+from services.portions import ProductPortionInfo
+
+
+class _FakeOff:
+    def __init__(self):
+        self.info = None
+        self.error = None
+        self.calls = []
+
+    async def get_portion_info(self, barcode):
+        self.calls.append(barcode)
+        if self.error is not None:
+            raise self.error
+        return self.info
+
+
+class _FakeGeneric:
+    def __init__(self):
+        self._real = GenericFoodsClient()
+
+    def get(self, food_id):
+        return self._real.get(food_id)
+
+
+@pytest.fixture
+def fake_off():
+    fake = _FakeOff()
+    app.dependency_overrides[get_off_client] = lambda: fake
+    app.dependency_overrides[get_generic_client] = lambda: _FakeGeneric()
+    yield fake
+    app.dependency_overrides.pop(get_off_client, None)
+    app.dependency_overrides.pop(get_generic_client, None)
+
+
+def _get_portions(client, barcode=BC):
+    r = client.get(f"/portions/{barcode}", headers=AUTH_HEADER)
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def _log(client, grams, barcode=BC, **extra):
+    body = {
+        "log_date": date.today().isoformat(), "meal": "LUNCH", "grams": grams,
+        "barcode": barcode, "name": "Miere", "kcal_100g": 300, "protein_100g": 0.5,
+        "carbs_100g": 80, "fat_100g": 0, **extra,
+    }
+    r = client.post("/food-logs", json=body, headers=AUTH_HEADER)
+    assert r.status_code == 201, r.text
+
+
+def test_portions_off_label_and_estimate(client, fake_off):
+    _ensure_profile(client)
+    fake_off.info = ProductPortionInfo(["spreads", "honeys"], None, 900)
+    body = _get_portions(client)
+    assert body["units"] == [
+        {"unit": "package", "grams": 900.0, "source": "label"},
+        {"unit": "tsp", "grams": 7.0, "source": "estimate"},
+        {"unit": "tbsp", "grams": 21.0, "source": "estimate"},
+    ]
+    assert body["presets_custom"] is False
+    assert body["last"] is None
+
+
+def test_portions_user_correction_and_custom(client, fake_off):
+    _ensure_profile(client)
+    fake_off.info = ProductPortionInfo(["spreads", "honeys"], None, 900)
+    _put_unit(client, "tsp", 6)
+    _put_unit(client, "Bolul meu", 250)
+    units = _get_portions(client)["units"]
+    assert [u["unit"] for u in units] == ["package", "tsp", "tbsp", "Bolul meu"]
+    assert units[1] == {"unit": "tsp", "grams": 6.0, "source": "user"}
+    assert units[-1] == {"unit": "Bolul meu", "grams": 250.0, "source": "user"}
+
+
+def test_portions_history_presets_and_last(client, fake_off):
+    _ensure_profile(client)
+    fake_off.info = ProductPortionInfo(["spreads", "honeys"], None, 900)
+    _log(client, 180)
+    _log(client, 180)
+    _log(client, 14, unit="tsp", unit_qty=2)
+    _log(client, 500, ingredients=[{
+        "name": "x", "grams": 500, "kcal_100g": 1, "protein_100g": 1,
+        "carbs_100g": 1, "fat_100g": 1,
+    }])
+    body = _get_portions(client)
+    assert body["gram_presets"][0] == 180
+    assert body["last"] == {"unit": "tsp", "unit_qty": 2.0, "grams": 14}
+
+
+def test_portions_custom_presets(client, fake_off):
+    _ensure_profile(client)
+    fake_off.info = None
+    client.put(f"/portions/{BC}/presets", json={"grams": [42]}, headers=AUTH_HEADER)
+    body = _get_portions(client)
+    assert body["gram_presets"] == [42]
+    assert body["presets_custom"] is True
+
+
+def test_portions_off_down_still_200(client, fake_off):
+    _ensure_profile(client)
+    fake_off.error = httpx.ConnectError("down")
+    _put_unit(client, "Bolul meu", 250)
+    body = _get_portions(client)
+    assert body["units"] == [{"unit": "Bolul meu", "grams": 250.0, "source": "user"}]
+    assert body["gram_presets"] == [50, 100, 150, 200, 250]
+
+
+def test_portions_generic_id(client, fake_off):
+    _ensure_profile(client)
+    body = _get_portions(client, "usda-egg-whole-raw")
+    piece = [u for u in body["units"] if u["unit"] == "piece_large"]
+    assert piece and piece[0]["grams"] == 50.0
+    assert fake_off.calls == []
+
+
+def test_portions_unknown_id(client, fake_off):
+    _ensure_profile(client)
+    body = _get_portions(client, "recipe-xyz")
+    assert body["units"] == []
+    assert body["gram_presets"] == [50, 100, 150, 200, 250]
+    assert fake_off.calls == []

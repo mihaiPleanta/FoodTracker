@@ -268,3 +268,22 @@ class GramPresetsIn(BaseModel):
 
 class GramPresetsOut(BaseModel):
     grams: List[int]
+
+
+class PortionUnitDto(BaseModel):
+    unit: str
+    grams: float
+    source: str
+
+
+class LastPortionDto(BaseModel):
+    unit: Optional[str] = None
+    unit_qty: Optional[float] = None
+    grams: int
+
+
+class PortionsDto(BaseModel):
+    units: List[PortionUnitDto]
+    gram_presets: List[int]
+    presets_custom: bool
+    last: Optional[LastPortionDto] = None
