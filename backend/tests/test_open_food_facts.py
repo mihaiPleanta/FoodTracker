@@ -224,3 +224,10 @@ async def test_portion_info_requests_product_fields():
     await client.get_portion_info("123")
     assert captured["path"].endswith("/product/123")
     assert "serving_quantity" in captured["fields"]
+
+
+@pytest.mark.asyncio
+async def test_portion_info_missing_unit_drops_package():
+    client = _portion_client({"product_quantity": "6"})
+    info = await client.get_portion_info("123")
+    assert info.package_g is None

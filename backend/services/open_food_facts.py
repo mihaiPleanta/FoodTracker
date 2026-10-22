@@ -13,7 +13,7 @@ SEARCH_URL = "https://world.openfoodfacts.org/cgi/search.pl"
 PRODUCT_URL = "https://world.openfoodfacts.org/api/v2/product/{barcode}"
 FIELDS = "code,product_name,product_name_ro,brands,image_small_url,categories_tags,nutriments"
 PORTION_FIELDS = "categories_tags,serving_quantity,product_quantity,product_quantity_unit"
-_UNIT_TO_G = {"g": 1.0, "kg": 1000.0, "ml": 1.0, "l": 1000.0, "cl": 10.0}
+_UNIT_TO_G = {"g": 1.0, "kg": 1000.0, "ml": 1.0, "l": 1000.0}
 
 
 def _to_float(value) -> float | None:
@@ -98,7 +98,7 @@ class OpenFoodFactsClient:
                 categories.append(stripped)
 
         package_g = _to_float(product.get("product_quantity"))
-        unit = str(product.get("product_quantity_unit") or "g").strip().lower()
+        unit = str(product.get("product_quantity_unit") or "").strip().lower()
         factor = _UNIT_TO_G.get(unit)
         package_g = package_g * factor if package_g is not None and factor else None
 
