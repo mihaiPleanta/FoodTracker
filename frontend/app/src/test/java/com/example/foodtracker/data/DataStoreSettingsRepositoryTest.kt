@@ -7,6 +7,8 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.example.foodtracker.model.AppLanguage
 import com.example.foodtracker.model.AppSettings
+import com.example.foodtracker.model.MealReminder
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -87,5 +89,26 @@ class DataStoreSettingsRepositoryTest {
         // Next read reflects new value
         val afterUpdate = repo.settings.first()
         assertEquals(false, afterUpdate.notificationsEnabled)
+    }
+
+    @Test
+    fun update_mealReminders_roundTrip() = runTest {
+        val custom = AppSettings(
+            lunchReminder = MealReminder(enabled = false, minuteOfDay = 12 * 60 + 30),
+            dinnerReminder = MealReminder(enabled = true, minuteOfDay = 20 * 60 + 15)
+        )
+        repo.update(custom)
+        assertEquals(custom, repo.settings.first())
+    }
+
+    @Test
+    fun settings_legacyStoreWithoutReminderKeys_returnsReminderDefaults() = runTest {
+        dataStore.edit { prefs ->
+            prefs[booleanPreferencesKey("notifications_enabled")] = false
+        }
+        val read = repo.settings.first()
+        assertEquals(false, read.notificationsEnabled)
+        assertEquals(MealReminder(enabled = true, minuteOfDay = 480), read.breakfastReminder)
+        assertEquals(MealReminder(enabled = true, minuteOfDay = 1140), read.dinnerReminder)
     }
 }
