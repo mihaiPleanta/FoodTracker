@@ -29,6 +29,7 @@ private class FakePortionsApi : PortionsApi {
     val byBarcode = mutableMapOf<String, PortionsDto>()
     val gates = mutableMapOf<String, CompletableDeferred<Unit>>()
     var failGet = false
+    var putGate: CompletableDeferred<Unit>? = null
     var failWrites = false
     val puts = mutableListOf<Pair<String, PortionUnitInDto>>()
     val deletedUnits = mutableListOf<Pair<String, String>>()
@@ -41,6 +42,7 @@ private class FakePortionsApi : PortionsApi {
         return byBarcode[barcode] ?: PortionsDto()
     }
     override suspend fun putUnit(barcode: String, body: PortionUnitInDto): PortionUnitInDto {
+        putGate?.await()
         if (failWrites) throw IOException("offline")
         puts += barcode to body
         val cur = byBarcode[barcode] ?: PortionsDto()
@@ -163,6 +165,52 @@ class PortionsViewModelTest {
         vm.load("1")
         advanceUntilIdle()
         vm.resetUserState()
+        assertEquals(PortionsState.Idle, vm.state.value)
+    }
+
+    @Test
+    fun quickSaveThenDelete_bothReachTheApi() = runTest(testDispatcher) {
+        val api = FakePortionsApi()
+        val vm = PortionsViewModel(api)
+        vm.load("1")
+        advanceUntilIdle()
+        vm.saveUnit("1", "bowl", 200f)
+        vm.deleteUnit("1", "slice")
+        advanceUntilIdle()
+        assertEquals(1, api.puts.size)
+        assertEquals(listOf("1" to "slice"), api.deletedUnits)
+    }
+
+    @Test
+    fun saveThenLoadOther_putStillCompletesAndStateIsOther() = runTest(testDispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        val api = FakePortionsApi().apply {
+            putGate = gate
+            byBarcode["b"] = PortionsDto(gramPresets = listOf(7))
+        }
+        val vm = PortionsViewModel(api)
+        vm.load("a")
+        advanceUntilIdle()
+        vm.saveUnit("a", "bowl", 200f)
+        advanceUntilIdle()
+        vm.load("b")
+        advanceUntilIdle()
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(1, api.puts.size)
+        assertEquals("b", (vm.state.value as PortionsState.Loaded).barcode)
+    }
+
+    @Test
+    fun resetWhileLoadGated_staysIdle() = runTest(testDispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        val api = FakePortionsApi().apply { gates["1"] = gate }
+        val vm = PortionsViewModel(api)
+        vm.load("1")
+        advanceUntilIdle()
+        vm.resetUserState()
+        gate.complete(Unit)
+        advanceUntilIdle()
         assertEquals(PortionsState.Idle, vm.state.value)
     }
 }

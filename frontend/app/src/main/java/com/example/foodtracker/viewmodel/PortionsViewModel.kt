@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import retrofit2.HttpException
 import java.io.IOException
 
@@ -42,11 +44,11 @@ class PortionsViewModel(
     val toastEvents: SharedFlow<Int> = _toastEvents.asSharedFlow()
 
     private var loadJob: Job? = null
-    private var writeJob: Job? = null
+    private val writeJobs = mutableSetOf<Job>()
+    private val writeMutex = Mutex()
 
     fun load(barcode: String) {
         loadJob?.cancel()
-        writeJob?.cancel()
         _state.value = PortionsState.Loading
         loadJob = viewModelScope.launch {
             _state.value = try {
@@ -73,28 +75,41 @@ class PortionsViewModel(
 
     fun resetUserState() {
         loadJob?.cancel()
-        writeJob?.cancel()
+        writeJobs.toList().forEach { it.cancel() }
+        writeJobs.clear()
         _state.value = PortionsState.Idle
     }
 
-    /** Runs [call], then reloads [barcode] without a Loading flash; on error the state is untouched. */
+    /**
+     * Runs [call], then reloads [barcode] without a Loading flash; on error the state is untouched.
+     * Writes are serialized and never cancelled by later writes or [load]; only [resetUserState] cancels them.
+     */
     private fun write(barcode: String, call: suspend () -> Unit) {
-        writeJob?.cancel()
-        writeJob = viewModelScope.launch {
+        lateinit var job: Job
+        job = viewModelScope.launch {
             try {
-                call()
-                val fresh = api.getPortions(barcode).toDomain()
-                val current = _state.value
-                if (current is PortionsState.Loaded && current.barcode == barcode) {
-                    _state.value = PortionsState.Loaded(barcode, fresh)
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                _toastEvents.tryEmit(
-                    if (e is IOException) R.string.error_no_internet else R.string.error_save
-                )
+                writeMutex.withLock { performWrite(barcode, call) }
+            } finally {
+                writeJobs.remove(job)
             }
+        }
+        writeJobs.add(job)
+    }
+
+    private suspend fun performWrite(barcode: String, call: suspend () -> Unit) {
+        try {
+            call()
+            val fresh = api.getPortions(barcode).toDomain()
+            val current = _state.value
+            if (current is PortionsState.Loaded && current.barcode == barcode) {
+                _state.value = PortionsState.Loaded(barcode, fresh)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            _toastEvents.tryEmit(
+                if (e is IOException) R.string.error_no_internet else R.string.error_save
+            )
         }
     }
 
