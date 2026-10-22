@@ -61,6 +61,8 @@ async def update_food_log(
         row.ingredients = [i.model_dump() for i in req.ingredients]
     else:
         row.grams = req.grams
+        row.unit = req.unit
+        row.unit_qty = req.unit_qty
     await db.commit()
     await db.refresh(row)
     return row

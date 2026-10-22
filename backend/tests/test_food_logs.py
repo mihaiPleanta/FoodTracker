@@ -190,3 +190,63 @@ def test_food_log_snapshot_persists_macros(client):
     assert created["categories"] == ["Spreads"]
     assert created["brand"] == "Ferrero"
     assert created["image_url"] == "https://example/nutella.jpg"
+
+
+def test_create_with_unit_roundtrips(client):
+    _ensure_profile(client)
+    body = {**_VALID_LOG, "grams": 14, "unit": "tsp", "unit_qty": 2.0}
+    r = client.post("/food-logs", json=body, headers=AUTH_HEADER)
+    assert r.status_code == 201, r.text
+    assert r.json()["unit"] == "tsp"
+    assert r.json()["unit_qty"] == 2.0
+    assert r.json()["grams"] == 14
+    d = client.get(f"/days/{_VALID_LOG['log_date']}", headers=AUTH_HEADER)
+    assert d.status_code == 200, d.text
+    item = d.json()["foods_by_meal"]["breakfast"][0]
+    assert item["unit"] == "tsp"
+    assert item["unit_qty"] == 2.0
+    assert item["grams"] == 14
+
+
+def test_create_without_unit_defaults_null(client):
+    _ensure_profile(client)
+    r = client.post("/food-logs", json=_VALID_LOG, headers=AUTH_HEADER)
+    assert r.status_code == 201, r.text
+    assert r.json()["unit"] is None
+    assert r.json()["unit_qty"] is None
+
+
+def test_unit_without_qty_rejected(client):
+    _ensure_profile(client)
+    for extra in ({"unit": "tsp"}, {"unit_qty": 1.0}, {"unit": "tsp", "unit_qty": 0}):
+        r = client.post("/food-logs", json={**_VALID_LOG, **extra}, headers=AUTH_HEADER)
+        assert r.status_code == 422, (extra, r.text)
+
+
+def test_unit_name_length_rejected(client):
+    _ensure_profile(client)
+    for unit in ("   ", "x" * 31):
+        r = client.post(
+            "/food-logs", json={**_VALID_LOG, "unit": unit, "unit_qty": 1.0},
+            headers=AUTH_HEADER,
+        )
+        assert r.status_code == 422, (unit, r.text)
+
+
+def test_patch_sets_and_clears_unit(client):
+    _ensure_profile(client)
+    lid = client.post("/food-logs", json=_VALID_LOG, headers=AUTH_HEADER).json()["id"]
+    r = client.patch(
+        f"/food-logs/{lid}",
+        json={"grams": 30, "unit": "slice", "unit_qty": 1.0},
+        headers=AUTH_HEADER,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["unit"] == "slice"
+    assert r.json()["unit_qty"] == 1.0
+    assert r.json()["grams"] == 30
+    r = client.patch(f"/food-logs/{lid}", json={"grams": 50}, headers=AUTH_HEADER)
+    assert r.status_code == 200, r.text
+    assert r.json()["unit"] is None
+    assert r.json()["unit_qty"] is None
+    assert r.json()["grams"] == 50

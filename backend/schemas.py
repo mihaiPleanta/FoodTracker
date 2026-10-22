@@ -1,7 +1,7 @@
 from datetime import date as _date, datetime as _datetime
 from typing import Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class ProfileRequest(BaseModel):
@@ -67,6 +67,17 @@ class FoodLogIngredient(BaseModel):
     fat_100g: float = Field(ge=0)
 
 
+def _check_unit_pair(unit: Optional[str], unit_qty: Optional[float]) -> None:
+    if unit is None and unit_qty is None:
+        return
+    if unit is None or unit_qty is None:
+        raise ValueError("unit and unit_qty must be both set or both null")
+    if unit_qty <= 0:
+        raise ValueError("unit_qty must be > 0")
+    if not 1 <= len(unit.strip()) <= 30:
+        raise ValueError("unit must be 1-30 characters")
+
+
 class FoodLogCreate(BaseModel):
     log_date: _date
     meal: _MEAL_VALUES
@@ -81,11 +92,25 @@ class FoodLogCreate(BaseModel):
     carbs_100g: float = Field(ge=0)
     fat_100g: float = Field(ge=0)
     ingredients: Optional[List[FoodLogIngredient]] = None
+    unit: Optional[str] = None
+    unit_qty: Optional[float] = None
+
+    @model_validator(mode="after")
+    def _unit_pair(self):
+        _check_unit_pair(self.unit, self.unit_qty)
+        return self
 
 
 class FoodLogUpdate(BaseModel):
     grams: int = Field(gt=0)
     ingredients: Optional[List[FoodLogIngredient]] = None
+    unit: Optional[str] = None
+    unit_qty: Optional[float] = None
+
+    @model_validator(mode="after")
+    def _unit_pair(self):
+        _check_unit_pair(self.unit, self.unit_qty)
+        return self
 
 
 class FoodLogDto(FoodLogCreate):
