@@ -61,10 +61,20 @@ private val ErrorRed = Color(0xFFFF6B6B)
 
 // ── Pure helpers (unit-tested) ────────────────────────────────────────────────
 
-/** Editable text for a quantity: "2", "1,5" — never "½", so [com.example.foodtracker.util.parseQty] can read it back. */
+/**
+ * Editable text for a quantity: "2", "1,5", "1,25" (up to 2 decimals, trailing zeros trimmed) —
+ * never "½", so [com.example.foodtracker.util.parseQty] reads back the same value.
+ */
 fun qtyInputText(qty: Float, decimalSeparator: Char): String =
     if (qty == qty.toInt().toFloat()) qty.toInt().toString()
-    else String.format(java.util.Locale.ROOT, "%.1f", qty).replace('.', decimalSeparator)
+    else String.format(java.util.Locale.ROOT, "%.2f", qty)
+        .trimEnd('0').trimEnd('.')
+        .replace('.', decimalSeparator)
+
+private val EDITABLE_QTY = Regex("""^\d*([.,]\d{0,2})?$""")
+
+/** What the quantity field accepts while typing: ≤ 5 chars, digits, one separator, ≤ 2 decimals. */
+fun isEditableQty(text: String): Boolean = text.length <= 5 && EDITABLE_QTY.matches(text)
 
 /** Grams per unit typed in a dialog: decimals with comma or dot, 0 < g ≤ 5000 (backend limit). */
 fun parseUnitGrams(text: String): Float? {
@@ -113,6 +123,7 @@ fun PortionQuantityStepper(
     onStep: (Float) -> Unit,
     accentColor: Color,
     isInvalid: Boolean,
+    step: Float = 0.5f,
 ) {
     Column {
         Text(
@@ -131,11 +142,11 @@ fun PortionQuantityStepper(
                 .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            StepperButton(symbol = "−", onClick = { onStep(-0.5f) })
+            StepperButton(symbol = "−", onClick = { onStep(-step) })
             BasicTextField(
                 value = qtyText,
                 onValueChange = { new ->
-                    if (new.length <= 5 && new.all { it.isDigit() || it == ',' || it == '.' }) onQtyTextChange(new)
+                    if (isEditableQty(new)) onQtyTextChange(new)
                 },
                 modifier = Modifier.weight(1f),
                 textStyle = TextStyle(
@@ -148,7 +159,7 @@ fun PortionQuantityStepper(
                 cursorBrush = SolidColor(accentColor),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             )
-            StepperButton(symbol = "+", onClick = { onStep(0.5f) })
+            StepperButton(symbol = "+", onClick = { onStep(step) })
         }
     }
 }

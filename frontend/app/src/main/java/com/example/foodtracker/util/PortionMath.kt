@@ -21,12 +21,18 @@ val STANDARD_UNITS: Set<String> = setOf(
 
 fun gramsFor(qty: Float, gramsPerUnit: Float): Int = max(1, (qty * gramsPerUnit).roundToInt())
 
-fun parseQty(text: String): Float? {
+/** Stepper increment: ±50 for millilitres, ±½ for everything else. */
+fun stepFor(unit: String?): Float = if (unit == "ml") 50f else 0.5f
+
+/** Largest quantity accepted: 5000 ml, otherwise 999 units. */
+fun maxQtyFor(unit: String?): Float = if (unit == "ml") 5000f else 999f
+
+fun parseQty(text: String, unit: String? = null): Float? {
     val v = text.trim().replace(',', '.').toFloatOrNull() ?: return null
-    return if (v.isFinite() && v > 0f && v <= 999f) v else null
+    return if (v.isFinite() && v > 0f && v <= maxQtyFor(unit)) v else null
 }
 
-fun stepQty(qty: Float, delta: Float): Float = max(0.5f, qty + delta)
+fun stepQty(qty: Float, delta: Float, floor: Float = 0.5f): Float = max(floor, qty + delta)
 
 fun formatQty(qty: Float, decimalSeparator: Char): String {
     if (qty == 0.5f) return "½"

@@ -59,7 +59,9 @@ import com.example.foodtracker.model.UnitSource
 import com.example.foodtracker.util.PortionChoice
 import com.example.foodtracker.util.gramsFor
 import com.example.foodtracker.util.mergeLoggedUnit
+import com.example.foodtracker.util.maxQtyFor
 import com.example.foodtracker.util.parseQty
+import com.example.foodtracker.util.stepFor
 import com.example.foodtracker.util.stepQty
 import com.example.foodtracker.util.unitPluralRes
 import com.example.foodtracker.viewmodel.PortionsState
@@ -127,7 +129,7 @@ fun AddFoodSheet(
         else units.firstOrNull { it.unit == u }?.grams
     }
     val unitMode = selectedUnit != null && rate != null
-    val qty = parseQty(qtyText)
+    val qty = parseQty(qtyText, selectedUnit)
     val gramsInt = parseGrams(gramsText)
     val choice: PortionChoice? = if (unitMode) {
         qty?.let { q -> PortionChoice(gramsFor(q, rate!!), selectedUnit, q) }
@@ -158,14 +160,22 @@ fun AddFoodSheet(
         dragHandle = null,
     ) {
       AppLocale(LocalAppLanguage.current) {
+        // The confirm button sits outside the scrolling part, so it stays pinned at the bottom of the
+        // (bottom-anchored) sheet: units arriving 0.5-2 s after opening grow the sheet upwards
+        // instead of pushing the button down under a quick tap.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 18.dp)
                 .padding(top = 12.dp, bottom = 22.dp)
                 .navigationBarsPadding(),
         ) {
+          Column(
+              modifier = Modifier
+                  .fillMaxWidth()
+                  .weight(1f, fill = false)
+                  .verticalScroll(rememberScrollState()),
+          ) {
             AddFoodSheetGrabber()
             Spacer(Modifier.height(8.dp))
             AddFoodSheetHeader(
@@ -181,11 +191,13 @@ fun AddFoodSheet(
                     onQtyTextChange = { settled = true; qtyText = it },
                     onStep = { delta ->
                         settled = true
-                        val next = stepQty(qty ?: 0f, delta).coerceAtMost(999f)
+                        val next = stepQty(qty ?: 0f, delta, floor = stepFor(selectedUnit))
+                            .coerceAtMost(maxQtyFor(selectedUnit))
                         qtyText = qtyInputText(next, decimalSep)
                     },
                     accentColor = accentColor,
                     isInvalid = qty == null,
+                    step = stepFor(selectedUnit),
                 )
             } else {
                 AddFoodSheetGramsField(
@@ -235,6 +247,7 @@ fun AddFoodSheet(
                 accentColor = accentColor,
                 showGrams = unitMode,
             )
+          }
             Spacer(Modifier.height(16.dp))
             AnimatedActionButton(
                 label = confirmLabel,

@@ -63,4 +63,23 @@ class PortionMathTest {
         assertEquals(units, mergeLoggedUnit(units, PortionChoice(14, "tsp", 2f)))
         assertEquals(units, mergeLoggedUnit(units, PortionChoice(30, null, null)))
     }
+
+    @Test fun `ml steps by 50 and caps at 5000, other units by half up to 999`() {
+        assertEquals(50f, stepFor("ml"))
+        assertEquals(0.5f, stepFor("tsp"))
+        assertEquals(0.5f, stepFor(null))
+        assertEquals(5000f, maxQtyFor("ml"))
+        assertEquals(999f, maxQtyFor("slice"))
+        assertEquals(1000f, parseQty("1000", "ml"))
+        assertEquals(5000f, parseQty("5000", "ml"))
+        assertNull(parseQty("5001", "ml"))
+        assertNull(parseQty("1000", "slice"))
+        assertEquals(999f, parseQty("999", "slice"))
+    }
+
+    @Test fun `stepQty floors at the unit step`() {
+        assertEquals(300f, stepQty(250f, 50f, floor = 50f))
+        assertEquals(50f, stepQty(50f, -50f, floor = 50f))
+        assertEquals(50f, stepQty(30f, -50f, floor = 50f))
+    }
 }

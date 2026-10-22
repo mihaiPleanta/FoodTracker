@@ -16,6 +16,26 @@ class PortionPickerHelpersTest {
     }
 
     @Test
+    fun `qtyInputText keeps two decimals so an unchanged edit reads back the same value`() {
+        assertEquals("1,25", qtyInputText(1.25f, ','))
+        assertEquals("0.75", qtyInputText(0.75f, '.'))
+        assertEquals("1,3", qtyInputText(1.3f, ','))
+        assertEquals(1.25f, com.example.foodtracker.util.parseQty(qtyInputText(1.25f, ',')))
+    }
+
+    @Test
+    fun `isEditableQty allows digits and at most two decimals`() {
+        assertTrue(isEditableQty(""))
+        assertTrue(isEditableQty("5000"))
+        assertTrue(isEditableQty("1,25"))
+        assertTrue(isEditableQty("1."))
+        assertFalse(isEditableQty("1,255"))
+        assertFalse(isEditableQty("123456"))
+        assertFalse(isEditableQty("1,2,3"))
+        assertFalse(isEditableQty("-1"))
+    }
+
+    @Test
     fun `parseUnitGrams accepts comma or dot and rejects zero or above 5000`() {
         assertEquals(6.5f, parseUnitGrams("6,5"))
         assertEquals(250f, parseUnitGrams(" 250 "))
