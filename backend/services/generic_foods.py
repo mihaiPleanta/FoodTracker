@@ -66,6 +66,9 @@ class GenericFoodsClient:
     def __init__(self, foods: list[GenericFood] | None = None) -> None:
         self._foods = foods if foods is not None else _load_dataset()
 
+    def get(self, food_id: str) -> GenericFood | None:
+        return next((f for f in self._foods if f.id == food_id), None)
+
     def search(self, query: str, limit: int) -> list[FoodItemDto]:
         scored: list[tuple[tuple[int, int], GenericFood]] = []
         for food in self._foods:

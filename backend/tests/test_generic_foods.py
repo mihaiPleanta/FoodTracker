@@ -94,3 +94,9 @@ def test_potato_variants_in_bundled_dataset():
     # The bare "cartof" query still surfaces them alongside boiled/sweet.
     names = {r.name for r in client.search("cartof", 20)}
     assert {"Cartof crud", "Cartof copt", "Cartof prăjit"}.issubset(names)
+
+
+def test_generic_get_by_id():
+    client = _client()
+    assert client.get("usda-rice-white-cooked").name_ro == "Orez alb fiert"
+    assert client.get("nope") is None

@@ -171,3 +171,56 @@ async def test_get_by_barcode_returns_none_when_nutrition_incomplete():
 
     client = OpenFoodFactsClient(http_client=_make_mock_http(handler))
     assert await client.get_by_barcode("111") is None
+
+
+def _portion_client(product: dict, captured=None) -> OpenFoodFactsClient:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if captured is not None:
+            captured["path"] = request.url.path
+            captured["fields"] = request.url.params.get("fields", "")
+        return httpx.Response(200, json={"status": 1, "product": product})
+
+    return OpenFoodFactsClient(http_client=_make_mock_http(handler))
+
+
+@pytest.mark.asyncio
+async def test_portion_info_full_categories():
+    client = _portion_client({"categories_tags": [
+        "en:a", "en:b", "ro:c", "en:d", "en:e"]})
+    info = await client.get_portion_info("123")
+    assert info.categories == ["a", "b", "c", "d", "e"]
+
+
+@pytest.mark.asyncio
+async def test_portion_info_parses_quantities():
+    client = _portion_client({
+        "serving_quantity": "15", "product_quantity": "0.5", "product_quantity_unit": "kg",
+    })
+    info = await client.get_portion_info("123")
+    assert info.serving_g == 15.0
+    assert info.package_g == 500.0
+
+
+@pytest.mark.asyncio
+async def test_portion_info_unknown_unit_drops_package():
+    client = _portion_client({"product_quantity": "6", "product_quantity_unit": "pcs"})
+    info = await client.get_portion_info("123")
+    assert info.package_g is None
+
+
+@pytest.mark.asyncio
+async def test_portion_info_not_found():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"status": 0})
+
+    client = OpenFoodFactsClient(http_client=_make_mock_http(handler))
+    assert await client.get_portion_info("123") is None
+
+
+@pytest.mark.asyncio
+async def test_portion_info_requests_product_fields():
+    captured: dict = {}
+    client = _portion_client({}, captured)
+    await client.get_portion_info("123")
+    assert captured["path"].endswith("/product/123")
+    assert "serving_quantity" in captured["fields"]

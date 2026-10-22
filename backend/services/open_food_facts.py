@@ -5,12 +5,22 @@ import asyncio
 import httpx
 
 from schemas import FoodItemDto
+from services.portions import ProductPortionInfo
 from services.text_match import relevance
 
 USER_AGENT = "FoodTracker/1.0 (mihaipleanta@gmail.com)"
 SEARCH_URL = "https://world.openfoodfacts.org/cgi/search.pl"
 PRODUCT_URL = "https://world.openfoodfacts.org/api/v2/product/{barcode}"
 FIELDS = "code,product_name,product_name_ro,brands,image_small_url,categories_tags,nutriments"
+PORTION_FIELDS = "categories_tags,serving_quantity,product_quantity,product_quantity_unit"
+_UNIT_TO_G = {"g": 1.0, "kg": 1000.0, "ml": 1.0, "l": 1000.0, "cl": 10.0}
+
+
+def _to_float(value) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 class OpenFoodFactsClient:
@@ -68,6 +78,35 @@ class OpenFoodFactsClient:
             return None
         product = body.get("product") or {}
         return self._normalize(product)
+
+    async def get_portion_info(self, barcode: str) -> ProductPortionInfo | None:
+        response = await self._get_with_retry(
+            PRODUCT_URL.format(barcode=barcode),
+            {"fields": PORTION_FIELDS},
+        )
+        body = response.json()
+        if body.get("status") != 1:
+            return None
+        product = body.get("product") or {}
+
+        categories: list[str] = []
+        for tag in product.get("categories_tags") or []:
+            if not isinstance(tag, str):
+                continue
+            stripped = tag.split(":", 1)[1] if ":" in tag else tag
+            if stripped not in categories:
+                categories.append(stripped)
+
+        package_g = _to_float(product.get("product_quantity"))
+        unit = str(product.get("product_quantity_unit") or "g").strip().lower()
+        factor = _UNIT_TO_G.get(unit)
+        package_g = package_g * factor if package_g is not None and factor else None
+
+        return ProductPortionInfo(
+            categories=categories,
+            serving_g=_to_float(product.get("serving_quantity")),
+            package_g=package_g,
+        )
 
     def _normalize(self, product: dict) -> FoodItemDto | None:
         barcode = product.get("code")
