@@ -33,6 +33,13 @@ class MealReminderWorker(
             MealReminderScheduler.Meal.valueOf(mealName)
         }.getOrNull() ?: return Result.success()
 
+        val settings = DataStoreSettingsRepository(applicationContext.settingsDataStore)
+            .settings.first()
+        // Safety net: a stale work may outlive a meal/master switch turned off in Settings.
+        if (!settings.notificationsEnabled || !meal.reminderOf(settings).enabled) {
+            return Result.success()
+        }
+
         val tracker = MealLogTracker(applicationContext.mealLogTrackerDataStore)
         if (tracker.wasLogged(LocalDate.now(), meal.key)) return Result.success()
 
@@ -42,8 +49,6 @@ class MealReminderWorker(
         }
 
         // Build a locale-aware context from the persisted language setting.
-        val settings = DataStoreSettingsRepository(applicationContext.settingsDataStore)
-            .settings.first()
         val languageTag = if (settings.language == AppLanguage.ENGLISH) "en" else "ro"
         val config = Configuration(applicationContext.resources.configuration).apply {
             setLocale(Locale(languageTag))

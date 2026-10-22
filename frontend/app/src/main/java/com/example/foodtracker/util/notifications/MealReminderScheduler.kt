@@ -39,29 +39,44 @@ object MealReminderScheduler {
         }
     }
 
-    /** Enqueue four unique periodic work requests, idempotent thanks to KEEP policy. */
-    fun scheduleAll(context: Context) {
+    /**
+     * Aduce WorkManager la programul dorit de [settings]. Compară cu ce s-a programat efectiv
+     * (persistat), deci mesele neschimbate rămân neatinse, iar o oră salvată înainte de un
+     * process death se aplică la următoarea pornire.
+     */
+    suspend fun sync(context: Context, settings: AppSettings) {
+        val store = ScheduledReminderStore(context.reminderScheduleDataStore)
+        val desired = desiredSchedule(settings)
+        val scheduled = store.read() ?: assumedLegacySchedule(settings)
         val wm = WorkManager.getInstance(context)
         val now = LocalDateTime.now()
-        Meal.values().forEach { meal ->
-            val delayMillis = nextOccurrenceMillis(meal.reminderOf(AppSettings()).minuteOfDay, now)
-            // Folosim overload-urile (long, TimeUnit) — variantele cu java.time.Duration
-            // din WorkManager cer API 26+ și nu sunt acoperite de desugaring.
-            val request = PeriodicWorkRequestBuilder<MealReminderWorker>(1, TimeUnit.DAYS)
-                .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
-                .setInputData(workDataOf(MealReminderWorker.KEY_MEAL to meal.name))
-                .addTag(TAG)
-                .build()
-            wm.enqueueUniquePeriodicWork(
-                meal.uniqueWorkName,
-                ExistingPeriodicWorkPolicy.KEEP,
-                request,
-            )
+        reconcile(desired, scheduled).forEach { (meal, action) ->
+            when (action) {
+                is ReminderAction.Keep ->
+                    enqueue(wm, meal, action.minuteOfDay, now, ExistingPeriodicWorkPolicy.KEEP)
+                is ReminderAction.Schedule ->
+                    enqueue(wm, meal, action.minuteOfDay, now, ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE)
+                ReminderAction.Cancel -> wm.cancelUniqueWork(meal.uniqueWorkName)
+            }
         }
+        store.write(desired)
     }
 
-    fun cancelAll(context: Context) {
-        WorkManager.getInstance(context).cancelAllWorkByTag(TAG)
+    private fun enqueue(
+        wm: WorkManager,
+        meal: Meal,
+        minuteOfDay: Int,
+        now: LocalDateTime,
+        policy: ExistingPeriodicWorkPolicy,
+    ) {
+        // Folosim overload-urile (long, TimeUnit) — variantele cu java.time.Duration
+        // din WorkManager cer API 26+ și nu sunt acoperite de desugaring.
+        val request = PeriodicWorkRequestBuilder<MealReminderWorker>(1, TimeUnit.DAYS)
+            .setInitialDelay(nextOccurrenceMillis(minuteOfDay, now), TimeUnit.MILLISECONDS)
+            .setInputData(workDataOf(MealReminderWorker.KEY_MEAL to meal.name))
+            .addTag(TAG)
+            .build()
+        wm.enqueueUniquePeriodicWork(meal.uniqueWorkName, policy, request)
     }
 
     internal fun nextOccurrenceMillis(minuteOfDay: Int, now: LocalDateTime): Long {

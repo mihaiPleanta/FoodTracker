@@ -33,6 +33,7 @@ import com.example.foodtracker.data.cache.RoomFoodCache
 import com.example.foodtracker.data.mealLogTrackerDataStore
 import com.example.foodtracker.data.settingsDataStore
 import com.example.foodtracker.util.notifications.MealReminderScheduler
+import com.example.foodtracker.util.notifications.desiredSchedule
 import com.example.foodtracker.util.notifications.MealReminderWorker
 import com.example.foodtracker.util.notifications.NotificationChannels
 import com.example.foodtracker.util.AppLocale
@@ -45,7 +46,6 @@ import com.example.foodtracker.viewmodel.RecipeViewModel
 import java.net.URLDecoder
 import java.net.URLEncoder
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 
 class MainActivity : ComponentActivity() {
     private var pendingDeepLink by mutableStateOf<DeepLink?>(null)
@@ -108,18 +108,13 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // Reschedule/cancel meal reminders whenever notificationsEnabled changes
-                // (also fires once on initial collect with the persisted value).
+                // Sync meal reminders whenever the desired schedule (master switch + per-meal
+                // time/toggle) changes; also fires once on start to apply anything left pending.
                 LaunchedEffect(Unit) {
                     viewModel.appSettings
-                        .map { it.notificationsEnabled }
-                        .distinctUntilChanged()
-                        .collect { enabled ->
-                            if (enabled) {
-                                MealReminderScheduler.scheduleAll(applicationContext)
-                            } else {
-                                MealReminderScheduler.cancelAll(applicationContext)
-                            }
+                        .distinctUntilChanged { old, new -> desiredSchedule(old) == desiredSchedule(new) }
+                        .collect { settings ->
+                            MealReminderScheduler.sync(applicationContext, settings)
                         }
                 }
 
