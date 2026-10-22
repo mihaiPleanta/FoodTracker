@@ -39,6 +39,7 @@ import com.example.foodtracker.util.AppLocale
 import com.example.foodtracker.viewmodel.AuthViewModel
 import com.example.foodtracker.viewmodel.FoodViewModel
 import com.example.foodtracker.viewmodel.FoodViewModelFactory
+import com.example.foodtracker.viewmodel.PortionsViewModel
 import com.example.foodtracker.viewmodel.QuickPicksViewModel
 import com.example.foodtracker.viewmodel.RecipeViewModel
 import java.net.URLDecoder
@@ -78,6 +79,7 @@ class MainActivity : ComponentActivity() {
             val recipeViewModel: RecipeViewModel = viewModel()
             // Activity-scoped like recipeViewModel; reset on logout so lists never leak between accounts.
             val quickPicksViewModel: QuickPicksViewModel = viewModel()
+            val portionsViewModel: PortionsViewModel = viewModel()
             val appSettings by viewModel.appSettings.collectAsState()
             // enableEdgeToEdge()'s auto() follows the *system* dark mode; keep the
             // status/nav bar icon contrast in sync with the in-app theme toggle.
@@ -273,6 +275,7 @@ class MainActivity : ComponentActivity() {
                                             viewModel.resetUserState()
                                             recipeViewModel.resetUserState()
                                             quickPicksViewModel.resetUserState()
+                                            portionsViewModel.resetUserState()
                                             navController.navigate("login") {
                                                 popUpTo(0) { inclusive = true }
                                             }
@@ -281,6 +284,7 @@ class MainActivity : ComponentActivity() {
                                             viewModel.resetUserState()
                                             recipeViewModel.resetUserState()
                                             quickPicksViewModel.resetUserState()
+                                            portionsViewModel.resetUserState()
                                             navController.navigate("login") {
                                                 popUpTo(0) { inclusive = true }
                                             }
