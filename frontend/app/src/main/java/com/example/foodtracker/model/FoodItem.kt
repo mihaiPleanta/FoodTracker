@@ -35,6 +35,8 @@ data class LoggedFood(
     val grams: Int,
     val id: Long? = null,
     val clientTempId: String? = null,
+    val unit: String? = null,
+    val unitQty: Float? = null,
 ) {
     val calories: Int get() = (food.per100g * grams / 100f).toInt()
     val protein:  Float get() = food.protein100g * grams / 100f

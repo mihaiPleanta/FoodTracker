@@ -429,6 +429,8 @@ class FoodViewModel(
                         carbs100g = optimistic.food.carbs100g,
                         fat100g = optimistic.food.fat100g,
                         ingredients = optimistic.food.ingredients?.map { it.toDto() },
+                        unit = optimistic.unit,
+                        unitQty = optimistic.unitQty,
                     )
                 )
                 replaceByTempId(key, mealName, tempId) { it.copy(id = response.id, clientTempId = null) }
@@ -531,40 +533,40 @@ class FoodViewModel(
         _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, list))
     }
 
-    fun updateFoodGrams(mealName: String, index: Int, newGrams: Int) {
+    fun updateFoodPortion(mealName: String, index: Int, grams: Int, unit: String?, unitQty: Float?) {
         val key = dateKey(_selectedHomeDate.value)
         val day = _foodsByDate.value[key] ?: return
         val list = mealList(day, mealName)
         if (index !in list.indices) return
         val target = list[index]
         val id = target.id ?: return          // încă în POST pending — edit indisponibil
-        if (newGrams == target.grams) return  // no-op
+        if (grams == target.grams && unit == target.unit && unitQty == target.unitQty) return  // no-op
 
         // Optimistic update (pe loc, fără reordonare)
-        val optimistic = target.copy(grams = newGrams)
+        val optimistic = target.copy(grams = grams, unit = unit, unitQty = unitQty)
         val newList = list.toMutableList().also { it[index] = optimistic }
         _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
 
         viewModelScope.launch {
             try {
-                logsApi.updateFoodLog(id, FoodLogUpdateDto(grams = newGrams))
+                logsApi.updateFoodLog(id, FoodLogUpdateDto(grams = grams, unit = unit, unitQty = unitQty))
             } catch (e: java.io.IOException) {
-                restoreGrams(key, mealName, id, target.grams)
+                restorePortion(key, mealName, id, target)
                 _toastEvents.tryEmit(ToastEvent(R.string.error_no_internet))
             } catch (e: retrofit2.HttpException) {
-                restoreGrams(key, mealName, id, target.grams)
+                restorePortion(key, mealName, id, target)
                 _toastEvents.tryEmit(ToastEvent(R.string.error_save, e.code()))
             } catch (e: Throwable) {
-                restoreGrams(key, mealName, id, target.grams)
+                restorePortion(key, mealName, id, target)
                 _toastEvents.tryEmit(ToastEvent(R.string.error_save))
             }
         }
     }
 
-    private fun restoreGrams(key: String, mealName: String, id: Long, oldGrams: Int) {
+    private fun restorePortion(key: String, mealName: String, id: Long, old: LoggedFood) {
         val day = _foodsByDate.value[key] ?: return
         val list = mealList(day, mealName)
-        val newList = list.map { if (it.id == id) it.copy(grams = oldGrams) else it }
+        val newList = list.map { if (it.id == id) it.copy(grams = old.grams, unit = old.unit, unitQty = old.unitQty) else it }
         _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
     }
 

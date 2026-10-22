@@ -283,7 +283,7 @@ fun MealDetailScreen(
                     initialGrams = logged.grams,
                     onDismiss = { editTarget = null },
                     onConfirm = { _, grams ->
-                        viewModel.updateFoodGrams(mealName, index, grams)
+                        viewModel.updateFoodPortion(mealName, index, grams, unit = null, unitQty = null)
                         editTarget = null
                     },
                 )

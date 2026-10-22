@@ -19,6 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -50,11 +51,16 @@ private object NoOpFoodApi : FoodApi {
 
 /**
  * Fake LogsApi for testing the PATCH-grams flow. getDay seeds one breakfast item with a real id
- * (so updateFoodGrams has something to edit without going through the add path / markLogged);
+ * (so updateFoodPortion has something to edit without going through the add path / markLogged);
  * updateFoodLog echoes the new grams and records the call. The rest throw.
  */
 private class FakeLogsApi : LogsApi {
     var lastUpdate: Pair<Long, Int>? = null
+    var lastUpdateBody: FoodLogUpdateDto? = null
+    var lastCreate: FoodLogCreateDto? = null
+    var failUpdateWith: Throwable? = null
+    var seedUnit: String? = null
+    var seedUnitQty: Float? = null
 
     override suspend fun getDay(date: String): DayResponseDto = DayResponseDto(
         foodsByMeal = mapOf(
@@ -63,7 +69,7 @@ private class FakeLogsApi : LogsApi {
                     id = 42L, logDate = date, meal = "BREAKFAST", grams = 100,
                     barcode = "111", name = "Oats", brand = null, imageUrl = null,
                     categories = emptyList(), kcal100g = 100f, protein100g = 5f,
-                    carbs100g = 10f, fat100g = 2f,
+                    carbs100g = 10f, fat100g = 2f, unit = seedUnit, unitQty = seedUnitQty,
                 )
             )
         ),
@@ -71,10 +77,19 @@ private class FakeLogsApi : LogsApi {
         weightCheckIn = null,
     )
 
-    override suspend fun createFoodLog(body: FoodLogCreateDto): FoodLogDto =
-        throw UnsupportedOperationException()
+    override suspend fun createFoodLog(body: FoodLogCreateDto): FoodLogDto {
+        lastCreate = body
+        return FoodLogDto(
+            id = 7L, logDate = body.logDate, meal = body.meal, grams = body.grams,
+            barcode = body.barcode, name = body.name, kcal100g = body.kcal100g,
+            protein100g = body.protein100g, carbs100g = body.carbs100g, fat100g = body.fat100g,
+            unit = body.unit, unitQty = body.unitQty,
+        )
+    }
 
     override suspend fun updateFoodLog(id: Long, body: FoodLogUpdateDto): FoodLogDto {
+        failUpdateWith?.let { throw it }
+        lastUpdateBody = body
         lastUpdate = id to body.grams
         return FoodLogDto(
             id = id, logDate = "2026-06-03", meal = "BREAKFAST", grams = body.grams,
@@ -235,7 +250,7 @@ class FoodViewModelTest {
     }
 
     @Test
-    fun updateFoodGrams_updatesGramsInPlace() = runTest(testDispatcher) {
+    fun updateFoodPortion_updatesGramsInPlace() = runTest(testDispatcher) {
         val fakeLogs = FakeLogsApi()
         val store = PreferenceDataStoreFactory.create(
             produceFile = { File(tempFolder.newFolder("tracker3"), "meal_log_tracker.preferences_pb") }
@@ -254,12 +269,80 @@ class FoodViewModelTest {
         assertEquals(1, foods.size)
         assertEquals(100, foods[0].grams)
 
-        vm.updateFoodGrams("Breakfast", 0, 175)
+        vm.updateFoodPortion("Breakfast", 0, 175, unit = null, unitQty = null)
         advanceUntilIdle()  // PATCH resolves
 
         assertEquals(1, foods.size)                     // still one item, in place
         assertEquals(175, foods[0].grams)               // grams updated
         assertEquals(42L to 175, fakeLogs.lastUpdate)   // PATCH sent id + new grams
+        job.cancel()
+    }
+
+
+    private fun TestScope.newVm(fake: FakeLogsApi, folder: String) = FoodViewModel(
+        settingsRepository = FakeSettingsRepository(),
+        mealLogTracker = MealLogTracker(
+            PreferenceDataStoreFactory.create(
+                produceFile = { File(tempFolder.newFolder(folder), "meal_log_tracker.preferences_pb") }
+            )
+        ),
+        foodRepository = FoodRepository(NoOpFoodApi, NoOpCache),
+        logsApi = fake,
+    )
+
+    @Test
+    fun addFood_sendsUnitAndQty() = runTest(testDispatcher) {
+        val fake = FakeLogsApi()
+        val vm = newVm(fake, "addUnit")
+        advanceUntilIdle()
+        val food = FoodItem(
+            barcode = "999", name = "Bread", brand = null, imageUrl = null,
+            categories = emptyList(), per100g = 250, protein100g = 8f, carbs100g = 45f, fat100g = 3f,
+        )
+        vm.addFoodToMeal("Lunch", LoggedFood(food, 60, unit = "slice", unitQty = 2f))
+        advanceUntilIdle()
+        assertEquals("slice", fake.lastCreate?.unit)
+        assertEquals(2f, fake.lastCreate?.unitQty)
+    }
+
+    @Test
+    fun updateFoodPortion_patchesUnit() = runTest(testDispatcher) {
+        val fake = FakeLogsApi()
+        val vm = newVm(fake, "patchUnit")
+        var foods: List<LoggedFood> = emptyList()
+        val job = launch { vm.getFoodsFlow("Breakfast").collect { foods = it } }
+        advanceUntilIdle()
+
+        vm.updateFoodPortion("Breakfast", 0, 60, unit = "slice", unitQty = 2f)
+        advanceUntilIdle()
+
+        assertEquals(60, fake.lastUpdateBody?.grams)
+        assertEquals("slice", fake.lastUpdateBody?.unit)
+        assertEquals(2f, fake.lastUpdateBody?.unitQty)
+        assertEquals(60, foods[0].grams)
+        assertEquals("slice", foods[0].unit)
+        assertEquals(2f, foods[0].unitQty)
+        job.cancel()
+    }
+
+    @Test
+    fun updateFoodPortion_rollbackRestoresUnit() = runTest(testDispatcher) {
+        val fake = FakeLogsApi().apply {
+            seedUnit = "tsp"; seedUnitQty = 3f
+            failUpdateWith = java.io.IOException("offline")
+        }
+        val vm = newVm(fake, "rollbackUnit")
+        var foods: List<LoggedFood> = emptyList()
+        val job = launch { vm.getFoodsFlow("Breakfast").collect { foods = it } }
+        advanceUntilIdle()
+        assertEquals("tsp", foods[0].unit)
+
+        vm.updateFoodPortion("Breakfast", 0, 60, unit = "slice", unitQty = 2f)
+        advanceUntilIdle()
+
+        assertEquals(100, foods[0].grams)
+        assertEquals("tsp", foods[0].unit)
+        assertEquals(3f, foods[0].unitQty)
         job.cancel()
     }
 

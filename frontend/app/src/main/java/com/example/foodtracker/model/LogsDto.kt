@@ -17,6 +17,8 @@ fun FoodLogIngredientDto.toDomain() = FoodIngredient(name, grams, kcal100g, prot
 data class FoodLogUpdateDto(
     val grams: Int,
     val ingredients: List<FoodLogIngredientDto>? = null,
+    val unit: String? = null,
+    @SerializedName("unit_qty") val unitQty: Float? = null,
 )
 
 data class FoodLogCreateDto(
@@ -33,6 +35,8 @@ data class FoodLogCreateDto(
     @SerializedName("carbs_100g") val carbs100g: Float,
     @SerializedName("fat_100g") val fat100g: Float,
     val ingredients: List<FoodLogIngredientDto>? = null,
+    val unit: String? = null,
+    @SerializedName("unit_qty") val unitQty: Float? = null,
 )
 
 data class FoodLogDto(
@@ -50,6 +54,8 @@ data class FoodLogDto(
     @SerializedName("carbs_100g") val carbs100g: Float,
     @SerializedName("fat_100g") val fat100g: Float,
     val ingredients: List<FoodLogIngredientDto>? = null,
+    val unit: String? = null,
+    @SerializedName("unit_qty") val unitQty: Float? = null,
 ) {
     fun toLogged(): LoggedFood = LoggedFood(
         food = FoodItem(
@@ -67,6 +73,8 @@ data class FoodLogDto(
         grams = grams,
         id = id,
         clientTempId = null,
+        unit = unit,
+        unitQty = unitQty,
     )
 }
 
