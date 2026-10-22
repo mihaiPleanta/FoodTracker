@@ -3,6 +3,8 @@ package com.example.foodtracker.util.notifications
 import android.content.Context
 import androidx.annotation.StringRes
 import com.example.foodtracker.R
+import com.example.foodtracker.model.AppSettings
+import com.example.foodtracker.model.MealReminder
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
@@ -21,14 +23,20 @@ object MealReminderScheduler {
         @StringRes val nameRes: Int,
         val emoji: String,
         val accentHex: String,
-        val targetHour: Int,
         val notificationId: Int,
         val uniqueWorkName: String,
     ) {
-        BREAKFAST("Breakfast", R.string.notif_meal_name_breakfast, "🍳", "FFD600", 8,  1, "meal_reminder_breakfast"),
-        LUNCH    ("Lunch",     R.string.notif_meal_name_lunch,     "🥗", "00E676", 13, 2, "meal_reminder_lunch"),
-        SNACKS   ("Snacks",    R.string.notif_meal_name_snacks,    "🍎", "FF6D00", 16, 3, "meal_reminder_snacks"),
-        DINNER   ("Dinner",    R.string.notif_meal_name_dinner,    "🍝", "448AFF", 19, 4, "meal_reminder_dinner"),
+        BREAKFAST("Breakfast", R.string.notif_meal_name_breakfast, "🍳", "FFD600", 1, "meal_reminder_breakfast"),
+        LUNCH    ("Lunch",     R.string.notif_meal_name_lunch,     "🥗", "00E676", 2, "meal_reminder_lunch"),
+        SNACKS   ("Snacks",    R.string.notif_meal_name_snacks,    "🍎", "FF6D00", 3, "meal_reminder_snacks"),
+        DINNER   ("Dinner",    R.string.notif_meal_name_dinner,    "🍝", "448AFF", 4, "meal_reminder_dinner");
+
+        fun reminderOf(settings: AppSettings): MealReminder = when (this) {
+            BREAKFAST -> settings.breakfastReminder
+            LUNCH     -> settings.lunchReminder
+            SNACKS    -> settings.snacksReminder
+            DINNER    -> settings.dinnerReminder
+        }
     }
 
     /** Enqueue four unique periodic work requests, idempotent thanks to KEEP policy. */
@@ -36,7 +44,7 @@ object MealReminderScheduler {
         val wm = WorkManager.getInstance(context)
         val now = LocalDateTime.now()
         Meal.values().forEach { meal ->
-            val delayMillis = nextOccurrenceMillis(meal.targetHour, now)
+            val delayMillis = nextOccurrenceMillis(meal.reminderOf(AppSettings()).minuteOfDay, now)
             // Folosim overload-urile (long, TimeUnit) — variantele cu java.time.Duration
             // din WorkManager cer API 26+ și nu sunt acoperite de desugaring.
             val request = PeriodicWorkRequestBuilder<MealReminderWorker>(1, TimeUnit.DAYS)
@@ -56,8 +64,8 @@ object MealReminderScheduler {
         WorkManager.getInstance(context).cancelAllWorkByTag(TAG)
     }
 
-    internal fun nextOccurrenceMillis(targetHour: Int, now: LocalDateTime): Long {
-        val todayAtTarget = now.toLocalDate().atTime(LocalTime.of(targetHour, 0))
+    internal fun nextOccurrenceMillis(minuteOfDay: Int, now: LocalDateTime): Long {
+        val todayAtTarget = now.toLocalDate().atTime(LocalTime.of(minuteOfDay / 60, minuteOfDay % 60))
         val target = if (now.isBefore(todayAtTarget)) todayAtTarget else todayAtTarget.plusDays(1)
         return Duration.between(now, target).toMillis()
     }
