@@ -41,10 +41,28 @@ class _Entry:
     presets: Tuple[int, ...]
 
 
+_DIACRITICS = str.maketrans("ăâîșşțţ", "aaisstt")
+
+
+def _normalize_tag(tag: str) -> str:
+    """'Ulei de măsline' -> 'ulei-de-masline', so RO/free-text OFF tags match table keys."""
+    return "-".join(tag.strip().lower().translate(_DIACRITICS).split())
+
+
 class PortionTable:
-    def __init__(self, categories: Dict[str, _Entry], generics: Dict[str, _Entry]):
+    def __init__(
+        self,
+        categories: Dict[str, _Entry],
+        generics: Dict[str, _Entry],
+        aliases: Optional[Dict[str, str]] = None,
+    ):
         self._categories = categories
         self._generics = generics
+        self._aliases = {_normalize_tag(k): v for k, v in (aliases or {}).items()}
+
+    def _entry_for(self, tag: str) -> Optional[_Entry]:
+        key = _normalize_tag(tag)
+        return self._categories.get(key) or self._categories.get(self._aliases.get(key, ""))
 
     @staticmethod
     def _result(entry: _Entry) -> Tuple[List[UnitOption], List[int]]:
@@ -54,8 +72,9 @@ class PortionTable:
         if generic_id is not None and generic_id in self._generics:
             return self._result(self._generics[generic_id])
         for tag in reversed(categories):
-            if tag in self._categories:
-                return self._result(self._categories[tag])
+            entry = self._entry_for(tag)
+            if entry is not None:
+                return self._result(entry)
         return [], []
 
 
@@ -71,6 +90,7 @@ def load_table(path: Path = _DATA_PATH) -> PortionTable:
     return PortionTable(
         {k: _parse_entry(v) for k, v in raw.get("categories", {}).items()},
         {k: _parse_entry(v) for k, v in raw.get("generics", {}).items()},
+        {str(k): str(v) for k, v in raw.get("aliases", {}).items()},
     )
 
 

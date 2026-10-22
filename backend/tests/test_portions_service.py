@@ -128,3 +128,41 @@ def test_real_table_dry_rice_pasta_vs_cooked_generics():
     ):
         units, _ = t.lookup(cats, gid)
         assert {u.unit: u.grams for u in units}.get("bowl") == bowl
+
+
+def _alias_table(tmp_path):
+    data = {
+        "categories": {
+            "rices": {"units": [{"unit": "serving", "grams": 75}], "presets": [50, 75]},
+            "honeys": {"units": [{"unit": "tsp", "grams": 7}], "presets": [10]},
+            "olive-oils": {"units": [{"unit": "tbsp", "grams": 14}], "presets": [5]},
+        },
+        "generics": {},
+        "aliases": {"orez": "rices", "miere": "honeys", "ulei-de-masline": "olive-oils"},
+    }
+    p = tmp_path / "a.json"
+    p.write_text(json.dumps(data), encoding="utf-8")
+    return load_table(p)
+
+
+def test_lookup_ignores_case_and_diacritics(tmp_path):
+    t = _alias_table(tmp_path)
+    assert [u.unit for u in t.lookup(["Rices"], None)[0]] == ["serving"]
+    assert [u.unit for u in t.lookup(["Orez"], None)[0]] == ["serving"]
+    assert [u.unit for u in t.lookup(["Ulei de măsline"], None)[0]] == ["tbsp"]
+
+
+def test_lookup_romanian_alias_most_specific_wins(tmp_path):
+    t = _alias_table(tmp_path)
+    units, presets = t.lookup(["Orez", "miere"], None)
+    assert [(u.unit, u.grams) for u in units] == [("tsp", 7)]
+    assert presets == [10]
+
+
+def test_real_table_aliases_point_to_categories():
+    raw = json.loads((__import__("pathlib").Path(__file__).resolve().parent.parent / "data" / "portion_units.json").read_text(encoding="utf-8"))
+    for alias, target in raw["aliases"].items():
+        assert target in raw["categories"], alias
+    t = load_table()
+    for tag in ("Orez", "pâine", "Miere", "ulei", "ouă", "lapte", "iaurt", "unt", "cașcaval"):
+        assert t.lookup([tag], None)[0], tag
