@@ -151,3 +151,37 @@ class FavoriteFood(Base):
         CheckConstraint("carbs_100g >= 0", name="ck_favorite_foods_carbs_nonneg"),
         CheckConstraint("fat_100g >= 0", name="ck_favorite_foods_fat_nonneg"),
     )
+
+
+class UserPortionUnit(Base):
+    __tablename__ = "user_portion_units"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    uid: Mapped[str] = mapped_column(
+        String, ForeignKey("profiles.uid", ondelete="CASCADE"), nullable=False
+    )
+    barcode: Mapped[str] = mapped_column(String, nullable=False)
+    unit: Mapped[str] = mapped_column(String, nullable=False)
+    unit_key: Mapped[str] = mapped_column(String, nullable=False)
+    grams: Mapped[float] = mapped_column(Float, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint("uid", "barcode", "unit_key", name="uq_user_portion_units_uid_barcode_key"),
+        CheckConstraint("grams > 0", name="ck_user_portion_units_grams_pos"),
+    )
+
+
+class UserGramPresets(Base):
+    __tablename__ = "user_gram_presets"
+
+    uid: Mapped[str] = mapped_column(
+        String, ForeignKey("profiles.uid", ondelete="CASCADE"), primary_key=True
+    )
+    barcode: Mapped[str] = mapped_column(String, primary_key=True)
+    presets: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )

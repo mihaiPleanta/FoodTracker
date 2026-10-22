@@ -229,3 +229,42 @@ class SavedRecipeDto(BaseModel):
     title: str
     recipe: RecipeDto
     created_at: _datetime
+
+
+class PortionUnitIn(BaseModel):
+    unit: str
+    grams: float = Field(gt=0, le=5000)
+
+    @field_validator("unit")
+    @classmethod
+    def _check_unit(cls, v: str) -> str:
+        from services.portions import STANDARD_UNITS
+
+        if v in STANDARD_UNITS:
+            return v  # exact standard key: a gram correction for a standard unit
+        v = v.strip()
+        if not 1 <= len(v) <= 30:
+            raise ValueError("unit must be 1-30 characters")
+        if v.casefold() in STANDARD_UNITS:
+            raise ValueError("custom unit name collides with a standard unit key")
+        return v
+
+
+class PortionUnitOut(BaseModel):
+    unit: str
+    grams: float
+
+
+class GramPresetsIn(BaseModel):
+    grams: List[int] = Field(min_length=1, max_length=5)
+
+    @field_validator("grams")
+    @classmethod
+    def _check_values(cls, v: List[int]) -> List[int]:
+        if any(not 1 <= g <= 5000 for g in v):
+            raise ValueError("each value must be between 1 and 5000")
+        return v
+
+
+class GramPresetsOut(BaseModel):
+    grams: List[int]
