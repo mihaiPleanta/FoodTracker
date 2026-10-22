@@ -111,7 +111,7 @@ class MainActivity : ComponentActivity() {
                 // Sync meal reminders whenever the desired schedule (master switch + per-meal
                 // time/toggle) changes; also fires once on start to apply anything left pending.
                 LaunchedEffect(Unit) {
-                    viewModel.appSettings
+                    viewModel.persistedSettings
                         .distinctUntilChanged { old, new -> desiredSchedule(old) == desiredSchedule(new) }
                         .collect { settings ->
                             MealReminderScheduler.sync(applicationContext, settings)

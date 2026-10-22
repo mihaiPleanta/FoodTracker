@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -193,6 +194,9 @@ class FoodViewModel(
             started = SharingStarted.Eagerly,
             initialValue = AppSettings()
         )
+
+    /** Only values read from storage — no AppSettings() placeholder (used by reminder sync). */
+    val persistedSettings: Flow<AppSettings> = settingsRepository.settings
 
     fun updateAppSettings(settings: AppSettings) {
         viewModelScope.launch {

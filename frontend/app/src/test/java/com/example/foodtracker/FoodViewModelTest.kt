@@ -5,6 +5,11 @@ import com.example.foodtracker.api.FoodApi
 import com.example.foodtracker.api.LogsApi
 import com.example.foodtracker.api.ProfileApi
 import com.example.foodtracker.data.FakeSettingsRepository
+import com.example.foodtracker.data.SettingsRepository
+import com.example.foodtracker.model.MealReminder
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import com.example.foodtracker.data.FoodRepository
 import com.example.foodtracker.data.MealLogTracker
 import com.example.foodtracker.data.cache.CachedProduct
@@ -221,6 +226,30 @@ class FoodViewModelTest {
         val profile = UserProfile(name = "Ana", age = 25, gender = Gender.FEMALE)
         viewModel.updateUserProfile(profile)
         assertEquals(profile, viewModel.userProfile.value)
+    }
+
+    @Test
+    fun persistedSettings_firstValueIsStoredOneNotDefaults() = runTest(testDispatcher) {
+        // Reminder sync must never run on the fabricated AppSettings() placeholder that
+        // appSettings starts with before DataStore loads — it would reschedule custom times.
+        val stored = AppSettings(lunchReminder = MealReminder(enabled = true, minuteOfDay = 750))
+        val slowRepo = object : SettingsRepository {
+            override val settings = flow { delay(1_000); emit(stored) }
+            override suspend fun update(settings: AppSettings) = Unit
+        }
+        val vm = FoodViewModel(
+            settingsRepository = slowRepo,
+            mealLogTracker = MealLogTracker(
+                PreferenceDataStoreFactory.create(
+                    scope = dataStoreScope,
+                    produceFile = { File(tempFolder.newFolder("tracker2"), "meal_log_tracker.preferences_pb") }
+                )
+            ),
+            foodRepository = FoodRepository(NoOpFoodApi, NoOpCache),
+            logsApi = SwitchableLogsApi(emptyDay()),
+            profileApi = NoOpProfileApi,
+        )
+        assertEquals(stored, vm.persistedSettings.first())
     }
 
     @Test
