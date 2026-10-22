@@ -48,6 +48,9 @@ import com.example.foodtracker.ui.theme.glassCard
 import com.example.foodtracker.util.LocalAppLanguage
 import com.example.foodtracker.util.toLocale
 import com.example.foodtracker.viewmodel.FoodViewModel
+import com.example.foodtracker.viewmodel.PortionsViewModel
+import com.example.foodtracker.util.PortionChoice
+import com.example.foodtracker.util.portionText
 import com.example.foodtracker.viewmodel.WeightCheckIn
 import java.net.URLEncoder
 import java.text.SimpleDateFormat
@@ -66,7 +69,9 @@ data class MealEntry(
     val name: String,
     val grams: Int,
     val calories: Int,
-    val isRecipe: Boolean = false
+    val isRecipe: Boolean = false,
+    val unit: String? = null,
+    val unitQty: Float? = null,
 )
 
 data class MealSection(
@@ -91,7 +96,7 @@ private fun goalsModeRes(mode: GoalsMode): Int = when (mode) {
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 @Composable
-fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
+fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions: PortionsViewModel) {
     val appLocale = LocalAppLanguage.current.toLocale()
     val calendarDays = remember(appLocale) { generateCalendarDays(appLocale) }
     val todayIndex = calendarDays.indexOfFirst { it.isToday }
@@ -111,6 +116,9 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
             val msg = if (event.code != null) "$base (${event.code})" else base
             snackbarHostState.showSnackbar(msg)
         }
+    }
+    LaunchedEffect(resources) {
+        portions.toastEvents.collect { res -> snackbarHostState.showSnackbar(resources.getString(res)) }
     }
 
     LaunchedEffect(Unit) {
@@ -183,7 +191,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
                 protein          = foods.sumOf { it.protein.toDouble() }.toInt(),
                 carbs            = foods.sumOf { it.carbs.toDouble() }.toInt(),
                 fat              = foods.sumOf { it.fat.toDouble() }.toInt(),
-                entries          = foods.map { MealEntry(it.food.name, it.grams, it.calories, it.food.ingredients != null) },
+                entries          = foods.map { MealEntry(it.food.name, it.grams, it.calories, it.food.ingredients != null, it.unit, it.unitQty) },
                 accentColor      = color
             )
         }
@@ -337,10 +345,11 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel) {
                     target = logged.food,
                     accentColor = accent,
                     confirmLabel = stringResource(R.string.action_save),
-                    initialGrams = logged.grams,
+                    portions = portions,
+                    initial = PortionChoice(logged.grams, logged.unit, logged.unitQty),
                     onDismiss = { editTarget = null },
-                    onConfirm = { _, grams ->
-                        viewModel.updateFoodPortion(mealName, index, grams, unit = null, unitQty = null)
+                    onConfirm = { _, choice ->
+                        viewModel.updateFoodPortion(mealName, index, choice.grams, choice.unit, choice.unitQty)
                         editTarget = null
                     },
                 )
@@ -729,7 +738,7 @@ fun MealEntryRow(entry: MealEntry, accentColor: Color, onEdit: () -> Unit) {
         }
         Text(
             if (entry.isRecipe) "${stringResource(R.string.recipe_portion_one)}  ·  ${entry.calories} kcal"
-            else "${entry.grams}g  ·  ${entry.calories} kcal",
+            else "${portionText(entry.grams, entry.unit, entry.unitQty)}  ·  ${entry.calories} kcal",
             fontSize = 12.sp, color = GlassColors.textSecondary,
             maxLines = 1, softWrap = false)
     }

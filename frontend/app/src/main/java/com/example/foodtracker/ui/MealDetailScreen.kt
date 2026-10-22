@@ -69,6 +69,9 @@ import com.example.foodtracker.util.findActivity
 import com.example.foodtracker.util.scaleNutrition
 import com.example.foodtracker.viewmodel.FoodViewModel
 import com.example.foodtracker.viewmodel.QuickPicksViewModel
+import com.example.foodtracker.viewmodel.PortionsViewModel
+import com.example.foodtracker.util.PortionChoice
+import com.example.foodtracker.util.portionText
 import kotlinx.coroutines.launch
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -81,6 +84,7 @@ fun MealDetailScreen(
     navController: NavController,
     viewModel: FoodViewModel,
     quickPicks: QuickPicksViewModel,
+    portions: PortionsViewModel,
 ) {
     val loggedFoods by viewModel.getFoodsFlow(mealName).collectAsState()
     val searchState by viewModel.searchState.collectAsState()
@@ -112,6 +116,9 @@ fun MealDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(Unit) {
         quickPicks.toastEvents.collect { res -> snackbarHostState.showSnackbar(context.getString(res)) }
+    }
+    LaunchedEffect(Unit) {
+        portions.toastEvents.collect { res -> snackbarHostState.showSnackbar(context.getString(res)) }
     }
 
     LaunchedEffect(searchQuery) {
@@ -232,14 +239,16 @@ fun MealDetailScreen(
         sheetTarget?.let { (food, initialGrams) ->
             AddFoodSheet(
                 target = food,
-                initialGrams = initialGrams,
+                fallbackGrams = initialGrams,
+                portions = portions,
                 isFavorite = food.barcode in favoriteBarcodes,
                 onToggleFavorite = { quickPicks.toggleFavorite(food) },
                 accentColor = accentColor,
                 confirmLabel = stringResource(R.string.meal_detail_add_to, mealName),
                 onDismiss = { sheetTarget = null },
-                onConfirm = { confirmedFood, grams ->
-                    val newLogged = LoggedFood(confirmedFood, grams)
+                onConfirm = { confirmedFood, choice ->
+                    val grams = choice.grams
+                    val newLogged = LoggedFood(confirmedFood, grams, unit = choice.unit, unitQty = choice.unitQty)
                     val newIndex = viewModel.addFoodToMealReturningIndex(mealName, newLogged)
                     quickPicks.recordAdded(confirmedFood, grams)
                     sheetTarget = null
@@ -280,10 +289,11 @@ fun MealDetailScreen(
                     target = logged.food,
                     accentColor = accentColor,
                     confirmLabel = stringResource(R.string.action_save),
-                    initialGrams = logged.grams,
+                    portions = portions,
+                    initial = PortionChoice(logged.grams, logged.unit, logged.unitQty),
                     onDismiss = { editTarget = null },
-                    onConfirm = { _, grams ->
-                        viewModel.updateFoodPortion(mealName, index, grams, unit = null, unitQty = null)
+                    onConfirm = { _, choice ->
+                        viewModel.updateFoodPortion(mealName, index, choice.grams, choice.unit, choice.unitQty)
                         editTarget = null
                     },
                 )
@@ -559,7 +569,7 @@ fun LoggedFoodRow(
         ) {
             Text(
                 text = if (logged.food.ingredients != null) stringResource(R.string.recipe_portion_one)
-                       else "${logged.grams}g",
+                       else portionText(logged.grams, logged.unit, logged.unitQty),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = GlassColors.textSecondary

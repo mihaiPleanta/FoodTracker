@@ -254,7 +254,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                                 composable("home") {
-                                    HomeScreen(navController, viewModel)
+                                    HomeScreen(navController, viewModel, portionsViewModel)
                                 }
                                 composable("stats") {
                                     StatsScreen(viewModel)
@@ -303,6 +303,7 @@ class MainActivity : ComponentActivity() {
                                         navController = navController,
                                         viewModel     = viewModel,
                                         quickPicks    = quickPicksViewModel,
+                                        portions      = portionsViewModel,
                                     )
                                 }
                             }
