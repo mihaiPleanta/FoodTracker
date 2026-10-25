@@ -208,8 +208,14 @@
     <string name="hydration_mode_auto">Automatic</string>
     <string name="hydration_mode_manual">Manual</string>
     <string name="hydration_breakdown_weight">%1$s kg × 35 ml = %2$s</string>
-    <string name="hydration_breakdown_activity">+ %1$s activity %2$s</string>
+    <string name="hydration_breakdown_activity">+ %1$s %2$s</string>
     <string name="hydration_breakdown_creatine">+ creatine %1$s</string>
+    <string name="hydration_activity_light">light activity</string>
+    <string name="hydration_activity_moderate">moderate activity</string>
+    <string name="hydration_activity_active">high activity</string>
+    <string name="hydration_activity_very_active">very high activity</string>
+    <string name="hydration_clamp_min">(minimum %1$s)</string>
+    <string name="hydration_clamp_max">(maximum %1$s)</string>
     <string name="hydration_manual_fixed">Fixed value, set by you</string>
     <string name="hydration_auto_would_be">Automatic would be %1$s</string>
     <string name="hydration_creatine">I take creatine</string>

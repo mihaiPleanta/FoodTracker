@@ -211,8 +211,14 @@
     <string name="hydration_mode_auto">Automat</string>
     <string name="hydration_mode_manual">Manual</string>
     <string name="hydration_breakdown_weight">%1$s kg × 35 ml = %2$s</string>
-    <string name="hydration_breakdown_activity">+ activitate %1$s %2$s</string>
+    <string name="hydration_breakdown_activity">+ %1$s %2$s</string>
     <string name="hydration_breakdown_creatine">+ creatină %1$s</string>
+    <string name="hydration_activity_light">activitate ușoară</string>
+    <string name="hydration_activity_moderate">activitate moderată</string>
+    <string name="hydration_activity_active">activitate intensă</string>
+    <string name="hydration_activity_very_active">activitate foarte intensă</string>
+    <string name="hydration_clamp_min">(minim %1$s)</string>
+    <string name="hydration_clamp_max">(maxim %1$s)</string>
     <string name="hydration_manual_fixed">Valoare fixă, aleasă de tine</string>
     <string name="hydration_auto_would_be">Automat ar fi %1$s</string>
     <string name="hydration_creatine">Iau creatină</string>

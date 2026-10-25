@@ -17,7 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -25,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import com.example.foodtracker.R
 import com.example.foodtracker.model.ActivityLevel
 import com.example.foodtracker.model.DEFAULT_HYDRATION_GOAL_L
+import com.example.foodtracker.model.HydrationGoal
 import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.ui.theme.glassCard
 import com.example.foodtracker.viewmodel.FoodViewModel
@@ -53,6 +53,25 @@ internal fun formatPartLiters(l: Float): String {
 internal fun formatKg(kg: Float): String =
     if (abs(kg - kg.roundToInt()) < 0.05f) kg.roundToInt().toString()
     else "%.1f".format(Locale.ENGLISH, kg)
+
+private const val AUTO_GOAL_MIN_L = 1.5f
+private const val AUTO_GOAL_MAX_L = 5.0f
+
+internal enum class HydrationClamp { MIN, MAX }
+
+/**
+ * Whether the automatic goal was clamped to [1.5, 5.0] L, i.e. the breakdown lines don't add up
+ * to it. Null in manual mode or when the (rounded) sum of the parts already equals the goal.
+ */
+internal fun hydrationClamp(h: HydrationGoal): HydrationClamp? {
+    if (h.isManual) return null
+    val sum = h.weightPartL + h.activityBonusL + h.creatineBonusL
+    return when {
+        abs(h.goalL - AUTO_GOAL_MIN_L) < 0.001f && sum < AUTO_GOAL_MIN_L - 0.05f -> HydrationClamp.MIN
+        abs(h.goalL - AUTO_GOAL_MAX_L) < 0.001f && sum > AUTO_GOAL_MAX_L + 0.05f -> HydrationClamp.MAX
+        else -> null
+    }
+}
 
 @Composable
 fun HydrationSettingsSection(viewModel: FoodViewModel) {
@@ -118,14 +137,13 @@ fun HydrationSettingsSection(viewModel: FoodViewModel) {
                 }
             }
         } else if (hydration != null) {
-            val locale = LocalConfiguration.current.locales[0] ?: Locale.getDefault()
             val activityLabel = when (profile.activityLevel) {
-                ActivityLevel.SEDENTARY -> stringResource(R.string.activity_sedentary)
-                ActivityLevel.LIGHT -> stringResource(R.string.activity_light)
-                ActivityLevel.MODERATE -> stringResource(R.string.activity_moderate)
-                ActivityLevel.ACTIVE -> stringResource(R.string.activity_active)
-                ActivityLevel.VERY_ACTIVE -> stringResource(R.string.activity_very_active)
-            }.lowercase(locale)
+                ActivityLevel.SEDENTARY -> ""   // bonus 0 → line hidden
+                ActivityLevel.LIGHT -> stringResource(R.string.hydration_activity_light)
+                ActivityLevel.MODERATE -> stringResource(R.string.hydration_activity_moderate)
+                ActivityLevel.ACTIVE -> stringResource(R.string.hydration_activity_active)
+                ActivityLevel.VERY_ACTIVE -> stringResource(R.string.hydration_activity_very_active)
+            }
             BreakdownLine(
                 stringResource(
                     R.string.hydration_breakdown_weight,
@@ -137,8 +155,8 @@ fun HydrationSettingsSection(viewModel: FoodViewModel) {
                 BreakdownLine(
                     stringResource(
                         R.string.hydration_breakdown_activity,
-                        formatPartLiters(hydration.activityBonusL),
-                        activityLabel
+                        activityLabel,
+                        formatPartLiters(hydration.activityBonusL)
                     )
                 )
             }
@@ -149,6 +167,15 @@ fun HydrationSettingsSection(viewModel: FoodViewModel) {
                         formatPartLiters(hydration.creatineBonusL)
                     )
                 )
+            }
+            when (hydrationClamp(hydration)) {
+                HydrationClamp.MIN -> BreakdownLine(
+                    stringResource(R.string.hydration_clamp_min, formatLiters(hydration.goalL))
+                )
+                HydrationClamp.MAX -> BreakdownLine(
+                    stringResource(R.string.hydration_clamp_max, formatLiters(hydration.goalL))
+                )
+                null -> {}
             }
         }
 
