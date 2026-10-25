@@ -244,6 +244,7 @@
     <string name="error_ai_invalid">Răspuns AI invalid, încearcă din nou</string>
     <string name="error_unexpected_code">Eroare neașteptată (%1$d)</string>
     <string name="error_save_hydration">Eroare la salvare hidratare</string>
+    <string name="error_save_hydration_prefs">Nu am putut salva setările de hidratare</string>
     <string name="error_load_day">Eroare la încărcarea zilei</string>
     <string name="error_weight_history">Eroare la istoricul greutății</string>
     <string name="error_weight_checkin">Eroare la check-in greutate</string>

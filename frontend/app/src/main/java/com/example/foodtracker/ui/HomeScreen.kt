@@ -138,6 +138,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
     }
 
     val goals = viewModel.nutritionGoals.collectAsState().value ?: NutritionGoals()
+    val hydrationGoalLiters by viewModel.hydrationGoalLiters.collectAsState()
 
     // ── Live data from ViewModel ──────────────────────────────────────────────
     val breakfastFoods by viewModel.breakfastFoods.collectAsState()
@@ -249,7 +250,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
             ) {
                 HydrationMiniWidget(
                     consumedLiters = hydrationLiters,
-                    goalLiters = viewModel.hydrationGoalLiters,
+                    goalLiters = hydrationGoalLiters,
                     onQuickIncrement = { viewModel.incrementHydration() },
                     modifier = Modifier.weight(1f)
                 )

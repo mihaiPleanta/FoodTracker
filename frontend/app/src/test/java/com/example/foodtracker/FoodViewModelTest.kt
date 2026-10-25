@@ -172,6 +172,33 @@ private object NoOpProfileApi : ProfileApi {
     override suspend fun deleteAccount(): retrofit2.Response<Unit> = throw UnsupportedOperationException()
 }
 
+/** ProfileApi that records saveProfile calls, can be made to fail, and serves a configurable GoalsDto. */
+private class RecordingProfileApi : ProfileApi {
+    val saved = mutableListOf<ProfileDto>()
+    var getGoalsCalls = 0
+    var saveFailure: Throwable? = null
+    var goals: GoalsDto? = null
+
+    override suspend fun getProfile(): retrofit2.Response<ProfileDto> = throw UnsupportedOperationException()
+    override suspend fun saveProfile(profile: ProfileDto): retrofit2.Response<ProfileDto> {
+        saveFailure?.let { throw it }
+        saved += profile
+        return retrofit2.Response.success(profile)
+    }
+    override suspend fun calculateTdee(profile: ProfileDto): retrofit2.Response<TdeeResponseDto> =
+        throw UnsupportedOperationException()
+    override suspend fun getGoals(): retrofit2.Response<GoalsDto> {
+        getGoalsCalls++
+        return retrofit2.Response.success(goals)
+    }
+    override suspend fun deleteAccount(): retrofit2.Response<Unit> = throw UnsupportedOperationException()
+}
+
+private fun goalsWithHydration(goalL: Float) = GoalsDto(
+    calorieGoal = 2000, proteinGoal = 150, carbsGoal = 250, fatGoal = 65, mode = "MAINTENANCE",
+    hydration = HydrationGoalDto(goalL, goalL, false, 2.7f, 0.5f, 0f),
+)
+
 private fun pagedDto(barcode: String) = FoodItemDto(
     barcode = barcode, name = "Food $barcode", kcal100g = 100f,
     protein100g = 5f, carbs100g = 10f, fat100g = 2f,
@@ -486,5 +513,111 @@ class FoodViewModelTest {
         assertEquals(0, firstIndex)
         assertEquals(1, secondIndex)
         assertEquals(2, thirdIndex)
+    }
+
+    private fun hydrationVm(profileApi: ProfileApi, logsApi: LogsApi = SwitchableLogsApi(emptyDay())) = FoodViewModel(
+        settingsRepository = FakeSettingsRepository(),
+        mealLogTracker = MealLogTracker(
+            PreferenceDataStoreFactory.create(
+                scope = dataStoreScope,
+                produceFile = { File(tempFolder.newFolder(), "meal_log_tracker.preferences_pb") }
+            )
+        ),
+        foodRepository = FoodRepository(NoOpFoodApi, NoOpCache),
+        logsApi = logsApi,
+        profileApi = profileApi,
+    )
+
+    @Test
+    fun hydrationGoal_fallsBackTo2_5WhenGoalsMissing() = runTest(testDispatcher) {
+        viewModel.loadGoals()
+        advanceUntilIdle()
+        assertEquals(2.5f, viewModel.hydrationGoalLiters.value)
+    }
+
+    @Test
+    fun hydrationGoal_comesFromGoals() = runTest(testDispatcher) {
+        val api = RecordingProfileApi().apply { goals = goalsWithHydration(3.5f) }
+        val vm = hydrationVm(api)
+        vm.loadGoals()
+        advanceUntilIdle()
+        assertEquals(3.5f, vm.hydrationGoalLiters.value)
+    }
+
+    @Test
+    fun updateHydrationPrefs_savesProfileAndReloadsGoals() = runTest(testDispatcher) {
+        val api = RecordingProfileApi().apply { goals = goalsWithHydration(3.0f) }
+        val vm = hydrationVm(api)
+        advanceUntilIdle()
+        val before = api.getGoalsCalls
+        vm.updateHydrationPrefs(takesCreatine = true, overrideL = null)
+        advanceUntilIdle()
+        assertEquals(1, api.saved.size)
+        assertEquals(true, api.saved[0].takesCreatine)
+        assertEquals(vm.userProfile.value.name, api.saved[0].name)
+        assertEquals(before + 1, api.getGoalsCalls)
+        assertEquals(3.0f, vm.hydrationGoalLiters.value)
+    }
+
+    @Test
+    fun updateHydrationPrefs_debounced_coalescesToLastValue() = runTest(testDispatcher) {
+        val api = RecordingProfileApi()
+        val vm = hydrationVm(api)
+        advanceUntilIdle()
+        vm.updateHydrationPrefs(false, 3.0f, debounce = true)
+        vm.updateHydrationPrefs(false, 3.1f, debounce = true)
+        vm.updateHydrationPrefs(false, 3.2f, debounce = true)
+        testScheduler.advanceTimeBy(599)
+        testScheduler.runCurrent()
+        assertEquals(0, api.saved.size)
+        advanceUntilIdle()
+        assertEquals(1, api.saved.size)
+        assertEquals(3.2f, api.saved[0].hydrationGoalOverrideL)
+    }
+
+    @Test
+    fun updateHydrationPrefs_immediateCancelsPendingDebounce() = runTest(testDispatcher) {
+        val api = RecordingProfileApi()
+        val vm = hydrationVm(api)
+        advanceUntilIdle()
+        vm.updateHydrationPrefs(false, 3.1f, debounce = true)
+        vm.updateHydrationPrefs(false, null)
+        advanceUntilIdle()
+        assertEquals(1, api.saved.size)
+        assertEquals(null, api.saved[0].hydrationGoalOverrideL)
+        assertEquals(null, vm.userProfile.value.hydrationGoalOverrideL)
+    }
+
+    @Test
+    fun updateHydrationPrefs_failureRevertsAndToasts() = runTest(testDispatcher) {
+        val api = RecordingProfileApi().apply { saveFailure = java.io.IOException("boom") }
+        val vm = hydrationVm(api)
+        advanceUntilIdle()
+        val toasts = mutableListOf<FoodViewModel.ToastEvent>()
+        val job = launch { vm.toastEvents.collect { toasts += it } }
+        advanceUntilIdle()
+        val initial = vm.userProfile.value
+        vm.updateHydrationPrefs(takesCreatine = true, overrideL = 4.0f)
+        assertEquals(true, vm.userProfile.value.takesCreatine)   // optimistic
+        advanceUntilIdle()
+        assertEquals(initial.takesCreatine, vm.userProfile.value.takesCreatine)
+        assertEquals(initial.hydrationGoalOverrideL, vm.userProfile.value.hydrationGoalOverrideL)
+        assertEquals(listOf(R.string.error_save_hydration_prefs), toasts.map { it.messageRes })
+        job.cancel()
+    }
+
+    @Test
+    fun addWeightCheckIn_success_reloadsGoals() = runTest(testDispatcher) {
+        val api = RecordingProfileApi()
+        val logs = object : LogsApi by SwitchableLogsApi(emptyDay()) {
+            override suspend fun postWeightCheckIn(body: WeightCheckInCreateDto) =
+                WeightCheckInDto(body.date, body.weightKg)
+        }
+        val vm = hydrationVm(api, logs)
+        advanceUntilIdle()
+        val before = api.getGoalsCalls
+        vm.addWeightCheckIn(80f)
+        advanceUntilIdle()
+        assertEquals(before + 1, api.getGoalsCalls)
     }
 }

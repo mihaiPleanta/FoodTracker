@@ -19,10 +19,15 @@ import com.example.foodtracker.model.mealKeyToBackend
 import com.example.foodtracker.model.toDto
 import com.example.foodtracker.model.HydrationUpdateDto
 import com.example.foodtracker.model.LoggedFood
+import com.example.foodtracker.model.DEFAULT_HYDRATION_GOAL_L
 import com.example.foodtracker.model.NutritionGoals
+import com.example.foodtracker.model.toProfileDto
 import com.example.foodtracker.model.UserProfile
 import com.example.foodtracker.model.WeightCheckInCreateDto
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -35,6 +40,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -44,6 +50,8 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
+
+private const val HYDRATION_SAVE_DEBOUNCE_MS = 600L
 
 private data class DayMeals(
     val breakfast: List<LoggedFood> = emptyList(),
@@ -244,7 +252,46 @@ class FoodViewModel(
 
     // Hydration: liters by day key, used by Home quick-add water card.
     private val _hydrationByDate = MutableStateFlow<Map<String, Float>>(emptyMap())
-    val hydrationGoalLiters = 2.5f
+    val hydrationGoalLiters: StateFlow<Float> = _nutritionGoals
+        .map { it?.hydration?.goalL ?: DEFAULT_HYDRATION_GOAL_L }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, DEFAULT_HYDRATION_GOAL_L)
+
+    // Salvarea preferințelor de hidratare (creatină / obiectiv manual): optimist, cu debounce
+    // opțional pentru stepper; la eșec revenim la profilul de dinainte de prima modificare nesalvată.
+    private var hydrationSaveJob: Job? = null
+    private var hydrationPrefsBeforeEdit: UserProfile? = null
+
+    fun updateHydrationPrefs(takesCreatine: Boolean, overrideL: Float?, debounce: Boolean = false) {
+        if (hydrationPrefsBeforeEdit == null) hydrationPrefsBeforeEdit = _userProfile.value
+        hydrationSaveJob?.cancel()
+        _userProfile.value = _userProfile.value.copy(
+            takesCreatine = takesCreatine,
+            hydrationGoalOverrideL = overrideL,
+        )
+        hydrationSaveJob = viewModelScope.launch {
+            if (debounce) delay(HYDRATION_SAVE_DEBOUNCE_MS)
+            val success = try {
+                profileApi.saveProfile(_userProfile.value.toProfileDto()).isSuccessful
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                false
+            }
+            if (success) {
+                hydrationPrefsBeforeEdit = null
+                loadGoals()
+            } else {
+                hydrationPrefsBeforeEdit?.let { before ->
+                    _userProfile.value = _userProfile.value.copy(
+                        takesCreatine = before.takesCreatine,
+                        hydrationGoalOverrideL = before.hydrationGoalOverrideL,
+                    )
+                }
+                hydrationPrefsBeforeEdit = null
+                _toastEvents.tryEmit(ToastEvent(R.string.error_save_hydration_prefs))
+            }
+        }
+    }
 
     val hydrationTodayLiters: StateFlow<Float> = combine(_selectedHomeDate, _hydrationByDate) { date, all ->
         all[dateKey(date)] ?: 0f
@@ -350,6 +397,7 @@ class FoodViewModel(
         viewModelScope.launch {
             try {
                 logsApi.postWeightCheckIn(WeightCheckInCreateDto(date = dateStr, weightKg = weightKg))
+                loadGoals()
             } catch (e: java.io.IOException) {
                 _weightHistory.value = previousHistory
                 _userProfile.value = _userProfile.value.copy(currentWeightKg = previousProfileWeight)
