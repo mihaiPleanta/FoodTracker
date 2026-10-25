@@ -1,5 +1,5 @@
 import pytest
-from services.nutrition import mifflin_st_jeor, calculate_goals
+from services.nutrition import mifflin_st_jeor, calculate_goals, calculate_hydration_goal
 
 
 def test_mifflin_male():
@@ -118,3 +118,46 @@ def test_calculate_goals_unknown_activity_falls_back_to_moderate():
     goals = calculate_goals(p)
     # Folosește 1.55 (MODERATE)
     assert goals.calorie_goal == 2720
+
+
+def _hp(kg, activity, creatine=False, override=None):
+    return _FakeProfile(
+        current_weight_kg=kg, activity_level=activity,
+        takes_creatine=creatine, hydration_goal_override_l=override,
+    )
+
+
+def test_hydration_70kg_sedentary():
+    g = calculate_hydration_goal(_hp(70, "SEDENTARY"))
+    assert g.goal_l == 2.5 and g.auto_l == 2.5 and not g.is_manual
+
+
+def test_hydration_70kg_moderate():
+    assert calculate_hydration_goal(_hp(70, "MODERATE")).goal_l == 3.0  # 2.95 -> half-up
+
+
+def test_hydration_70kg_moderate_creatine():
+    g = calculate_hydration_goal(_hp(70, "MODERATE", creatine=True))
+    assert g.goal_l == 3.5 and g.weight_part_l == 2.45
+    assert g.activity_bonus_l == 0.5 and g.creatine_bonus_l == 0.5
+
+
+def test_hydration_clamps_low():
+    assert calculate_hydration_goal(_hp(40, "SEDENTARY")).goal_l == 1.5
+
+
+def test_hydration_clamps_high():
+    assert calculate_hydration_goal(_hp(150, "VERY_ACTIVE", creatine=True)).goal_l == 5.0
+
+
+def test_hydration_unknown_activity_as_moderate():
+    assert calculate_hydration_goal(_hp(70, "WHATEVER")).goal_l == 3.0
+
+
+def test_hydration_override_wins_and_ignores_creatine():
+    g = calculate_hydration_goal(_hp(70, "MODERATE", creatine=True, override=3.0))
+    assert g.goal_l == 3.0 and g.is_manual and g.auto_l == 3.5 and g.creatine_bonus_l == 0.5
+
+
+def test_hydration_override_independent_of_weight():
+    assert calculate_hydration_goal(_hp(95, "ACTIVE", override=2.2)).goal_l == 2.2
