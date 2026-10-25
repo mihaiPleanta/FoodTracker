@@ -8,6 +8,7 @@ import com.example.foodtracker.model.toUserProfile
 import com.google.gson.Gson
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HydrationGoalDtoTest {
@@ -27,5 +28,11 @@ class HydrationGoalDtoTest {
     @Test fun goalsDto_missingHydration_isNull() {
         val g = Gson().fromJson("{$base}", GoalsDto::class.java).toDomain()
         assertNull(g.hydration)
+    }
+
+    @Test fun userProfile_serializesHydrationPrefsToSnakeCase() {
+        val json = Gson().toJson(UserProfile(takesCreatine = true, hydrationGoalOverrideL = 3.0f).toProfileDto())
+        assertTrue(json, json.contains("\"takes_creatine\":true"))
+        assertTrue(json, json.contains("\"hydration_goal_override_l\":3.0"))
     }
 }

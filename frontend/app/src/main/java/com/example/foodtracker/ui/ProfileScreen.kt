@@ -197,14 +197,14 @@ fun ProfileScreen(viewModel: FoodViewModel, authViewModel: AuthViewModel) {
                             ?: profile.currentWeightKg
                         val weightChanged = newWeight != profile.currentWeightKg
 
-                        val updated = UserProfile(
-                            name            = name.trim().ifBlank { profile.name },
-                            age             = age.toIntOrNull() ?: profile.age,
+                        val updated = editedProfile(
+                            base            = profile,
+                            name            = name,
+                            age             = age,
                             gender          = gender,
-                            heightCm        = heightCm.toIntOrNull() ?: profile.heightCm,
+                            heightCm        = heightCm,
                             currentWeightKg = newWeight,
-                            targetWeightKg  = targetWeight.replace(",", ".").toFloatOrNull()
-                                                ?: profile.targetWeightKg,
+                            targetWeight    = targetWeight,
                             activityLevel   = activityLevel
                         )
                         viewModel.updateUserProfile(updated)
@@ -221,6 +221,30 @@ fun ProfileScreen(viewModel: FoodViewModel, authViewModel: AuthViewModel) {
         }
     }
 }
+
+/**
+ * Applies the edited form fields on top of [base] with `copy`, so fields the form doesn't show
+ * (creatine, manual hydration goal) are kept — the result is POSTed as the whole profile.
+ * Blank/invalid inputs fall back to the current value.
+ */
+internal fun editedProfile(
+    base: UserProfile,
+    name: String,
+    age: String,
+    gender: Gender,
+    heightCm: String,
+    currentWeightKg: Float,
+    targetWeight: String,
+    activityLevel: ActivityLevel,
+): UserProfile = base.copy(
+    name            = name.trim().ifBlank { base.name },
+    age             = age.toIntOrNull() ?: base.age,
+    gender          = gender,
+    heightCm        = heightCm.toIntOrNull() ?: base.heightCm,
+    currentWeightKg = currentWeightKg,
+    targetWeightKg  = targetWeight.replace(",", ".").toFloatOrNull() ?: base.targetWeightKg,
+    activityLevel   = activityLevel
+)
 
 // ── Avatar header ─────────────────────────────────────────────────────────────
 
