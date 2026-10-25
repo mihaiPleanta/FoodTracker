@@ -702,6 +702,9 @@ class FoodViewModel(
         _showMealSelector.value = false
         _userProfile.value = UserProfile()
         _nutritionGoals.value = null
+        hydrationSaveJob?.cancel()
+        hydrationSaveJob = null
+        hydrationPrefsBeforeEdit = null
         _loadedDates.clear()
         _loadingDay.value = false
         _selectedHomeDate.value = Date()

@@ -620,4 +620,15 @@ class FoodViewModelTest {
         advanceUntilIdle()
         assertEquals(before + 1, api.getGoalsCalls)
     }
+
+    @Test
+    fun resetUserState_cancelsPendingHydrationSave() = runTest(testDispatcher) {
+        val api = RecordingProfileApi()
+        val vm = hydrationVm(api)
+        advanceUntilIdle()
+        vm.updateHydrationPrefs(false, 3.1f, debounce = true)
+        vm.resetUserState()
+        advanceUntilIdle()
+        assertEquals(0, api.saved.size)
+    }
 }
