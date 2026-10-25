@@ -71,3 +71,22 @@ def test_goals_macros_present_and_consistent(client):
     assert data["carbs_goal_g"] > 0
     macros_kcal = data["protein_goal_g"] * 4 + data["carbs_goal_g"] * 4 + data["fat_goal_g"] * 9
     assert abs(macros_kcal - data["calorie_goal"]) <= 10
+
+
+def test_goals_includes_auto_hydration(client):
+    _create_profile(client)
+    h = client.get("/goals", headers=AUTH_HEADER).json()["hydration"]
+    assert h == {
+        "goal_l": 3.1,
+        "auto_l": 3.1,
+        "is_manual": False,
+        "weight_part_l": 2.63,
+        "activity_bonus_l": 0.5,
+        "creatine_bonus_l": 0.0,
+    }
+
+
+def test_goals_hydration_manual(client):
+    _create_profile(client, takes_creatine=True, hydration_goal_override_l=2.8)
+    h = client.get("/goals", headers=AUTH_HEADER).json()["hydration"]
+    assert h["goal_l"] == 2.8 and h["is_manual"] and h["auto_l"] == 3.6

@@ -1,4 +1,5 @@
 from datetime import date as _date, datetime as _datetime
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -12,6 +13,17 @@ class ProfileRequest(BaseModel):
     current_weight_kg: float
     target_weight_kg: float
     activity_level: str   # "SEDENTARY" | "LIGHT" | "MODERATE" | "ACTIVE" | "VERY_ACTIVE"
+    takes_creatine: bool = False
+    hydration_goal_override_l: Optional[float] = None
+
+    @field_validator("hydration_goal_override_l")
+    @classmethod
+    def _validate_hydration_override(cls, v: Optional[float]) -> Optional[float]:
+        if v is None:
+            return None
+        if v < 1.0 or v > 6.0:
+            raise ValueError("hydration_goal_override_l must be between 1.0 and 6.0")
+        return float(Decimal(str(v)).quantize(Decimal("0.1"), ROUND_HALF_UP))
 
 
 class ProfileResponse(ProfileRequest):
@@ -150,12 +162,22 @@ class DayResponse(BaseModel):
     weight_check_in: Optional[WeightCheckInDto] = None
 
 
+class HydrationGoalDto(BaseModel):
+    goal_l: float
+    auto_l: float
+    is_manual: bool
+    weight_part_l: float
+    activity_bonus_l: float
+    creatine_bonus_l: float
+
+
 class GoalsResponse(BaseModel):
     calorie_goal: int
     protein_goal_g: int
     carbs_goal_g: int
     fat_goal_g: int
     mode: Literal["DEFICIT", "MAINTENANCE", "SURPLUS"]
+    hydration: HydrationGoalDto
 
 
 MealType = Literal["BREAKFAST", "LUNCH", "DINNER", "SNACKS"]

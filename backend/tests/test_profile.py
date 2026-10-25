@@ -88,3 +88,39 @@ def test_delete_profile_returns_502_when_firebase_fails(client):
         assert client.get("/profile", headers=AUTH_HEADER).status_code == 200
     finally:
         app.dependency_overrides.pop(get_user_deleter, None)
+
+
+def test_profile_defaults_hydration_prefs(client):
+    r = client.post("/profile", json=_VALID_PROFILE, headers=AUTH_HEADER).json()
+    assert r["takes_creatine"] is False and r["hydration_goal_override_l"] is None
+
+
+def test_profile_persists_hydration_prefs(client):
+    client.post(
+        "/profile",
+        json={**_VALID_PROFILE, "takes_creatine": True, "hydration_goal_override_l": 3.0},
+        headers=AUTH_HEADER,
+    )
+    r = client.get("/profile", headers=AUTH_HEADER).json()
+    assert r["takes_creatine"] is True and r["hydration_goal_override_l"] == 3.0
+
+
+def test_profile_rounds_override(client):
+    for raw in (3.0000001, 2.96):
+        r = client.post(
+            "/profile",
+            json={**_VALID_PROFILE, "hydration_goal_override_l": raw},
+            headers=AUTH_HEADER,
+        )
+        assert r.status_code == 200
+        assert r.json()["hydration_goal_override_l"] == 3.0
+
+
+def test_profile_rejects_override_out_of_range(client):
+    for raw in (0.9, 6.1):
+        r = client.post(
+            "/profile",
+            json={**_VALID_PROFILE, "hydration_goal_override_l": raw},
+            headers=AUTH_HEADER,
+        )
+        assert r.status_code == 422

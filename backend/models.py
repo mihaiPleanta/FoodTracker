@@ -3,6 +3,7 @@ from typing import Optional
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     CheckConstraint,
     DateTime,
     Date,
@@ -12,6 +13,7 @@ from sqlalchemy import (
     Integer,
     String,
     UniqueConstraint,
+    false,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -30,6 +32,10 @@ class Profile(Base):
     current_weight_kg: Mapped[float] = mapped_column(Float, nullable=False)
     target_weight_kg: Mapped[float] = mapped_column(Float, nullable=False)
     activity_level: Mapped[str] = mapped_column(String, nullable=False)
+    takes_creatine: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    hydration_goal_override_l: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
 
 class FoodLog(Base):
