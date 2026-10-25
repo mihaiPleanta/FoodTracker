@@ -202,6 +202,17 @@
     <string name="settings_notifications">NOTIFICATIONS</string>
     <string name="settings_meal_reminders">Meal reminders</string>
     <string name="settings_reminder_time_title">Reminder time</string>
+    <string name="settings_hydration">HYDRATION</string>
+    <string name="hydration_mode_auto">Automatic</string>
+    <string name="hydration_mode_manual">Manual</string>
+    <string name="hydration_breakdown_weight">%1$s kg × 35 ml = %2$s</string>
+    <string name="hydration_breakdown_activity">+ %1$s activity %2$s</string>
+    <string name="hydration_breakdown_creatine">+ creatine %1$s</string>
+    <string name="hydration_manual_fixed">Fixed value, set by you</string>
+    <string name="hydration_auto_would_be">Automatic would be %1$s</string>
+    <string name="hydration_creatine">I take creatine</string>
+    <string name="hydration_creatine_sub">+0.5L per day (common recommendation)</string>
+    <string name="hydration_creatine_manual_sub">Only counts in automatic mode</string>
     <string name="settings_appearance">APPEARANCE</string>
     <string name="settings_theme_dark">Dark theme</string>
     <string name="settings_language">LANGUAGE</string>

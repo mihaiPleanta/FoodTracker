@@ -205,6 +205,17 @@
     <string name="settings_notifications">NOTIFICĂRI</string>
     <string name="settings_meal_reminders">Remindere mese</string>
     <string name="settings_reminder_time_title">Ora reminderului</string>
+    <string name="settings_hydration">HIDRATARE</string>
+    <string name="hydration_mode_auto">Automat</string>
+    <string name="hydration_mode_manual">Manual</string>
+    <string name="hydration_breakdown_weight">%1$s kg × 35 ml = %2$s</string>
+    <string name="hydration_breakdown_activity">+ activitate %1$s %2$s</string>
+    <string name="hydration_breakdown_creatine">+ creatină %1$s</string>
+    <string name="hydration_manual_fixed">Valoare fixă, aleasă de tine</string>
+    <string name="hydration_auto_would_be">Automat ar fi %1$s</string>
+    <string name="hydration_creatine">Iau creatină</string>
+    <string name="hydration_creatine_sub">+0.5L pe zi (recomandare uzuală)</string>
+    <string name="hydration_creatine_manual_sub">Contează doar în modul automat</string>
     <string name="settings_appearance">ASPECT</string>
     <string name="settings_theme_dark">Temă întunecată</string>
     <string name="settings_language">LIMBĂ</string>

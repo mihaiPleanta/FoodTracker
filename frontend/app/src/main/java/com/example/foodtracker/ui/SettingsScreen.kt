@@ -164,6 +164,9 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(14.dp))
 
+            // ── Hidratare ─────────────────────────────────────────────────────
+            HydrationSettingsSection(viewModel)
+
             // ── Aspect ────────────────────────────────────────────────────────
             SettingsSectionTitle(stringResource(R.string.settings_appearance))
             Spacer(Modifier.height(8.dp))
