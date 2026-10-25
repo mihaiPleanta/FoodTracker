@@ -57,14 +57,16 @@ import com.example.foodtracker.viewmodel.ProfileSaveState
 fun ProfileScreen(viewModel: FoodViewModel, authViewModel: AuthViewModel) {
     val profile by viewModel.userProfile.collectAsState()
     val saveState by authViewModel.profileSaveState.collectAsState()
+    // Hydration prefs save on their own; changing them must not reset unsaved form edits.
+    val formKey = profile.copy(takesCreatine = false, hydrationGoalOverrideL = null)
 
-    var name          by remember(profile) { mutableStateOf(profile.name) }
-    var age           by remember(profile) { mutableStateOf(profile.age.toString()) }
-    var gender        by remember(profile) { mutableStateOf(profile.gender) }
-    var heightCm      by remember(profile) { mutableStateOf(profile.heightCm.toString()) }
-    var currentWeight by remember(profile) { mutableStateOf(profile.currentWeightKg.toString()) }
-    var targetWeight  by remember(profile) { mutableStateOf(profile.targetWeightKg.toString()) }
-    var activityLevel by remember(profile) { mutableStateOf(profile.activityLevel) }
+    var name          by remember(formKey) { mutableStateOf(profile.name) }
+    var age           by remember(formKey) { mutableStateOf(profile.age.toString()) }
+    var gender        by remember(formKey) { mutableStateOf(profile.gender) }
+    var heightCm      by remember(formKey) { mutableStateOf(profile.heightCm.toString()) }
+    var currentWeight by remember(formKey) { mutableStateOf(profile.currentWeightKg.toString()) }
+    var targetWeight  by remember(formKey) { mutableStateOf(profile.targetWeightKg.toString()) }
+    var activityLevel by remember(formKey) { mutableStateOf(profile.activityLevel) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -184,6 +186,11 @@ fun ProfileScreen(viewModel: FoodViewModel, authViewModel: AuthViewModel) {
                         onSelect = { activityLevel = it }
                     )
                 }
+
+                Spacer(Modifier.height(14.dp))
+
+                // Saves on its own (no Save button), like the other toggles.
+                HydrationSettingsSection(viewModel)
 
                 Spacer(Modifier.height(28.dp))
 

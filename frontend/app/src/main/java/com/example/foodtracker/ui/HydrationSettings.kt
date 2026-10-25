@@ -84,7 +84,10 @@ fun HydrationSettingsSection(viewModel: FoodViewModel) {
     val displayed = profile.hydrationGoalOverrideL ?: (hydration?.goalL ?: DEFAULT_HYDRATION_GOAL_L)
     val takes = profile.takesCreatine
 
-    SettingsSectionTitle(stringResource(R.string.settings_hydration))
+    ProfileSectionLabel(
+        stringResource(R.string.settings_hydration),
+        Modifier.padding(horizontal = 20.dp)
+    )
     Spacer(Modifier.height(8.dp))
     Column(
         Modifier
