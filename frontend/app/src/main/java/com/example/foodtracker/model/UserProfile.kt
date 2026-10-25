@@ -11,7 +11,9 @@ data class UserProfile(
     val heightCm: Int = 178,
     val currentWeightKg: Float = 78.1f,
     val targetWeightKg: Float = 75.0f,
-    val activityLevel: ActivityLevel = ActivityLevel.MODERATE
+    val activityLevel: ActivityLevel = ActivityLevel.MODERATE,
+    val takesCreatine: Boolean = false,
+    val hydrationGoalOverrideL: Float? = null
 )
 
 fun UserProfile.toProfileDto() = ProfileDto(
@@ -21,7 +23,9 @@ fun UserProfile.toProfileDto() = ProfileDto(
     heightCm = heightCm,
     currentWeightKg = currentWeightKg,
     targetWeightKg = targetWeightKg,
-    activityLevel = activityLevel.name
+    activityLevel = activityLevel.name,
+    takesCreatine = takesCreatine,
+    hydrationGoalOverrideL = hydrationGoalOverrideL
 )
 
 fun ProfileDto.toUserProfile() = UserProfile(
@@ -32,5 +36,7 @@ fun ProfileDto.toUserProfile() = UserProfile(
     currentWeightKg = currentWeightKg,
     targetWeightKg = targetWeightKg,
     activityLevel = runCatching { ActivityLevel.valueOf(activityLevel) }
-        .getOrDefault(ActivityLevel.MODERATE)
+        .getOrDefault(ActivityLevel.MODERATE),
+    takesCreatine = takesCreatine,
+    hydrationGoalOverrideL = hydrationGoalOverrideL
 )

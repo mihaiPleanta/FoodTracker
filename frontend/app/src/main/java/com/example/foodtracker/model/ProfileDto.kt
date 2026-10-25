@@ -9,7 +9,9 @@ data class ProfileDto(
     @SerializedName("height_cm")          val heightCm: Int,
     @SerializedName("current_weight_kg")  val currentWeightKg: Float,
     @SerializedName("target_weight_kg")   val targetWeightKg: Float,
-    @SerializedName("activity_level")     val activityLevel: String
+    @SerializedName("activity_level")     val activityLevel: String,
+    @SerializedName("takes_creatine")     val takesCreatine: Boolean = false,
+    @SerializedName("hydration_goal_override_l") val hydrationGoalOverrideL: Float? = null
 )
 
 data class TdeeResponseDto(
