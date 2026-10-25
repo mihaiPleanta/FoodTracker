@@ -221,6 +221,7 @@
     <string name="hydration_creatine">I take creatine</string>
     <string name="hydration_creatine_sub">+0.5L per day (common recommendation)</string>
     <string name="hydration_creatine_manual_sub">Only counts in automatic mode</string>
+    <string name="hydration_picker_title">Daily water goal</string>
     <string name="settings_appearance">APPEARANCE</string>
     <string name="settings_theme_dark">Dark theme</string>
     <string name="settings_language">LANGUAGE</string>

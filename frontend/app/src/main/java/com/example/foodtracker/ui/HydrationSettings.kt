@@ -4,6 +4,19 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Switch
@@ -39,6 +52,19 @@ private const val MAX_MANUAL_GOAL_L = 6.0f
 internal fun stepManualGoal(current: Float, delta: Float): Float {
     val tenths = ((current + delta) * 10f).roundToInt()
     return (tenths / 10f).coerceIn(MIN_MANUAL_GOAL_L, MAX_MANUAL_GOAL_L)
+}
+
+/** Every value the wheel picker offers: 1.0 .. 6.0 L in 0.1 L steps. */
+internal fun manualGoalOptions(): List<Float> {
+    val from = (MIN_MANUAL_GOAL_L * 10f).roundToInt()
+    val to = (MAX_MANUAL_GOAL_L * 10f).roundToInt()
+    return (from..to).map { it / 10f }
+}
+
+/** Index of [liters] in [manualGoalOptions], rounded to the nearest tenth and clamped. */
+internal fun manualGoalIndex(liters: Float): Int {
+    val tenths = (liters.coerceIn(MIN_MANUAL_GOAL_L, MAX_MANUAL_GOAL_L) * 10f).roundToInt()
+    return tenths - (MIN_MANUAL_GOAL_L * 10f).roundToInt()
 }
 
 internal fun formatLiters(l: Float): String = "%.1f".format(Locale.ENGLISH, l) + "L"
@@ -83,6 +109,7 @@ fun HydrationSettingsSection(viewModel: FoodViewModel) {
     val autoFallback = hydration?.autoL ?: DEFAULT_HYDRATION_GOAL_L
     val displayed = profile.hydrationGoalOverrideL ?: (hydration?.goalL ?: DEFAULT_HYDRATION_GOAL_L)
     val takes = profile.takesCreatine
+    var showPicker by remember { mutableStateOf(false) }
 
     ProfileSectionLabel(
         stringResource(R.string.settings_hydration),
@@ -109,7 +136,25 @@ fun HydrationSettingsSection(viewModel: FoodViewModel) {
                 formatLiters(displayed),
                 fontSize = 20.sp,
                 fontWeight = FontWeight.ExtraBold,
-                color = GlassColors.accentBlue
+                color = GlassColors.accentBlue,
+                textDecoration = if (isManual) TextDecoration.Underline else null,
+                modifier = if (isManual) {
+                    Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { showPicker = true }
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                } else Modifier
+            )
+        }
+
+        if (showPicker) {
+            LitersPickerDialog(
+                initial = displayed,
+                onDismiss = { showPicker = false },
+                onConfirm = {
+                    showPicker = false
+                    viewModel.updateHydrationPrefs(takes, it)
+                }
             )
         }
 
@@ -243,6 +288,87 @@ private fun HydrationModePill(label: String, selected: Boolean, onClick: () -> U
             fontWeight = FontWeight.SemiBold,
             color = if (selected) Color.Black else GlassColors.textSecondary
         )
+    }
+}
+
+@Composable
+private fun LitersPickerDialog(
+    initial: Float,
+    onDismiss: () -> Unit,
+    onConfirm: (Float) -> Unit
+) {
+    val options = remember { manualGoalOptions() }
+    var selected by remember { mutableIntStateOf(manualGoalIndex(initial)) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.hydration_picker_title), color = GlassColors.textPrimary) },
+        text = { LitersWheel(options, initialIndex = selected, onSelectedChange = { selected = it }) },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(options[selected]) }) {
+                Text(
+                    stringResource(R.string.action_save),
+                    color = GlassColors.accentGreen,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel), color = GlassColors.textSecondary)
+            }
+        },
+        containerColor = GlassColors.cardBackground,
+        shape = RoundedCornerShape(20.dp)
+    )
+}
+
+/**
+ * Snapping wheel: the item in the middle slot is the selection. Two items of padding above
+ * and below let the first/last values reach the middle.
+ */
+@Composable
+private fun LitersWheel(options: List<Float>, initialIndex: Int, onSelectedChange: (Int) -> Unit) {
+    val itemHeight = 44.dp
+    val itemHeightPx = with(LocalDensity.current) { itemHeight.toPx() }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
+    val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
+    val centered by remember {
+        derivedStateOf {
+            val pastHalf = listState.firstVisibleItemScrollOffset > itemHeightPx / 2
+            (listState.firstVisibleItemIndex + if (pastHalf) 1 else 0).coerceIn(options.indices)
+        }
+    }
+    LaunchedEffect(centered) { onSelectedChange(centered) }
+
+    val accent = GlassColors.accentBlue
+    val primary = GlassColors.textPrimary
+    val tertiary = GlassColors.textTertiary
+    Box(Modifier.fillMaxWidth().height(itemHeight * 5)) {
+        Box(
+            Modifier
+                .align(Alignment.Center)
+                .fillMaxWidth()
+                .height(itemHeight)
+                .background(accent.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
+        )
+        LazyColumn(
+            state = listState,
+            flingBehavior = flingBehavior,
+            contentPadding = PaddingValues(vertical = itemHeight * 2),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            items(options.size) { i ->
+                val isCentered = i == centered
+                Box(Modifier.fillMaxWidth().height(itemHeight), contentAlignment = Alignment.Center) {
+                    Text(
+                        formatLiters(options[i]),
+                        fontSize = if (isCentered) 22.sp else 16.sp,
+                        fontWeight = if (isCentered) FontWeight.ExtraBold else FontWeight.Normal,
+                        color = if (isCentered) primary else tertiary
+                    )
+                }
+            }
+        }
     }
 }
 

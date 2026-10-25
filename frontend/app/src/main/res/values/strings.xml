@@ -224,6 +224,7 @@
     <string name="hydration_creatine">Iau creatină</string>
     <string name="hydration_creatine_sub">+0.5L pe zi (recomandare uzuală)</string>
     <string name="hydration_creatine_manual_sub">Contează doar în modul automat</string>
+    <string name="hydration_picker_title">Obiectiv zilnic de apă</string>
     <string name="settings_appearance">ASPECT</string>
     <string name="settings_theme_dark">Temă întunecată</string>
     <string name="settings_language">LIMBĂ</string>

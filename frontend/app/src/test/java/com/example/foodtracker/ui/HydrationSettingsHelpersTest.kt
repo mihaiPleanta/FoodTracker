@@ -57,4 +57,19 @@ class HydrationSettingsHelpersTest {
     @Test fun hydrationClamp_noneInManualMode() {
         assertNull(hydrationClamp(HydrationGoal(1.5f, 1.5f, true, 1.0f, 0f, 0f)))
     }
+
+    @Test fun manualGoalOptions_coverRangeInTenths() {
+        val options = manualGoalOptions()
+        assertEquals(51, options.size)
+        assertEquals(1.0f, options.first())
+        assertEquals(6.0f, options.last())
+        assertEquals(3.4f, options[24])
+    }
+
+    @Test fun manualGoalIndex_findsValueAndClamps() {
+        assertEquals(24, manualGoalIndex(3.4f))
+        assertEquals(24, manualGoalIndex(3.4000001f))
+        assertEquals(0, manualGoalIndex(0.5f))
+        assertEquals(50, manualGoalIndex(9f))
+    }
 }
