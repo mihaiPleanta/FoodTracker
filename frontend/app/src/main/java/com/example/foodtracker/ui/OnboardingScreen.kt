@@ -11,6 +11,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -107,11 +109,13 @@ fun OnboardingScreen(
                     else -> OnboardingStep3(
                         targetWeightKg = data.targetWeightKg,
                         activityLevel = data.activityLevel,
+                        takesCreatine = data.takesCreatine,
                         calculatedCalorieGoal = data.calculatedCalorieGoal,
                         isTdeeLoading = data.isTdeeLoading,
                         isSubmitting = isSubmitting,
                         onTargetWeightChange = { authViewModel.updateOnboardingData { copy(targetWeightKg = it) } },
                         onActivityChange = { authViewModel.updateOnboardingData { copy(activityLevel = it) } },
+                        onCreatineChange = { authViewModel.updateOnboardingData { copy(takesCreatine = it) } },
                         onCalculate = { authViewModel.calculateTdee() },
                         onBack = { authViewModel.prevStep() },
                         onFinish = { authViewModel.submitProfile() }
@@ -222,11 +226,13 @@ private fun OnboardingStep2(
 private fun OnboardingStep3(
     targetWeightKg: String,
     activityLevel: ActivityLevel,
+    takesCreatine: Boolean,
     calculatedCalorieGoal: Int?,
     isTdeeLoading: Boolean,
     isSubmitting: Boolean,
     onTargetWeightChange: (String) -> Unit,
     onActivityChange: (ActivityLevel) -> Unit,
+    onCreatineChange: (Boolean) -> Unit,
     onCalculate: () -> Unit,
     onBack: () -> Unit,
     onFinish: () -> Unit
@@ -275,6 +281,30 @@ private fun OnboardingStep3(
                         color = if (selected) Color.Black else GlassColors.textSecondary)
                 }
             }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        Row(
+            Modifier.fillMaxWidth().glassCard(14).padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.onboarding_creatine), fontSize = 15.sp,
+                    color = GlassColors.textPrimary)
+                Text(stringResource(R.string.onboarding_creatine_sub), fontSize = 12.sp,
+                    color = GlassColors.textSecondary)
+            }
+            Switch(
+                checked = takesCreatine,
+                onCheckedChange = onCreatineChange,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor   = Color.Black,
+                    checkedTrackColor   = GlassColors.accentGreen,
+                    uncheckedThumbColor = GlassColors.textSecondary,
+                    uncheckedTrackColor = GlassColors.cardBorder
+                )
+            )
         }
 
         Spacer(Modifier.height(20.dp))

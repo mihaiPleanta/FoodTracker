@@ -81,6 +81,8 @@
     <string name="onboarding_calculate">Calculate calorie goal</string>
     <string name="onboarding_calculated">Calorie goal calculated</string>
     <string name="onboarding_start">Let\'s get started</string>
+    <string name="onboarding_creatine">Do you take creatine?</string>
+    <string name="onboarding_creatine_sub">We\'ll adjust your water goal</string>
 
     <!-- Gender -->
     <string name="gender_male">Male</string>

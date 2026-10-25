@@ -84,6 +84,8 @@
     <string name="onboarding_calculate">Calculează obiectivul caloric</string>
     <string name="onboarding_calculated">Obiectiv caloric calculat</string>
     <string name="onboarding_start">Hai să începem</string>
+    <string name="onboarding_creatine">Iei creatină?</string>
+    <string name="onboarding_creatine_sub">Îți ajustăm obiectivul de apă</string>
 
     <!-- Gender -->
     <string name="gender_male">Masculin</string>

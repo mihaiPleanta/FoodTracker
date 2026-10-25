@@ -71,9 +71,22 @@ data class OnboardingData(
     val currentWeightKg: String = "",
     val targetWeightKg: String = "",
     val activityLevel: ActivityLevel = ActivityLevel.MODERATE,
+    val takesCreatine: Boolean = false,
     val calculatedCalorieGoal: Int? = null,
     val isTdeeLoading: Boolean = false
 )
+
+/** Parses the onboarding form into a profile; null when age/height/current weight are invalid. */
+internal fun OnboardingData.toProfileDtoOrNull(): ProfileDto? {
+    val age = age.toIntOrNull() ?: return null
+    val heightCm = heightCm.toIntOrNull() ?: return null
+    val currentKg = currentWeightKg.replace(",", ".").toFloatOrNull() ?: return null
+    val targetKg = targetWeightKg.replace(",", ".").toFloatOrNull() ?: currentKg
+    return ProfileDto(
+        name, age, gender.name, heightCm, currentKg, targetKg, activityLevel.name,
+        takesCreatine = takesCreatine, hydrationGoalOverrideL = null
+    )
+}
 
 class AuthViewModel : ViewModel() {
 
@@ -333,15 +346,11 @@ class AuthViewModel : ViewModel() {
     /** Saves profile to backend and navigates home. */
     fun submitProfile() {
         val d = _onboardingData.value
-        val age = d.age.toIntOrNull() ?: return
-        val heightCm = d.heightCm.toIntOrNull() ?: return
-        val currentKg = d.currentWeightKg.replace(",", ".").toFloatOrNull() ?: return
-        val targetKg = d.targetWeightKg.replace(",", ".").toFloatOrNull() ?: currentKg
+        val dto = d.toProfileDtoOrNull() ?: return
 
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
             try {
-                val dto = ProfileDto(d.name, age, d.gender.name, heightCm, currentKg, targetKg, d.activityLevel.name)
                 profileApi.saveProfile(dto)
                 _loadedProfile.value = dto.toUserProfile()
                 _uiState.value = AuthUiState.NavigateHome
