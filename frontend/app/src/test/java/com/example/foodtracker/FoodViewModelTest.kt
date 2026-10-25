@@ -631,4 +631,56 @@ class FoodViewModelTest {
         advanceUntilIdle()
         assertEquals(0, api.saved.size)
     }
+
+    @Test
+    fun applyLoadedProfile_setsProfileAndLoadsGoals() = runTest(testDispatcher) {
+        val api = RecordingProfileApi().apply { goals = goalsWithHydration(3.4f) }
+        val vm = hydrationVm(api)
+        advanceUntilIdle()
+        val before = api.getGoalsCalls
+        val loaded = UserProfile(name = "Ana", takesCreatine = true)
+        vm.applyLoadedProfile(loaded)
+        advanceUntilIdle()
+        assertEquals(loaded, vm.userProfile.value)
+        assertEquals(before + 1, api.getGoalsCalls)
+        assertEquals(3.4f, vm.hydrationGoalLiters.value)
+    }
+
+    @Test
+    fun applyLoadedProfile_sameProfileAgain_keepsLocalChangesAndDoesNotReload() = runTest(testDispatcher) {
+        val api = RecordingProfileApi()
+        val vm = hydrationVm(api)
+        advanceUntilIdle()
+        val loaded = UserProfile(name = "Ana")
+        vm.applyLoadedProfile(loaded)
+        advanceUntilIdle()
+        vm.updateHydrationPrefs(takesCreatine = true, overrideL = 3.0f)
+        advanceUntilIdle()
+        val before = api.getGoalsCalls
+
+        vm.applyLoadedProfile(loaded)   // e.g. Activity recreated, LaunchedEffect re-runs
+        advanceUntilIdle()
+
+        assertEquals(true, vm.userProfile.value.takesCreatine)
+        assertEquals(3.0f, vm.userProfile.value.hydrationGoalOverrideL)
+        assertEquals(before, api.getGoalsCalls)
+    }
+
+    @Test
+    fun applyLoadedProfile_afterReset_appliesSameProfileAgain() = runTest(testDispatcher) {
+        val api = RecordingProfileApi()
+        val vm = hydrationVm(api)
+        advanceUntilIdle()
+        val loaded = UserProfile(name = "Ana")
+        vm.applyLoadedProfile(loaded)
+        advanceUntilIdle()
+        vm.resetUserState()
+        val before = api.getGoalsCalls
+
+        vm.applyLoadedProfile(loaded)
+        advanceUntilIdle()
+
+        assertEquals(loaded, vm.userProfile.value)
+        assertEquals(before + 1, api.getGoalsCalls)
+    }
 }

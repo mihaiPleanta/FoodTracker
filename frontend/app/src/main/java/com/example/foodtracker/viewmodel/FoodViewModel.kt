@@ -195,6 +195,19 @@ class FoodViewModel(
     val userProfile: StateFlow<UserProfile> = _userProfile.asStateFlow()
     fun updateUserProfile(profile: UserProfile) { _userProfile.value = profile }
 
+    // Last profile received from auth (login / onboarding / profile edit). MainActivity's
+    // LaunchedEffect re-delivers the same value on Activity recreation; ignoring it keeps
+    // local changes made since (hydration prefs, weight) from being overwritten.
+    private var lastAppliedAuthProfile: UserProfile? = null
+
+    /** Applies a profile coming from auth and (re)loads goals, which need the profile to exist. */
+    fun applyLoadedProfile(profile: UserProfile) {
+        if (profile == lastAppliedAuthProfile) return
+        lastAppliedAuthProfile = profile
+        _userProfile.value = profile
+        loadGoals()
+    }
+
     // ── App settings ──────────────────────────────────────────────────────────────
     val appSettings: StateFlow<AppSettings> = settingsRepository.settings
         .stateIn(
@@ -701,6 +714,7 @@ class FoodViewModel(
         _searchState.value = SearchUiState.Idle
         _showMealSelector.value = false
         _userProfile.value = UserProfile()
+        lastAppliedAuthProfile = null
         _nutritionGoals.value = null
         hydrationSaveJob?.cancel()
         hydrationSaveJob = null

@@ -99,7 +99,7 @@ class MainActivity : ComponentActivity() {
 
                 val loadedProfile by authViewModel.loadedProfile.collectAsState()
                 LaunchedEffect(loadedProfile) {
-                    loadedProfile?.let { viewModel.updateUserProfile(it) }
+                    loadedProfile?.let { viewModel.applyLoadedProfile(it) }
                 }
 
                 LaunchedEffect(Unit) {
