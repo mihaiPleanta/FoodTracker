@@ -778,4 +778,53 @@ class FoodViewModelTest {
         assertEquals(listOf(R.string.error_no_internet), toasts.map { it.messageRes })
         job.cancel()
     }
+
+    @Test
+    fun undoCopy_withNoLocalDay_stillCallsDeleteBatch() = runTest(testDispatcher) {
+        val fake = FakeLogsApi()
+        val vm = newVm(fake, "copyUndoNoDay")
+        advanceUntilIdle()
+        vm.undoCopy("2020-01-01", listOf(5L, 6L))
+        advanceUntilIdle()
+        assertEquals(listOf(5L, 6L), fake.lastDeleteBatch!!.ids)
+    }
+
+    @Test
+    fun undoCopy_failure_doesNotClobberConcurrentChanges() = runTest(testDispatcher) {
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val base = FakeLogsApi()
+        val logs = object : LogsApi by base {
+            override suspend fun deleteFoodLogs(body: FoodLogDeleteBatchDto): FoodLogDeleteBatchResultDto {
+                gate.await()
+                throw java.io.IOException()
+            }
+        }
+        val vm = FoodViewModel(
+            settingsRepository = FakeSettingsRepository(),
+            mealLogTracker = MealLogTracker(
+                PreferenceDataStoreFactory.create(
+                    scope = dataStoreScope,
+                    produceFile = { File(tempFolder.newFolder("copyUndoRace"), "meal_log_tracker.preferences_pb") }
+                )
+            ),
+            foodRepository = FoodRepository(NoOpFoodApi, NoOpCache),
+            logsApi = logs,
+            profileApi = NoOpProfileApi,
+        )
+        val job = launch { vm.breakfastFoods.collect { } }
+        vm.setSelectedHomeDate(java.util.Date())
+        advanceUntilIdle()
+        val key = todayKey()
+        vm.appendCopiedLogs(key, listOf(copiedDto(100, "BREAKFAST", "Eggs", key)))
+        vm.undoCopy(key, listOf(100L))
+        advanceUntilIdle()
+        assertEquals(listOf("Oats"), vm.breakfastFoods.value.map { it.food.name })
+        vm.addFoodToMeal("Breakfast", LoggedFood(
+            food = sampleFood("Toast"), 30))
+        advanceUntilIdle()
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(listOf("Oats", "Toast", "Eggs"), vm.breakfastFoods.value.map { it.food.name })
+        job.cancel()
+    }
 }

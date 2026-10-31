@@ -16,9 +16,9 @@ import com.example.foodtracker.model.FoodItem
 import com.example.foodtracker.model.FoodLogCreateDto
 import com.example.foodtracker.model.FoodLogDeleteBatchDto
 import com.example.foodtracker.model.FoodLogDto
-import com.example.foodtracker.model.mealNameFromBackend
 import com.example.foodtracker.model.FoodLogUpdateDto
 import com.example.foodtracker.model.mealKeyToBackend
+import com.example.foodtracker.model.mealNameFromBackend
 import com.example.foodtracker.model.toDto
 import com.example.foodtracker.model.HydrationUpdateDto
 import com.example.foodtracker.model.LoggedFood
@@ -538,30 +538,50 @@ class FoodViewModel(
         }
     }
 
-    /** Anulează o copiere: scoate optimist rândurile și le șterge în lot pe backend. */
+    /** Anulează o copiere: scoate optimist rândurile locale și le șterge ÎNTOTDEAUNA în lot pe backend. */
     fun undoCopy(dateKey: String, ids: List<Long>) {
-        val previous = _foodsByDate.value[dateKey] ?: return
         val idSet = ids.toSet()
-        _foodsByDate.value = _foodsByDate.value + (dateKey to previous.copy(
-            breakfast = previous.breakfast.filterNot { it.id in idSet },
-            lunch = previous.lunch.filterNot { it.id in idSet },
-            dinner = previous.dinner.filterNot { it.id in idSet },
-            snacks = previous.snacks.filterNot { it.id in idSet },
-        ))
+        // (nume masă, rând) pentru fiecare rând scos local, ca la eșec să le re-inserăm în masa lor.
+        val removed = mutableListOf<Pair<String, LoggedFood>>()
+        val day = _foodsByDate.value[dateKey]
+        if (day != null) {
+            var updated: DayMeals = day
+            for (meal in listOf("Breakfast", "Lunch", "Dinner", "Snacks")) {
+                val list = mealList(updated, meal)
+                val (gone, kept) = list.partition { it.id in idSet }
+                gone.forEach { removed += meal to it }
+                if (gone.isNotEmpty()) updated = updateMealList(updated, meal, kept)
+            }
+            _foodsByDate.value = _foodsByDate.value + (dateKey to updated)
+        }
         viewModelScope.launch {
             try {
                 logsApi.deleteFoodLogs(FoodLogDeleteBatchDto(ids))
             } catch (e: java.io.IOException) {
-                _foodsByDate.value = _foodsByDate.value + (dateKey to previous)
+                restoreRemoved(dateKey, removed)
                 _toastEvents.tryEmit(ToastEvent(R.string.error_no_internet))
             } catch (e: retrofit2.HttpException) {
-                _foodsByDate.value = _foodsByDate.value + (dateKey to previous)
+                restoreRemoved(dateKey, removed)
                 _toastEvents.tryEmit(ToastEvent(R.string.error_undo_copy, e.code()))
             } catch (e: Throwable) {
-                _foodsByDate.value = _foodsByDate.value + (dateKey to previous)
+                restoreRemoved(dateKey, removed)
                 _toastEvents.tryEmit(ToastEvent(R.string.error_undo_copy))
             }
         }
+    }
+
+    /** Re-inserează doar rândurile scoase, în starea CURENTĂ a zilei (sare peste id-urile deja prezente). */
+    private fun restoreRemoved(dateKey: String, removed: List<Pair<String, LoggedFood>>) {
+        if (removed.isEmpty()) return
+        var day = _foodsByDate.value[dateKey] ?: DayMeals()
+        val present = listOf("Breakfast", "Lunch", "Dinner", "Snacks")
+            .flatMap { mealList(day, it) }.mapNotNull { it.id }.toMutableSet()
+        for ((meal, food) in removed) {
+            val id = food.id
+            if (id != null && !present.add(id)) continue
+            day = updateMealList(day, meal, mealList(day, meal) + food)
+        }
+        _foodsByDate.value = _foodsByDate.value + (dateKey to day)
     }
 
     private fun mealList(day: DayMeals, mealName: String): List<LoggedFood> = when (mealName) {
