@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
@@ -47,6 +48,8 @@ import com.example.foodtracker.ui.theme.accentCard
 import com.example.foodtracker.ui.theme.glassCard
 import com.example.foodtracker.util.LocalAppLanguage
 import com.example.foodtracker.util.toLocale
+import com.example.foodtracker.viewmodel.CopyMode
+import com.example.foodtracker.viewmodel.CopyViewModel
 import com.example.foodtracker.viewmodel.FoodViewModel
 import com.example.foodtracker.viewmodel.PortionsViewModel
 import com.example.foodtracker.util.PortionChoice
@@ -96,7 +99,7 @@ private fun goalsModeRes(mode: GoalsMode): Int = when (mode) {
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 @Composable
-fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions: PortionsViewModel) {
+fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions: PortionsViewModel, copy: CopyViewModel) {
     val appLocale = LocalAppLanguage.current.toLocale()
     val calendarDays = remember(appLocale) { generateCalendarDays(appLocale) }
     val todayIndex = calendarDays.indexOfFirst { it.isToday }
@@ -119,6 +122,36 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
     }
     LaunchedEffect(resources) {
         portions.toastEvents.collect { res -> snackbarHostState.showSnackbar(resources.getString(res)) }
+    }
+
+    LaunchedEffect(Unit) {
+        copy.copied.collect { r ->
+            viewModel.appendCopiedLogs(r.targetDateKey, r.logs)
+            val n = r.logs.size
+            val res = resources.getQuantityString(R.plurals.copy_done, n, n)
+            val result = snackbarHostState.showSnackbar(
+                message = res,
+                actionLabel = resources.getString(R.string.action_cancel),
+                duration = SnackbarDuration.Short,
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                viewModel.undoCopy(r.targetDateKey, r.logs.map { it.id })
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        copy.errors.collect { event ->
+            val base = resources.getString(event.messageRes)
+            snackbarHostState.showSnackbar(if (event.code != null) "$base (${event.code})" else base)
+        }
+    }
+    var showCopySheet by remember { mutableStateOf(false) }
+    val openCopy = {
+        copy.open(
+            CopyMode.Day,
+            selectedDate.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate(),
+        )
+        showCopySheet = true
     }
 
     LaunchedEffect(Unit) {
@@ -220,6 +253,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
                 subtitle = headerSubtitle,
                 initial = initial,
                 onSettingsClick = { navController.navigate("settings") },
+                onCopyFromDay = openCopy,
                 modifier = Modifier.padding(horizontal = 20.dp)
             )
 
@@ -275,6 +309,8 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
                     title = stringResource(R.string.home_empty_day_title),
                     subtitle = stringResource(R.string.home_empty_day_subtitle),
                     modifier = Modifier.padding(horizontal = 20.dp),
+                    actionLabel = stringResource(R.string.home_copy_from_day),
+                    onAction = openCopy,
                 )
                 Spacer(Modifier.height(12.dp))
             }
@@ -309,6 +345,16 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
+
+        if (showCopySheet) {
+            CopyFoodsSheet(
+                copy = copy,
+                foodViewModel = viewModel,
+                portions = portions,
+                accentColor = GlassColors.accentGreen,
+                onDismiss = { showCopySheet = false },
+            )
+        }
 
         if (showWeightSheet) {
             WeightCheckInSheet(
@@ -362,7 +408,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
 // ── Header ────────────────────────────────────────────────────────────────────
 
 @Composable
-fun HomeHeader(title: String, subtitle: String, initial: String, onSettingsClick: () -> Unit, modifier: Modifier = Modifier) {
+fun HomeHeader(title: String, subtitle: String, initial: String, onSettingsClick: () -> Unit, modifier: Modifier = Modifier, onCopyFromDay: () -> Unit = {}) {
     Row(modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
         Column {
             Text(subtitle, fontSize = 13.sp, color = GlassColors.textSecondary)
@@ -372,6 +418,31 @@ fun HomeHeader(title: String, subtitle: String, initial: String, onSettingsClick
         }
         Row(verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            var menuOpen by remember { mutableStateOf(false) }
+            Box {
+                Box(
+                    Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(GlassColors.cardBackground)
+                        .border(1.dp, GlassColors.cardBorder, CircleShape)
+                        .clickable { menuOpen = true },
+                    Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.MoreVert,
+                        contentDescription = null,
+                        tint = GlassColors.textSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.copy_menu_item)) },
+                        onClick = { menuOpen = false; onCopyFromDay() },
+                    )
+                }
+            }
             Box(
                 Modifier
                     .size(42.dp)

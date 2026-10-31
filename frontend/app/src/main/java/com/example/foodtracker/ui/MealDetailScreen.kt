@@ -23,6 +23,9 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.MoreVert
+import com.example.foodtracker.viewmodel.CopyMode
+import com.example.foodtracker.viewmodel.CopyViewModel
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -85,6 +88,7 @@ fun MealDetailScreen(
     viewModel: FoodViewModel,
     quickPicks: QuickPicksViewModel,
     portions: PortionsViewModel,
+    copy: CopyViewModel,
 ) {
     val loggedFoods by viewModel.getFoodsFlow(mealName).collectAsState()
     val searchState by viewModel.searchState.collectAsState()
@@ -121,6 +125,30 @@ fun MealDetailScreen(
         portions.toastEvents.collect { res -> snackbarHostState.showSnackbar(context.getString(res)) }
     }
 
+    LaunchedEffect(Unit) {
+        copy.copied.collect { r ->
+            viewModel.appendCopiedLogs(r.targetDateKey, r.logs)
+            val n = r.logs.size
+            val res = context.resources.getQuantityString(R.plurals.copy_done, n, n)
+            val result = snackbarHostState.showSnackbar(
+                message = res,
+                actionLabel = context.getString(R.string.action_cancel),
+                duration = SnackbarDuration.Short,
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                viewModel.undoCopy(r.targetDateKey, r.logs.map { it.id })
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        copy.errors.collect { event ->
+            val base = context.getString(event.messageRes)
+            snackbarHostState.showSnackbar(if (event.code != null) "$base (${event.code})" else base)
+        }
+    }
+    var showCopySheet by remember { mutableStateOf(false) }
+    val selectedHomeDate by viewModel.selectedHomeDate.collectAsState()
+
     LaunchedEffect(searchQuery) {
         viewModel.searchFoods(searchQuery)
     }
@@ -147,6 +175,13 @@ fun MealDetailScreen(
                 mealIcon    = mealIcon,
                 accentColor = accentColor,
                 onBack      = goBackToHome,
+                onCopyFromDay = {
+                    copy.open(
+                        CopyMode.Meal(mealName),
+                        selectedHomeDate.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate(),
+                    )
+                    showCopySheet = true
+                },
             )
 
             Row(
@@ -236,6 +271,16 @@ fun MealDetailScreen(
                 .navigationBarsPadding(),
         )
 
+        if (showCopySheet) {
+            CopyFoodsSheet(
+                copy = copy,
+                foodViewModel = viewModel,
+                portions = portions,
+                accentColor = accentColor,
+                onDismiss = { showCopySheet = false },
+            )
+        }
+
         sheetTarget?.let { (food, initialGrams) ->
             AddFoodSheet(
                 target = food,
@@ -309,7 +354,8 @@ fun MealDetailHeader(
     mealName: String,
     mealIcon: String,
     accentColor: Color,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onCopyFromDay: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier
@@ -363,6 +409,32 @@ fun MealDetailHeader(
                 fontSize = 12.sp,
                 color = GlassColors.textTertiary
             )
+        }
+
+        var menuOpen by remember { mutableStateOf(false) }
+        Box {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(GlassColors.cardBackground)
+                    .border(1.dp, GlassColors.cardBorder, CircleShape)
+                    .clickable { menuOpen = true },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.MoreVert,
+                    contentDescription = null,
+                    tint = GlassColors.textSecondary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.copy_menu_item)) },
+                    onClick = { menuOpen = false; onCopyFromDay() },
+                )
+            }
         }
     }
 }

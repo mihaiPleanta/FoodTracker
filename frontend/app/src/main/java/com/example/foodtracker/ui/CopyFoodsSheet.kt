@@ -39,6 +39,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -87,7 +88,8 @@ fun CopyFoodsSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val locale = LocalAppLanguage.current.toLocale()
 
-    LaunchedEffect(copy) { copy.copied.collect { onDismiss() } }
+    val currentOnDismiss by rememberUpdatedState(onDismiss)
+    LaunchedEffect(copy) { copy.copied.collect { currentOnDismiss() } }
 
     var showDatePicker by remember { mutableStateOf(false) }
     var editingId by remember { mutableStateOf<Long?>(null) }
@@ -234,7 +236,10 @@ fun CopyFoodsSheet(
                         }
                         showDatePicker = false
                     },
-                ) { Text(stringResource(R.string.action_save)) }
+                ) { Text(stringResource(R.string.action_ok)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text(stringResource(R.string.action_cancel)) }
             },
         ) { DatePicker(state = pickerState) }
     }

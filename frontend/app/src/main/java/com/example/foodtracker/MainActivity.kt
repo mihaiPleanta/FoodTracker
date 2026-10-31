@@ -38,6 +38,7 @@ import com.example.foodtracker.util.notifications.MealReminderWorker
 import com.example.foodtracker.util.notifications.NotificationChannels
 import com.example.foodtracker.util.AppLocale
 import com.example.foodtracker.viewmodel.AuthViewModel
+import com.example.foodtracker.viewmodel.CopyViewModel
 import com.example.foodtracker.viewmodel.FoodViewModel
 import com.example.foodtracker.viewmodel.FoodViewModelFactory
 import com.example.foodtracker.viewmodel.PortionsViewModel
@@ -80,6 +81,7 @@ class MainActivity : ComponentActivity() {
             // Activity-scoped like recipeViewModel; reset on logout so lists never leak between accounts.
             val quickPicksViewModel: QuickPicksViewModel = viewModel()
             val portionsViewModel: PortionsViewModel = viewModel()
+            val copyViewModel: CopyViewModel = viewModel()
             val appSettings by viewModel.appSettings.collectAsState()
             // enableEdgeToEdge()'s auto() follows the *system* dark mode; keep the
             // status/nav bar icon contrast in sync with the in-app theme toggle.
@@ -249,7 +251,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                                 composable("home") {
-                                    HomeScreen(navController, viewModel, portionsViewModel)
+                                    HomeScreen(navController, viewModel, portionsViewModel, copyViewModel)
                                 }
                                 composable("stats") {
                                     StatsScreen(viewModel)
@@ -271,6 +273,7 @@ class MainActivity : ComponentActivity() {
                                             recipeViewModel.resetUserState()
                                             quickPicksViewModel.resetUserState()
                                             portionsViewModel.resetUserState()
+                                            copyViewModel.resetUserState()
                                             navController.navigate("login") {
                                                 popUpTo(0) { inclusive = true }
                                             }
@@ -280,6 +283,7 @@ class MainActivity : ComponentActivity() {
                                             recipeViewModel.resetUserState()
                                             quickPicksViewModel.resetUserState()
                                             portionsViewModel.resetUserState()
+                                            copyViewModel.resetUserState()
                                             navController.navigate("login") {
                                                 popUpTo(0) { inclusive = true }
                                             }
@@ -299,6 +303,7 @@ class MainActivity : ComponentActivity() {
                                         viewModel     = viewModel,
                                         quickPicks    = quickPicksViewModel,
                                         portions      = portionsViewModel,
+                                        copy          = copyViewModel,
                                     )
                                 }
                             }

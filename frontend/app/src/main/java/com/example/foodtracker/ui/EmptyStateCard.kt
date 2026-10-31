@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.sp
 import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.ui.theme.glassCard
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 
 /**
  * A friendly, centered empty-state card (emoji + title + subtitle). Shared between
@@ -25,6 +26,8 @@ fun EmptyStateCard(
     title: String,
     subtitle: String,
     modifier: Modifier = Modifier,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
 ) {
     Column(
         modifier = modifier
@@ -48,5 +51,10 @@ fun EmptyStateCard(
             color = GlassColors.textSecondary,
             textAlign = TextAlign.Center,
         )
+        if (actionLabel != null && onAction != null) {
+            TextButton(onClick = onAction) {
+                Text(actionLabel, fontWeight = FontWeight.SemiBold, color = GlassColors.accentGreen)
+            }
+        }
     }
 }
