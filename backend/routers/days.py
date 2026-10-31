@@ -8,16 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from auth import verify_token
 from database import get_db
 from models import FoodLog, HydrationLog, WeightCheckIn
-from schemas import DayResponse, FoodLogDto, WeightCheckInDto
+from schemas import MEAL_KEYS, DayResponse, FoodLogDto, WeightCheckInDto
 
 router = APIRouter()
 
-_MEAL_KEYS = {
-    "BREAKFAST": "breakfast",
-    "LUNCH": "lunch",
-    "DINNER": "dinner",
-    "SNACKS": "snacks",
-}
+_MEAL_KEYS = MEAL_KEYS
 
 
 @router.get("/days/{day}", response_model=DayResponse, response_model_by_alias=False)
@@ -32,7 +27,7 @@ async def get_day(
         await db.execute(
             select(FoodLog)
             .where(FoodLog.uid == uid, FoodLog.log_date == day)
-            .order_by(FoodLog.created_at.asc())
+            .order_by(FoodLog.created_at.asc(), FoodLog.id.asc())
         )
     ).scalars().all()
 

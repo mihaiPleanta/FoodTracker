@@ -162,6 +162,28 @@ class DayResponse(BaseModel):
     weight_check_in: Optional[WeightCheckInDto] = None
 
 
+MEAL_KEYS = {
+    "BREAKFAST": "breakfast",
+    "LUNCH": "lunch",
+    "DINNER": "dinner",
+    "SNACKS": "snacks",
+}
+
+
+class MealSummary(BaseModel):
+    count: int
+    kcal: int
+
+
+class DaySummary(BaseModel):
+    date: _date
+    meals: Dict[str, MealSummary]
+
+
+class FoodLogSummaryResponse(BaseModel):
+    days: List[DaySummary]
+
+
 class HydrationGoalDto(BaseModel):
     goal_l: float
     auto_l: float

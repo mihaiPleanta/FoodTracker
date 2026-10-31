@@ -1,11 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from datetime import date
+from typing import Dict
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth import verify_token
 from database import get_db
 from models import FoodLog
-from schemas import FoodLogCreate, FoodLogDto, FoodLogUpdate
+from schemas import (
+    MEAL_KEYS,
+    DaySummary,
+    FoodLogCreate,
+    FoodLogDto,
+    FoodLogSummaryResponse,
+    FoodLogUpdate,
+    MealSummary,
+)
 
 router = APIRouter()
 
@@ -38,6 +49,54 @@ async def create_food_log(
     await db.commit()
     await db.refresh(row)
     return row
+
+
+_MAX_SUMMARY_DAYS = 62
+
+
+@router.get("/food-logs/summary", response_model=FoodLogSummaryResponse)
+async def food_log_summary(
+    to: date,
+    from_: date = Query(alias="from"),
+    token: dict = Depends(verify_token),
+    db: AsyncSession = Depends(get_db),
+) -> FoodLogSummaryResponse:
+    if from_ > to:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="from must be <= to"
+        )
+    if (to - from_).days + 1 > _MAX_SUMMARY_DAYS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Range cannot exceed {_MAX_SUMMARY_DAYS} days",
+        )
+    rows = (
+        await db.execute(
+            select(FoodLog).where(
+                FoodLog.uid == token["uid"],
+                FoodLog.log_date >= from_,
+                FoodLog.log_date <= to,
+            )
+        )
+    ).scalars().all()
+
+    counts: Dict[date, Dict[str, list]] = {}
+    for row in rows:
+        key = MEAL_KEYS.get(row.meal)
+        if key is None:
+            continue
+        acc = counts.setdefault(row.log_date, {}).setdefault(key, [0, 0.0])
+        acc[0] += 1
+        acc[1] += row.kcal_100g * row.grams / 100
+
+    days = [
+        DaySummary(
+            date=d,
+            meals={k: MealSummary(count=v[0], kcal=round(v[1])) for k, v in meals.items()},
+        )
+        for d, meals in sorted(counts.items(), key=lambda kv: kv[0], reverse=True)
+    ]
+    return FoodLogSummaryResponse(days=days)
 
 
 @router.patch("/food-logs/{log_id}", response_model=FoodLogDto)
