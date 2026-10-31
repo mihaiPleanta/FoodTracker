@@ -382,4 +382,29 @@
     </plurals>
     <string name="error_undo_copy">Nu am putut anula copierea</string>
     <string name="copy_error_load">Nu am putut încărca zilele</string>
+    <string name="copy_menu_item">Copiază din altă zi…</string>
+    <string name="copy_title_meal">Copiază %1$s din…</string>
+    <string name="copy_title_day">Copiază din…</string>
+    <string name="copy_day_summary">%1$s · %2$s · %3$d kcal</string>
+    <plurals name="copy_foods_count">
+        <item quantity="one">%d aliment</item>
+        <item quantity="few">%d alimente</item>
+        <item quantity="other">%d de alimente</item>
+    </plurals>
+    <string name="copy_empty_meal_day">Nimic la %1$s în ziua asta</string>
+    <string name="copy_empty_day">Nimic logat în ziua asta</string>
+    <string name="copy_none_recent_meal">N-ai mai logat %1$s recent</string>
+    <string name="copy_none_recent_day">N-ai logat nimic recent</string>
+    <plurals name="copy_button">
+        <item quantity="one">Copiază (%d)</item>
+        <item quantity="few">Copiază (%d)</item>
+        <item quantity="other">Copiază (%d)</item>
+    </plurals>
+    <plurals name="copy_done">
+        <item quantity="one">Am copiat %d aliment</item>
+        <item quantity="few">Am copiat %d alimente</item>
+        <item quantity="other">Am copiat %d de alimente</item>
+    </plurals>
+    <string name="home_copy_from_day">📋 Copiază din altă zi</string>
+    <string name="copy_pick_date">Alege o dată</string>
 </resources>

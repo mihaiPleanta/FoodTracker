@@ -365,4 +365,26 @@
     </plurals>
     <string name="error_undo_copy">Couldn\'t undo the copy</string>
     <string name="copy_error_load">Couldn\'t load days</string>
+    <string name="copy_menu_item">Copy from another day…</string>
+    <string name="copy_title_meal">Copy %1$s from…</string>
+    <string name="copy_title_day">Copy from…</string>
+    <string name="copy_day_summary">%1$s · %2$s · %3$d kcal</string>
+    <plurals name="copy_foods_count">
+        <item quantity="one">%d food</item>
+        <item quantity="other">%d foods</item>
+    </plurals>
+    <string name="copy_empty_meal_day">Nothing for %1$s on this day</string>
+    <string name="copy_empty_day">Nothing logged on this day</string>
+    <string name="copy_none_recent_meal">You haven\'t logged %1$s recently</string>
+    <string name="copy_none_recent_day">Nothing logged recently</string>
+    <plurals name="copy_button">
+        <item quantity="one">Copy (%d)</item>
+        <item quantity="other">Copy (%d)</item>
+    </plurals>
+    <plurals name="copy_done">
+        <item quantity="one">Copied %d food</item>
+        <item quantity="other">Copied %d foods</item>
+    </plurals>
+    <string name="home_copy_from_day">📋 Copy from another day</string>
+    <string name="copy_pick_date">Pick a date</string>
 </resources>
