@@ -364,4 +364,5 @@
         <item quantity="other">%s ml</item>
     </plurals>
     <string name="error_undo_copy">Couldn\'t undo the copy</string>
+    <string name="copy_error_load">Couldn\'t load days</string>
 </resources>

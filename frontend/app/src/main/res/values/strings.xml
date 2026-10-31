@@ -381,4 +381,5 @@
         <item quantity="other">%s ml</item>
     </plurals>
     <string name="error_undo_copy">Nu am putut anula copierea</string>
+    <string name="copy_error_load">Nu am putut încărca zilele</string>
 </resources>
