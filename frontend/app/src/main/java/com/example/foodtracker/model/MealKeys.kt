@@ -8,3 +8,13 @@ fun mealKeyToBackend(meal: String): String = when (meal) {
     "Snacks"    -> "SNACKS"
     else        -> "BREAKFAST"
 }
+
+/** Inverse of [mealKeyToBackend]: backend enum ("DINNER") to UI name ("Dinner"); unknown -> "Snacks". */
+fun mealNameFromBackend(meal: String): String = when (meal) {
+    "BREAKFAST" -> "Breakfast"
+    "LUNCH"     -> "Lunch"
+    "DINNER"    -> "Dinner"
+    else        -> "Snacks"
+}
+
+val MEAL_ORDER = listOf("Breakfast", "Lunch", "Dinner", "Snacks")

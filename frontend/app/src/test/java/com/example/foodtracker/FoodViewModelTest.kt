@@ -64,6 +64,12 @@ private object NoOpFoodApi : FoodApi {
  * updateFoodLog echoes the new grams and records the call. The rest throw.
  */
 private class FakeLogsApi : LogsApi {
+    override suspend fun getFoodLogSummary(from: String, to: String): com.example.foodtracker.model.FoodLogSummaryDto =
+        throw UnsupportedOperationException()
+    override suspend fun copyFoodLogs(body: com.example.foodtracker.model.FoodLogCopyRequestDto): List<FoodLogDto> =
+        throw UnsupportedOperationException()
+    override suspend fun deleteFoodLogs(body: com.example.foodtracker.model.FoodLogDeleteBatchDto): com.example.foodtracker.model.FoodLogDeleteBatchResultDto =
+        throw UnsupportedOperationException()
     var lastUpdate: Pair<Long, Int>? = null
     var lastUpdateBody: FoodLogUpdateDto? = null
     var lastCreate: FoodLogCreateDto? = null
@@ -123,6 +129,12 @@ private class FakeLogsApi : LogsApi {
  * accounts (account A logs in, logs out, account B logs in on the same process).
  */
 private class SwitchableLogsApi(initial: DayResponseDto) : LogsApi {
+    override suspend fun getFoodLogSummary(from: String, to: String): com.example.foodtracker.model.FoodLogSummaryDto =
+        throw UnsupportedOperationException()
+    override suspend fun copyFoodLogs(body: com.example.foodtracker.model.FoodLogCopyRequestDto): List<FoodLogDto> =
+        throw UnsupportedOperationException()
+    override suspend fun deleteFoodLogs(body: com.example.foodtracker.model.FoodLogDeleteBatchDto): com.example.foodtracker.model.FoodLogDeleteBatchResultDto =
+        throw UnsupportedOperationException()
     var day: DayResponseDto = initial
 
     override suspend fun getDay(date: String): DayResponseDto = day

@@ -1,7 +1,11 @@
 package com.example.foodtracker.api
 
 import com.example.foodtracker.model.DayResponseDto
+import com.example.foodtracker.model.FoodLogCopyRequestDto
 import com.example.foodtracker.model.FoodLogCreateDto
+import com.example.foodtracker.model.FoodLogDeleteBatchDto
+import com.example.foodtracker.model.FoodLogDeleteBatchResultDto
+import com.example.foodtracker.model.FoodLogSummaryDto
 import com.example.foodtracker.model.FoodLogDto
 import com.example.foodtracker.model.FoodLogUpdateDto
 import com.example.foodtracker.model.HydrationDto
@@ -29,6 +33,15 @@ interface LogsApi {
 
     @PATCH("food-logs/{id}")
     suspend fun updateFoodLog(@Path("id") id: Long, @Body body: FoodLogUpdateDto): FoodLogDto
+
+    @GET("food-logs/summary")
+    suspend fun getFoodLogSummary(@Query("from") from: String, @Query("to") to: String): FoodLogSummaryDto
+
+    @POST("food-logs/copy")
+    suspend fun copyFoodLogs(@Body body: FoodLogCopyRequestDto): List<FoodLogDto>
+
+    @POST("food-logs/delete-batch")
+    suspend fun deleteFoodLogs(@Body body: FoodLogDeleteBatchDto): FoodLogDeleteBatchResultDto
 
     @DELETE("food-logs/{id}")
     suspend fun deleteFoodLog(@Path("id") id: Long): Response<Unit>

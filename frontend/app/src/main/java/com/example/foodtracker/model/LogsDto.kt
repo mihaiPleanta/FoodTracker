@@ -98,3 +98,23 @@ data class DayResponseDto(
     @SerializedName("hydration_liters") val hydrationLiters: Float,
     @SerializedName("weight_check_in") val weightCheckIn: WeightCheckInDto?,
 )
+
+data class MealSummaryDto(val count: Int, val kcal: Int)
+data class DaySummaryDto(val date: String, val meals: Map<String, MealSummaryDto>)
+data class FoodLogSummaryDto(val days: List<DaySummaryDto>)
+
+data class FoodLogCopyItemDto(
+    @SerializedName("source_id") val sourceId: Long,
+    val grams: Int,
+    val unit: String? = null,
+    @SerializedName("unit_qty") val unitQty: Float? = null,
+    val ingredients: List<FoodLogIngredientDto>? = null,
+)
+
+data class FoodLogCopyRequestDto(
+    @SerializedName("to_date") val toDate: String,
+    val items: List<FoodLogCopyItemDto>,
+)
+
+data class FoodLogDeleteBatchDto(val ids: List<Long>)
+data class FoodLogDeleteBatchResultDto(val deleted: Int)
