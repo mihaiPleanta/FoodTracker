@@ -114,3 +114,12 @@ def test_get_day_orders_same_timestamp_by_id(client):
     assert r.status_code == 200, r.text
     names = [f["name"] for f in r.json()["foods_by_meal"]["breakfast"]]
     assert names == ["A", "B", "C"]
+
+
+def test_day_query_orders_by_created_at_then_id():
+    from datetime import date
+    from routers.days import day_food_logs_query
+
+    sql = str(day_food_logs_query("u", date(2026, 5, 20)))
+    order_by = sql.split("ORDER BY", 1)[1]
+    assert order_by.index("food_logs.created_at") < order_by.index("food_logs.id")

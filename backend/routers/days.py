@@ -12,7 +12,12 @@ from schemas import MEAL_KEYS, DayResponse, FoodLogDto, WeightCheckInDto
 
 router = APIRouter()
 
-_MEAL_KEYS = MEAL_KEYS
+def day_food_logs_query(uid: str, day: date):
+    return (
+        select(FoodLog)
+        .where(FoodLog.uid == uid, FoodLog.log_date == day)
+        .order_by(FoodLog.created_at.asc(), FoodLog.id.asc())
+    )
 
 
 @router.get("/days/{day}", response_model=DayResponse, response_model_by_alias=False)
@@ -25,15 +30,13 @@ async def get_day(
 
     food_rows = (
         await db.execute(
-            select(FoodLog)
-            .where(FoodLog.uid == uid, FoodLog.log_date == day)
-            .order_by(FoodLog.created_at.asc(), FoodLog.id.asc())
+            day_food_logs_query(uid, day)
         )
     ).scalars().all()
 
-    foods_by_meal: Dict[str, List[FoodLogDto]] = {key: [] for key in _MEAL_KEYS.values()}
+    foods_by_meal: Dict[str, List[FoodLogDto]] = {key: [] for key in MEAL_KEYS.values()}
     for row in food_rows:
-        meal_key = _MEAL_KEYS.get(row.meal)
+        meal_key = MEAL_KEYS.get(row.meal)
         if meal_key is None:
             continue
         foods_by_meal[meal_key].append(FoodLogDto.model_validate(row))
