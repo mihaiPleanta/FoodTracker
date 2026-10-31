@@ -292,3 +292,31 @@ def test_delete_batch_ignores_foreign_and_missing_ids(client):
 def test_delete_batch_empty_ids_returns_422(client):
     _ensure_profile(client)
     assert _delete_batch(client, []).status_code == 422
+
+
+def test_delete_batch_over_100_ids_returns_422(client):
+    _ensure_profile(client)
+    assert _delete_batch(client, list(range(1, 102))).status_code == 422
+
+
+def test_summary_exactly_62_days_is_accepted(client):
+    _ensure_profile(client)
+    # 2026-01-01 .. 2026-03-03 inclusive = 62 days
+    r = client.get("/food-logs/summary?from=2026-01-01&to=2026-03-03", headers=AUTH_HEADER)
+    assert r.status_code == 200, r.text
+
+
+def test_copy_plain_food_writes_json_null_not_sql_null(client):
+    from sqlalchemy import text
+    _ensure_profile(client)
+    src = _post(client)
+    r = _copy(client, [{"source_id": src["id"], "grams": 100}])
+    new_id = r.json()[0]["id"]
+    engine = create_engine(f"sqlite:///{_TEST_DB_PATH}")
+    with Session(engine) as s:
+        raw = s.execute(
+            text("SELECT ingredients, ingredients IS NULL FROM food_logs WHERE id = :i"),
+            {"i": new_id},
+        ).one()
+    engine.dispose()
+    assert raw[1] == 0, "ingredients must be JSON null, not SQL NULL"

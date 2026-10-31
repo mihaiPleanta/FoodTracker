@@ -108,6 +108,7 @@ async def copy_food_logs(
             row.kcal_100g, row.protein_100g, row.carbs_100g, row.fat_100g = (
                 src.kcal_100g, src.protein_100g, src.carbs_100g, src.fat_100g,
             )
+            row.ingredients = None  # JSON null, like POST /food-logs (not SQL NULL)
             row.unit = item.unit
             row.unit_qty = item.unit_qty
         new_rows.append(row)
