@@ -2,7 +2,7 @@ from datetime import date
 from typing import Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth import verify_token
@@ -13,6 +13,8 @@ from schemas import (
     DaySummary,
     FoodLogCopyRequest,
     FoodLogCreate,
+    FoodLogDeleteBatchRequest,
+    FoodLogDeleteBatchResponse,
     FoodLogDto,
     FoodLogSummaryResponse,
     FoodLogUpdate,
@@ -115,6 +117,19 @@ async def copy_food_logs(
     for row in new_rows:
         await db.refresh(row)
     return new_rows
+
+
+@router.post("/food-logs/delete-batch", response_model=FoodLogDeleteBatchResponse)
+async def delete_food_logs_batch(
+    req: FoodLogDeleteBatchRequest,
+    token: dict = Depends(verify_token),
+    db: AsyncSession = Depends(get_db),
+) -> FoodLogDeleteBatchResponse:
+    result = await db.execute(
+        delete(FoodLog).where(FoodLog.id.in_(req.ids), FoodLog.uid == token["uid"])
+    )
+    await db.commit()
+    return FoodLogDeleteBatchResponse(deleted=result.rowcount)
 
 
 _MAX_SUMMARY_DAYS = 62

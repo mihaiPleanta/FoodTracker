@@ -252,3 +252,43 @@ def test_copy_over_100_items_returns_422(client):
     src = _post(client)
     items = [{"source_id": src["id"], "grams": 10}] * 101
     assert _copy(client, items).status_code == 422
+
+
+def _delete_batch(client, ids):
+    return client.post(
+        "/food-logs/delete-batch", json={"ids": ids}, headers=AUTH_HEADER
+    )
+
+
+def test_delete_batch_removes_own_logs(client):
+    _ensure_profile(client)
+    a = _post(client, log_date="2026-05-21")
+    b = _post(client, log_date="2026-05-21", meal="LUNCH")
+    r = _delete_batch(client, [a["id"], b["id"]])
+    assert r.status_code == 200, r.text
+    assert r.json() == {"deleted": 2}
+    day = client.get("/days/2026-05-21", headers=AUTH_HEADER).json()
+    assert all(v == [] for v in day["foods_by_meal"].values())
+
+
+def test_delete_batch_ignores_foreign_and_missing_ids(client):
+    _ensure_profile(client)
+    mine = _post(client)
+    _insert_direct([{"uid": "other", "log_date": "2026-05-20"}], extra_profiles=["other"])
+    from sqlalchemy import select
+    engine = create_engine(f"sqlite:///{_TEST_DB_PATH}")
+    with Session(engine) as s:
+        foreign_id = s.execute(select(FoodLog.id).where(FoodLog.uid == "other")).scalar_one()
+    engine.dispose()
+    r = _delete_batch(client, [foreign_id, 99999, mine["id"]])
+    assert r.status_code == 200, r.text
+    assert r.json() == {"deleted": 1}
+    engine = create_engine(f"sqlite:///{_TEST_DB_PATH}")
+    with Session(engine) as s:
+        assert s.execute(select(FoodLog.id).where(FoodLog.id == foreign_id)).scalar_one() == foreign_id
+    engine.dispose()
+
+
+def test_delete_batch_empty_ids_returns_422(client):
+    _ensure_profile(client)
+    assert _delete_batch(client, []).status_code == 422

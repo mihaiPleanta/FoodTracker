@@ -143,6 +143,14 @@ class FoodLogCopyRequest(BaseModel):
     items: List[FoodLogCopyItem] = Field(min_length=1, max_length=100)
 
 
+class FoodLogDeleteBatchRequest(BaseModel):
+    ids: List[int] = Field(min_length=1, max_length=100)
+
+
+class FoodLogDeleteBatchResponse(BaseModel):
+    deleted: int
+
+
 class FoodLogDto(FoodLogCreate):
     model_config = ConfigDict(from_attributes=True)
     id: int
