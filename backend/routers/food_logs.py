@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Dict
+from typing import Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
@@ -11,6 +11,7 @@ from models import FoodLog
 from schemas import (
     MEAL_KEYS,
     DaySummary,
+    FoodLogCopyRequest,
     FoodLogCreate,
     FoodLogDto,
     FoodLogSummaryResponse,
@@ -49,6 +50,71 @@ async def create_food_log(
     await db.commit()
     await db.refresh(row)
     return row
+
+
+@router.post(
+    "/food-logs/copy",
+    response_model=List[FoodLogDto],
+    status_code=status.HTTP_201_CREATED,
+)
+async def copy_food_logs(
+    req: FoodLogCopyRequest,
+    token: dict = Depends(verify_token),
+    db: AsyncSession = Depends(get_db),
+) -> List[FoodLog]:
+    uid = token["uid"]
+    ids = {item.source_id for item in req.items}
+    sources = {
+        r.id: r
+        for r in (
+            await db.execute(select(FoodLog).where(FoodLog.id.in_(ids), FoodLog.uid == uid))
+        ).scalars().all()
+    }
+    if len(sources) != len(ids):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Food log not found")
+
+    new_rows = []
+    for item in req.items:
+        src = sources[item.source_id]
+        row = FoodLog(
+            uid=uid,
+            log_date=req.to_date,
+            meal=src.meal,
+            barcode=src.barcode,
+            name=src.name,
+            brand=src.brand,
+            image_url=src.image_url,
+            categories=src.categories,
+        )
+        if item.ingredients:
+            g, k, p, c, f = _totals_from_ingredients(item.ingredients)
+            row.grams = g
+            row.kcal_100g, row.protein_100g, row.carbs_100g, row.fat_100g = k, p, c, f
+            row.ingredients = [i.model_dump() for i in item.ingredients]
+            row.unit = None
+            row.unit_qty = None
+        elif src.ingredients is not None:
+            row.grams = src.grams
+            row.kcal_100g, row.protein_100g, row.carbs_100g, row.fat_100g = (
+                src.kcal_100g, src.protein_100g, src.carbs_100g, src.fat_100g,
+            )
+            row.ingredients = src.ingredients
+            row.unit = None
+            row.unit_qty = None
+        else:
+            row.grams = item.grams
+            row.kcal_100g, row.protein_100g, row.carbs_100g, row.fat_100g = (
+                src.kcal_100g, src.protein_100g, src.carbs_100g, src.fat_100g,
+            )
+            row.unit = item.unit
+            row.unit_qty = item.unit_qty
+        new_rows.append(row)
+
+    db.add_all(new_rows)
+    await db.commit()
+    for row in new_rows:
+        await db.refresh(row)
+    return new_rows
 
 
 _MAX_SUMMARY_DAYS = 62

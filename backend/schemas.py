@@ -125,6 +125,24 @@ class FoodLogUpdate(BaseModel):
         return self
 
 
+class FoodLogCopyItem(BaseModel):
+    source_id: int
+    grams: int = Field(gt=0)
+    unit: Optional[str] = None
+    unit_qty: Optional[float] = None
+    ingredients: Optional[List[FoodLogIngredient]] = None
+
+    @model_validator(mode="after")
+    def _unit_pair(self):
+        _check_unit_pair(self.unit, self.unit_qty)
+        return self
+
+
+class FoodLogCopyRequest(BaseModel):
+    to_date: _date
+    items: List[FoodLogCopyItem] = Field(min_length=1, max_length=100)
+
+
 class FoodLogDto(FoodLogCreate):
     model_config = ConfigDict(from_attributes=True)
     id: int
