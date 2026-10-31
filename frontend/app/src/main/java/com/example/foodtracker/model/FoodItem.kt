@@ -30,6 +30,23 @@ data class FoodItem(
     val ingredients: List<FoodIngredient>? = null,
 )
 
+/** Sum of ingredient grams, floored at 1 so per-100g division is always defined. */
+fun List<FoodIngredient>.totalGrams(): Double =
+    sumOf { it.grams.toDouble() }.coerceAtLeast(1.0)
+
+/** Single formula for a recipe portion: per-100g macros recomputed from [ingredients]
+ *  so that grams * per100g / 100 == sum of ingredient contributions. */
+fun FoodItem.withIngredients(ingredients: List<FoodIngredient>): FoodItem {
+    val totalG = ingredients.totalGrams()
+    return copy(
+        per100g = (ingredients.sumOf { it.kcal.toDouble() } / totalG * 100).toInt(),
+        protein100g = (ingredients.sumOf { it.protein.toDouble() } / totalG * 100).toFloat(),
+        carbs100g = (ingredients.sumOf { it.carbs.toDouble() } / totalG * 100).toFloat(),
+        fat100g = (ingredients.sumOf { it.fat.toDouble() } / totalG * 100).toFloat(),
+        ingredients = ingredients,
+    )
+}
+
 data class LoggedFood(
     val food: FoodItem,
     val grams: Int,

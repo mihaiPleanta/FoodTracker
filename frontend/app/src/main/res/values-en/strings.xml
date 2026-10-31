@@ -388,4 +388,5 @@
     <string name="home_copy_from_day">📋 Copy from another day</string>
     <string name="copy_pick_date">Pick a date</string>
     <string name="action_ok">OK</string>
+    <string name="action_more_options">More options</string>
 </resources>

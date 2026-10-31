@@ -17,6 +17,8 @@ import com.example.foodtracker.model.MEAL_ORDER
 import com.example.foodtracker.model.mealKeyToBackend
 import com.example.foodtracker.model.mealNameFromBackend
 import com.example.foodtracker.model.toDto
+import com.example.foodtracker.model.totalGrams
+import com.example.foodtracker.model.withIngredients
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -122,7 +124,8 @@ class CopyViewModel(
     private var copyJob: Job? = null
 
     fun open(mode: CopyMode, targetDate: LocalDate) {
-        cancelAll()
+        // A copy already sent is committed server-side: let it finish and emit.
+        cancelLoads()
         _state.value = CopyUiState(
             mode = mode,
             targetDate = targetDate,
@@ -225,18 +228,20 @@ class CopyViewModel(
             it.copy(logged = it.logged.copy(grams = grams, unit = unit, unitQty = unitQty))
         }
 
-    fun updateIngredients(sourceId: Long, ingredients: List<FoodIngredient>) =
+    fun updateIngredients(sourceId: Long, ingredients: List<FoodIngredient>) {
+        if (ingredients.isEmpty()) return
         editCandidate(sourceId) {
             it.copy(
                 logged = it.logged.copy(
-                    food = it.logged.food.copy(ingredients = ingredients),
-                    grams = ingredients.sumOf { ing -> ing.grams.toDouble() }.roundToInt(),
+                    food = it.logged.food.withIngredients(ingredients),
+                    grams = ingredients.totalGrams().roundToInt().coerceAtLeast(1),
                     unit = null,
                     unitQty = null,
                 ),
                 ingredientsEdited = true,
             )
         }
+    }
 
     fun copy() {
         val s = _state.value
@@ -276,9 +281,13 @@ class CopyViewModel(
         }
     }
 
-    private fun cancelAll() {
+    private fun cancelLoads() {
         openJob?.cancel()
         dayJob?.cancel()
+    }
+
+    private fun cancelAll() {
+        cancelLoads()
         copyJob?.cancel()
     }
 

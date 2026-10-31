@@ -64,6 +64,7 @@ private class FakeCopyLogsApi : LogsApi {
     var failCopy: Throwable? = null
     var summaryGate: CompletableDeferred<Unit>? = null
     var failSummary = false
+    var copyGate: CompletableDeferred<Unit>? = null
     var copyResult: List<FoodLogDto> = emptyList()
     val summaryRequests = mutableListOf<Pair<String, String>>()
     val copyRequests = mutableListOf<FoodLogCopyRequestDto>()
@@ -80,6 +81,7 @@ private class FakeCopyLogsApi : LogsApi {
     }
     override suspend fun copyFoodLogs(body: FoodLogCopyRequestDto): List<FoodLogDto> {
         copyRequests += body
+        copyGate?.await()
         failCopy?.let { throw it }
         return copyResult
     }
@@ -288,6 +290,57 @@ class CopyViewModelTest {
         assertEquals("2026-10-31", got[0].targetDateKey)
         assertEquals(listOf(99L), got[0].logs.map { it.id })
         assertEquals(false, vm.state.value.copying)
+    }
+
+    @Test
+    fun open_whileCopyInFlight_doesNotCancelCopy() = runTest(testDispatcher) {
+        val api = apiWithOne().apply { copyGate = CompletableDeferred() }
+        val vm = CopyViewModel(api)
+        val got = mutableListOf<CopyResult>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.copied.collect { got += it } }
+        vm.open(CopyMode.Day, target)
+        advanceUntilIdle()
+        vm.copy()
+        runCurrent()
+        vm.open(CopyMode.Day, target)
+        api.copyGate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(1, got.size)
+        assertEquals(listOf(99L), got[0].logs.map { it.id })
+    }
+
+    private fun ingredientsApi() = FakeCopyLogsApi().apply {
+        summary = summaryOf("2026-10-30" to mapOf("lunch" to ms))
+        days["2026-10-30"] = dayOf("lunch" to listOf(log(1, "LUNCH", grams = 300,
+            ingredients = listOf(FoodLogIngredientDto("Orez", 200f, 130f, 2.7f, 28f, 0.3f)))))
+    }
+
+    @Test
+    fun updateIngredients_emptyList_leavesCandidateUnchanged() = runTest(testDispatcher) {
+        val vm = CopyViewModel(ingredientsApi())
+        vm.open(CopyMode.Day, target)
+        advanceUntilIdle()
+        val before = vm.cands()[0]
+        vm.updateIngredients(before.sourceId, emptyList())
+        assertEquals(before, vm.cands()[0])
+        assertEquals(false, vm.cands()[0].ingredientsEdited)
+    }
+
+    @Test
+    fun updateIngredients_recomputesPer100gSoCaloriesMatchIngredients() = runTest(testDispatcher) {
+        val vm = CopyViewModel(ingredientsApi())
+        vm.open(CopyMode.Day, target)
+        advanceUntilIdle()
+        val id = vm.cands()[0].sourceId
+        val ings = listOf(
+            FoodIngredient("Orez", 100f, 130f, 2.7f, 28f, 0.3f),
+            FoodIngredient("Pui", 150f, 165f, 31f, 0f, 3.6f),
+        )
+        vm.updateIngredients(id, ings)
+        val c = vm.cands()[0].logged
+        assertEquals(250, c.grams)
+        assertEquals(ings.sumOf { it.kcal.toDouble() }, c.calories.toDouble(), 1.0)
+        assertEquals(ings.sumOf { it.protein.toDouble() }, c.protein.toDouble(), 0.5)
     }
 
     private fun apiWithOne() = FakeCopyLogsApi().apply {

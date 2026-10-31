@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import kotlinx.coroutines.launch
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -129,13 +130,15 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
             viewModel.appendCopiedLogs(r.targetDateKey, r.logs)
             val n = r.logs.size
             val res = resources.getQuantityString(R.plurals.copy_done, n, n)
-            val result = snackbarHostState.showSnackbar(
-                message = res,
-                actionLabel = resources.getString(R.string.action_cancel),
-                duration = SnackbarDuration.Short,
-            )
-            if (result == SnackbarResult.ActionPerformed) {
-                viewModel.undoCopy(r.targetDateKey, r.logs.map { it.id })
+            launch {
+                val result = snackbarHostState.showSnackbar(
+                    message = res,
+                    actionLabel = resources.getString(R.string.action_cancel),
+                    duration = SnackbarDuration.Short,
+                )
+                if (result == SnackbarResult.ActionPerformed) {
+                    viewModel.undoCopy(r.targetDateKey, r.logs.map { it.id })
+                }
             }
         }
     }
@@ -431,7 +434,7 @@ fun HomeHeader(title: String, subtitle: String, initial: String, onSettingsClick
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.MoreVert,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.action_more_options),
                         tint = GlassColors.textSecondary,
                         modifier = Modifier.size(20.dp)
                     )

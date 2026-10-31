@@ -408,4 +408,5 @@
     <string name="home_copy_from_day">📋 Copiază din altă zi</string>
     <string name="copy_pick_date">Alege o dată</string>
     <string name="action_ok">OK</string>
+    <string name="action_more_options">Mai multe opțiuni</string>
 </resources>

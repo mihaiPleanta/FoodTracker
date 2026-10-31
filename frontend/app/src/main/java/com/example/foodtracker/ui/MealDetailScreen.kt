@@ -130,13 +130,15 @@ fun MealDetailScreen(
             viewModel.appendCopiedLogs(r.targetDateKey, r.logs)
             val n = r.logs.size
             val res = context.resources.getQuantityString(R.plurals.copy_done, n, n)
-            val result = snackbarHostState.showSnackbar(
-                message = res,
-                actionLabel = context.getString(R.string.action_cancel),
-                duration = SnackbarDuration.Short,
-            )
-            if (result == SnackbarResult.ActionPerformed) {
-                viewModel.undoCopy(r.targetDateKey, r.logs.map { it.id })
+            launch {
+                val result = snackbarHostState.showSnackbar(
+                    message = res,
+                    actionLabel = context.getString(R.string.action_cancel),
+                    duration = SnackbarDuration.Short,
+                )
+                if (result == SnackbarResult.ActionPerformed) {
+                    viewModel.undoCopy(r.targetDateKey, r.logs.map { it.id })
+                }
             }
         }
     }
@@ -424,7 +426,7 @@ fun MealDetailHeader(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.MoreVert,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.action_more_options),
                     tint = GlassColors.textSecondary,
                     modifier = Modifier.size(20.dp)
                 )

@@ -20,6 +20,8 @@ import com.example.foodtracker.model.FoodLogUpdateDto
 import com.example.foodtracker.model.mealKeyToBackend
 import com.example.foodtracker.model.mealNameFromBackend
 import com.example.foodtracker.model.toDto
+import com.example.foodtracker.model.totalGrams
+import com.example.foodtracker.model.withIngredients
 import com.example.foodtracker.model.HydrationUpdateDto
 import com.example.foodtracker.model.LoggedFood
 import com.example.foodtracker.model.DEFAULT_HYDRATION_GOAL_L
@@ -711,18 +713,8 @@ class FoodViewModel(
         val id = target.id ?: return          // încă în POST pending — edit indisponibil
         if (ingredients.isEmpty()) return
 
-        val totalG = ingredients.sumOf { it.grams.toDouble() }.coerceAtLeast(1.0)
-        val totalKcal = ingredients.sumOf { it.kcal.toDouble() }
-        val totalP = ingredients.sumOf { it.protein.toDouble() }
-        val totalC = ingredients.sumOf { it.carbs.toDouble() }
-        val totalF = ingredients.sumOf { it.fat.toDouble() }
-        val newFood = target.food.copy(
-            per100g = (totalKcal / totalG * 100).toInt(),
-            protein100g = (totalP / totalG * 100).toFloat(),
-            carbs100g = (totalC / totalG * 100).toFloat(),
-            fat100g = (totalF / totalG * 100).toFloat(),
-            ingredients = ingredients,
-        )
+        val totalG = ingredients.totalGrams()
+        val newFood = target.food.withIngredients(ingredients)
         val optimistic = target.copy(food = newFood, grams = totalG.toInt())
         val newList = list.toMutableList().also { it[index] = optimistic }
         _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
