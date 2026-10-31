@@ -23,6 +23,7 @@ import com.example.foodtracker.viewmodel.CopyResult
 import com.example.foodtracker.viewmodel.CopyViewModel
 import com.example.foodtracker.viewmodel.SourceDayState
 import com.example.foodtracker.viewmodel.FoodViewModel
+import com.example.foodtracker.viewmodel.candidatesFrom
 import com.example.foodtracker.viewmodel.stripDaysFor
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -61,6 +62,8 @@ private class FakeCopyLogsApi : LogsApi {
     val days = mutableMapOf<String, DayResponseDto>()
     val dayGates = mutableMapOf<String, CompletableDeferred<Unit>>()
     var failCopy: Throwable? = null
+    var summaryGate: CompletableDeferred<Unit>? = null
+    var failSummary = false
     var copyResult: List<FoodLogDto> = emptyList()
     val summaryRequests = mutableListOf<Pair<String, String>>()
     val copyRequests = mutableListOf<FoodLogCopyRequestDto>()
@@ -71,6 +74,8 @@ private class FakeCopyLogsApi : LogsApi {
     }
     override suspend fun getFoodLogSummary(from: String, to: String): FoodLogSummaryDto {
         summaryRequests += from to to
+        summaryGate?.await()
+        if (failSummary) throw IOException("offline")
         return summary
     }
     override suspend fun copyFoodLogs(body: FoodLogCopyRequestDto): List<FoodLogDto> {
@@ -181,7 +186,7 @@ class CopyViewModelTest {
         assertEquals(2, vm.state.value.checkedCount)
     }
 
-    private fun TestScopeVm(api: FakeCopyLogsApi): CopyViewModel {
+    private fun vmWithTwoMeals(api: FakeCopyLogsApi): CopyViewModel {
         api.summary = summaryOf("2026-10-30" to mapOf("breakfast" to ms, "lunch" to ms))
         api.days["2026-10-30"] = dayOf(
             "breakfast" to listOf(log(1, "BREAKFAST"), log(2, "BREAKFAST")),
@@ -194,7 +199,7 @@ class CopyViewModelTest {
 
     @Test
     fun toggleMeal_allChecked_unchecksGroup_elseChecksAll() = runTest(testDispatcher) {
-        val vm = TestScopeVm(FakeCopyLogsApi())
+        val vm = vmWithTwoMeals(FakeCopyLogsApi())
         vm.open(CopyMode.Day, target)
         advanceUntilIdle()
         vm.toggleMeal("Breakfast")
@@ -208,7 +213,7 @@ class CopyViewModelTest {
     @Test
     fun selectDay_resetsEditsAndChecks() = runTest(testDispatcher) {
         val api = FakeCopyLogsApi()
-        val vm = TestScopeVm(api)
+        val vm = vmWithTwoMeals(api)
         vm.open(CopyMode.Day, target)
         advanceUntilIdle()
         vm.toggle(1)
@@ -271,7 +276,7 @@ class CopyViewModelTest {
 
     @Test
     fun copy_success_emitsCopied() = runTest(testDispatcher) {
-        val api = TestApiWithOne()
+        val api = apiWithOne()
         val vm = CopyViewModel(api)
         val got = mutableListOf<CopyResult>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.copied.collect { got += it } }
@@ -285,7 +290,7 @@ class CopyViewModelTest {
         assertEquals(false, vm.state.value.copying)
     }
 
-    private fun TestApiWithOne() = FakeCopyLogsApi().apply {
+    private fun apiWithOne() = FakeCopyLogsApi().apply {
         summary = summaryOf("2026-10-30" to mapOf("lunch" to ms))
         days["2026-10-30"] = dayOf("lunch" to listOf(log(1, "LUNCH")))
         copyResult = listOf(log(99, "LUNCH"))
@@ -293,7 +298,7 @@ class CopyViewModelTest {
 
     @Test
     fun copy_failure_keepsSelectionAndEmitsError() = runTest(testDispatcher) {
-        val api = TestApiWithOne().apply { failCopy = IOException("offline") }
+        val api = apiWithOne().apply { failCopy = IOException("offline") }
         val vm = CopyViewModel(api)
         val errs = mutableListOf<FoodViewModel.ToastEvent>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.errors.collect { errs += it } }
@@ -304,5 +309,60 @@ class CopyViewModelTest {
         assertEquals(listOf(R.string.error_no_internet), errs.map { it.messageRes })
         assertEquals(1, vm.state.value.checkedCount)
         assertEquals(false, vm.state.value.copying)
+    }
+
+    @Test
+    fun selectDay_whileSummaryLoading_isNotOverwrittenByPreselection() = runTest(testDispatcher) {
+        val api = FakeCopyLogsApi().apply {
+            summary = summaryOf("2026-10-30" to mapOf("lunch" to ms))
+            days["2026-10-30"] = dayOf("lunch" to listOf(log(1, "LUNCH")))
+            days["2026-10-27"] = dayOf("lunch" to listOf(log(7, "LUNCH")))
+            summaryGate = CompletableDeferred()
+        }
+        val vm = CopyViewModel(api)
+        vm.open(CopyMode.Day, target)
+        runCurrent()
+        vm.selectDay(LocalDate.of(2026, 10, 27))
+        runCurrent()
+        api.summaryGate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(LocalDate.of(2026, 10, 27), vm.state.value.selectedDay)
+        assertEquals(listOf(7L), vm.cands().map { it.sourceId })
+        assertEquals(setOf(LocalDate.of(2026, 10, 30)), vm.state.value.daysWithContent)
+    }
+
+    @Test
+    fun retry_afterSummaryError_recovers() = runTest(testDispatcher) {
+        val api = apiWithOne().apply { failSummary = true }
+        val vm = CopyViewModel(api)
+        vm.open(CopyMode.Day, target)
+        advanceUntilIdle()
+        assertEquals(R.string.copy_error_load, vm.state.value.summaryError)
+        api.failSummary = false
+        vm.retry()
+        advanceUntilIdle()
+        assertNull(vm.state.value.summaryError)
+        assertEquals(1, vm.cands().size)
+    }
+
+    @Test
+    fun copy_httpFailure_emitsSaveErrorWithCode() = runTest(testDispatcher) {
+        val body = okhttp3.ResponseBody.create(null, "")
+        val api = apiWithOne().apply { failCopy = retrofit2.HttpException(Response.error<Any>(500, body)) }
+        val vm = CopyViewModel(api)
+        val errs = mutableListOf<FoodViewModel.ToastEvent>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.errors.collect { errs += it } }
+        vm.open(CopyMode.Day, target)
+        advanceUntilIdle()
+        vm.copy()
+        advanceUntilIdle()
+        assertEquals(listOf(FoodViewModel.ToastEvent(R.string.error_save, 500)), errs)
+        assertEquals(1, vm.state.value.checkedCount)
+    }
+
+    @Test
+    fun candidatesFrom_mealMode_returnsOnlyThatMeal() {
+        val day = dayOf("breakfast" to listOf(log(1, "BREAKFAST")), "dinner" to listOf(log(2, "DINNER")))
+        assertEquals(listOf(2L), candidatesFrom(day, CopyMode.Meal("Dinner")).map { it.sourceId })
     }
 }

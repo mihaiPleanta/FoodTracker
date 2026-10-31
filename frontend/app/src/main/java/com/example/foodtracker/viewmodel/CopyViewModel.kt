@@ -136,17 +136,25 @@ class CopyViewModel(
                     to = targetDate.minusDays(1).toString(),
                 )
                 val days = daysWithContent(summary, mode)
-                val selected = preselectDay(days)
+                var toLoad: LocalDate? = null
                 _state.update {
-                    it.copy(
-                        summaryLoading = false,
-                        daysWithContent = days,
-                        selectedDay = selected,
-                        extraDay = selected?.takeIf { d -> d !in it.stripDays },
-                        source = if (selected == null) SourceDayState.None else SourceDayState.Loading,
-                    )
+                    if (it.selectedDay != null) {
+                        // The user already picked a day while the summary was loading.
+                        toLoad = null
+                        it.copy(summaryLoading = false, daysWithContent = days)
+                    } else {
+                        val selected = preselectDay(days)
+                        toLoad = selected
+                        it.copy(
+                            summaryLoading = false,
+                            daysWithContent = days,
+                            selectedDay = selected,
+                            extraDay = selected?.takeIf { d -> d !in it.stripDays },
+                            source = if (selected == null) SourceDayState.None else SourceDayState.Loading,
+                        )
+                    }
                 }
-                if (selected != null) loadDay(selected)
+                toLoad?.let { loadDay(it) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
