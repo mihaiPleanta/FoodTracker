@@ -14,6 +14,9 @@ import com.example.foodtracker.model.AppSettings
 import com.example.foodtracker.model.FoodIngredient
 import com.example.foodtracker.model.FoodItem
 import com.example.foodtracker.model.FoodLogCreateDto
+import com.example.foodtracker.model.FoodLogDeleteBatchDto
+import com.example.foodtracker.model.FoodLogDto
+import com.example.foodtracker.model.mealNameFromBackend
 import com.example.foodtracker.model.FoodLogUpdateDto
 import com.example.foodtracker.model.mealKeyToBackend
 import com.example.foodtracker.model.toDto
@@ -516,6 +519,49 @@ class FoodViewModel(
             }
         }
         return insertedIndex
+    }
+
+    /** Adaugă local logurile deja create de backend prin copiere (fără request). */
+    fun appendCopiedLogs(dateKey: String, logs: List<FoodLogDto>) {
+        if (logs.isEmpty()) return
+        var day = _foodsByDate.value[dateKey] ?: DayMeals()
+        val meals = linkedSetOf<String>()
+        for (log in logs) {
+            val mealName = mealNameFromBackend(log.meal)
+            meals += mealName
+            day = updateMealList(day, mealName, mealList(day, mealName) + log.toLogged())
+        }
+        _foodsByDate.value = _foodsByDate.value + (dateKey to day)
+        viewModelScope.launch {
+            val date = LocalDate.parse(dateKey)
+            meals.forEach { meal -> runCatching { mealLogTracker.markLogged(date, meal) } }
+        }
+    }
+
+    /** Anulează o copiere: scoate optimist rândurile și le șterge în lot pe backend. */
+    fun undoCopy(dateKey: String, ids: List<Long>) {
+        val previous = _foodsByDate.value[dateKey] ?: return
+        val idSet = ids.toSet()
+        _foodsByDate.value = _foodsByDate.value + (dateKey to previous.copy(
+            breakfast = previous.breakfast.filterNot { it.id in idSet },
+            lunch = previous.lunch.filterNot { it.id in idSet },
+            dinner = previous.dinner.filterNot { it.id in idSet },
+            snacks = previous.snacks.filterNot { it.id in idSet },
+        ))
+        viewModelScope.launch {
+            try {
+                logsApi.deleteFoodLogs(FoodLogDeleteBatchDto(ids))
+            } catch (e: java.io.IOException) {
+                _foodsByDate.value = _foodsByDate.value + (dateKey to previous)
+                _toastEvents.tryEmit(ToastEvent(R.string.error_no_internet))
+            } catch (e: retrofit2.HttpException) {
+                _foodsByDate.value = _foodsByDate.value + (dateKey to previous)
+                _toastEvents.tryEmit(ToastEvent(R.string.error_undo_copy, e.code()))
+            } catch (e: Throwable) {
+                _foodsByDate.value = _foodsByDate.value + (dateKey to previous)
+                _toastEvents.tryEmit(ToastEvent(R.string.error_undo_copy))
+            }
+        }
     }
 
     private fun mealList(day: DayMeals, mealName: String): List<LoggedFood> = when (mealName) {

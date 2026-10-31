@@ -363,4 +363,5 @@
         <item quantity="one">%s ml</item>
         <item quantity="other">%s ml</item>
     </plurals>
+    <string name="error_undo_copy">Couldn\'t undo the copy</string>
 </resources>

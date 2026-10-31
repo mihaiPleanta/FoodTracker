@@ -380,4 +380,5 @@
         <item quantity="few">%s ml</item>
         <item quantity="other">%s ml</item>
     </plurals>
+    <string name="error_undo_copy">Nu am putut anula copierea</string>
 </resources>

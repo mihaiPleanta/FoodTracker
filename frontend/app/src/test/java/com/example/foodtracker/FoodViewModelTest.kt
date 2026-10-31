@@ -68,8 +68,13 @@ private class FakeLogsApi : LogsApi {
         throw UnsupportedOperationException()
     override suspend fun copyFoodLogs(body: com.example.foodtracker.model.FoodLogCopyRequestDto): List<FoodLogDto> =
         throw UnsupportedOperationException()
-    override suspend fun deleteFoodLogs(body: com.example.foodtracker.model.FoodLogDeleteBatchDto): com.example.foodtracker.model.FoodLogDeleteBatchResultDto =
-        throw UnsupportedOperationException()
+    var lastDeleteBatch: com.example.foodtracker.model.FoodLogDeleteBatchDto? = null
+    var failDeleteBatchWith: Throwable? = null
+    override suspend fun deleteFoodLogs(body: com.example.foodtracker.model.FoodLogDeleteBatchDto): com.example.foodtracker.model.FoodLogDeleteBatchResultDto {
+        failDeleteBatchWith?.let { throw it }
+        lastDeleteBatch = body
+        return com.example.foodtracker.model.FoodLogDeleteBatchResultDto(body.ids.size)
+    }
     var lastUpdate: Pair<Long, Int>? = null
     var lastUpdateBody: FoodLogUpdateDto? = null
     var lastCreate: FoodLogCreateDto? = null
@@ -694,5 +699,83 @@ class FoodViewModelTest {
 
         assertEquals(loaded, vm.userProfile.value)
         assertEquals(before + 1, api.getGoalsCalls)
+    }
+
+    private fun copiedDto(id: Long, meal: String, name: String, date: String) = FoodLogDto(
+        id = id, logDate = date, meal = meal, grams = 50,
+        barcode = "b$id", name = name, brand = null, imageUrl = null,
+        categories = emptyList(), kcal100g = 100f, protein100g = 5f,
+        carbs100g = 10f, fat100g = 2f,
+    )
+
+    private fun todayKey() = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+
+    @Test
+    fun appendCopiedLogs_addsToEndOfMealsOnGivenDate() = runTest(testDispatcher) {
+        val vm = newVm(FakeLogsApi(), "copyAppend")
+        val job = launch {
+            launch { vm.breakfastFoods.collect { } }
+            launch { vm.dinnerFoods.collect { } }
+        }
+        vm.setSelectedHomeDate(java.util.Date())
+        advanceUntilIdle()
+        val key = todayKey()
+        vm.appendCopiedLogs(key, listOf(copiedDto(100, "BREAKFAST", "Eggs", key), copiedDto(101, "DINNER", "Rice", key)))
+        advanceUntilIdle()
+        assertEquals(listOf("Oats", "Eggs"), vm.breakfastFoods.value.map { it.food.name })
+        assertEquals(listOf("Rice"), vm.dinnerFoods.value.map { it.food.name })
+        job.cancel()
+    }
+
+    @Test
+    fun appendCopiedLogs_onNonSelectedDate_doesNotChangeVisibleDay() = runTest(testDispatcher) {
+        val vm = newVm(FakeLogsApi(), "copyOther")
+        val job = launch { vm.breakfastFoods.collect { } }
+        vm.setSelectedHomeDate(java.util.Date())
+        advanceUntilIdle()
+        vm.appendCopiedLogs("2020-01-01", listOf(copiedDto(100, "BREAKFAST", "Eggs", "2020-01-01")))
+        advanceUntilIdle()
+        assertEquals(listOf("Oats"), vm.breakfastFoods.value.map { it.food.name })
+        job.cancel()
+    }
+
+    @Test
+    fun undoCopy_removesRowsAndCallsDeleteBatch() = runTest(testDispatcher) {
+        val fake = FakeLogsApi()
+        val vm = newVm(fake, "copyUndo")
+        val job = launch {
+            launch { vm.breakfastFoods.collect { } }
+            launch { vm.dinnerFoods.collect { } }
+        }
+        vm.setSelectedHomeDate(java.util.Date())
+        advanceUntilIdle()
+        val key = todayKey()
+        vm.appendCopiedLogs(key, listOf(copiedDto(100, "BREAKFAST", "Eggs", key), copiedDto(101, "DINNER", "Rice", key)))
+        vm.undoCopy(key, listOf(100L, 101L))
+        advanceUntilIdle()
+        assertEquals(listOf(100L, 101L), fake.lastDeleteBatch!!.ids)
+        assertEquals(listOf("Oats"), vm.breakfastFoods.value.map { it.food.name })
+        assertEquals(emptyList<String>(), vm.dinnerFoods.value.map { it.food.name })
+        job.cancel()
+    }
+
+    @Test
+    fun undoCopy_networkFailure_restoresRowsAndEmitsToast() = runTest(testDispatcher) {
+        val fake = FakeLogsApi().apply { failDeleteBatchWith = java.io.IOException() }
+        val vm = newVm(fake, "copyUndoFail")
+        val toasts = mutableListOf<FoodViewModel.ToastEvent>()
+        val job = launch {
+            launch { vm.breakfastFoods.collect { } }
+            launch { vm.toastEvents.collect { toasts += it } }
+        }
+        vm.setSelectedHomeDate(java.util.Date())
+        advanceUntilIdle()
+        val key = todayKey()
+        vm.appendCopiedLogs(key, listOf(copiedDto(100, "BREAKFAST", "Eggs", key)))
+        vm.undoCopy(key, listOf(100L))
+        advanceUntilIdle()
+        assertEquals(listOf("Oats", "Eggs"), vm.breakfastFoods.value.map { it.food.name })
+        assertEquals(listOf(R.string.error_no_internet), toasts.map { it.messageRes })
+        job.cancel()
     }
 }
