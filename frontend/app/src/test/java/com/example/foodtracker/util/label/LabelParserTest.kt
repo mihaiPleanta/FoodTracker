@@ -39,7 +39,8 @@ class LabelParserTest {
         val label = LabelParser.parse(LabelFixtures.per100AndServing)
         assertMacros(label, kcal = 452f, fat = 17f, carbs = 68f, protein = 6.1f)
         assertValue(30f, label.servingGrams, "servingGrams")
-        assertEquals("porție", label.servingUnit)
+        // Generic portion: no unit name, the UI supplies a localized default (ruling R4).
+        assertNull(label.servingUnit)
     }
 
     @Test
@@ -73,6 +74,7 @@ class LabelParserTest {
         val label = LabelParser.parse(LabelFixtures.englishLabel)
         assertMacros(label, kcal = 250f, fat = 9f, carbs = 35f, protein = 4.5f)
         assertValue(30f, label.servingGrams, "servingGrams")
+        assertNull(label.servingUnit)
     }
 
     @Test
@@ -111,6 +113,33 @@ class LabelParserTest {
         assertNull(label.carbs)
         assertNull(label.fat)
         assertValue(452f, label.kcal, "kcal")
+    }
+
+    @Test
+    fun ingredientsFatAboveTable_usesTheTableNotTheIngredients() {
+        val label = LabelParser.parse(LabelFixtures.ingredientsFatAboveTable)
+        assertMacros(label, kcal = 452f, fat = 17f, carbs = 68f, protein = 6.1f)
+    }
+
+    @Test
+    fun ingredientsProteinNoHeader_usesTheTableNotTheIngredients() {
+        val label = LabelParser.parse(LabelFixtures.ingredientsProteinNoHeader)
+        assertMacros(label, kcal = 370f, fat = 12f, carbs = 55f, protein = 6.1f)
+    }
+
+    @Test
+    fun jamProse100g_isNotMistakenForTheColumnHeader() {
+        val label = LabelParser.parse(LabelFixtures.jamProse100g)
+        assertMacros(label, kcal = 250f, fat = 0.2f, carbs = 60f, protein = 0.5f)
+        assertValue(20f, label.servingGrams, "servingGrams")
+        assertNull(label.servingUnit)
+    }
+
+    @Test
+    fun pieceWithDiacritics_keepsOriginalSpelling() {
+        val label = LabelParser.parse(LabelFixtures.pieceWithDiacritics)
+        assertValue(20f, label.servingGrams, "servingGrams")
+        assertEquals("bucată", label.servingUnit)
     }
 
     @Test

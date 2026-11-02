@@ -143,6 +143,49 @@ object LabelFixtures {
         line("Proteine 61 g", 20, 160),
     )
 
+    /** Ingredient list wrapped so that a line starts with "grăsimi vegetale … 20", above the table. */
+    val ingredientsFatAboveTable: List<OcrLine> = listOf(
+        line("Ingrediente: făină de grâu, zahăr,", 20, 0),
+        line("grăsimi vegetale (palmier) 20, sare.", 20, 36),
+        line("Valori nutriționale medii", 20, 90),
+        line("100 g", 380, 130), line("Porție 30 g", 520, 131),
+        line("Energie", 20, 170), line("1891 kJ / 452 kcal", 380, 170), line("567 kJ / 136 kcal", 640, 171),
+        line("Grăsimi", 20, 210), line("17 g", 380, 210), line("5,1 g", 640, 211),
+        line("Glucide", 20, 250), line("68 g", 380, 250), line("20 g", 640, 250),
+        line("Proteine", 20, 290), line("6,1 g", 380, 291), line("1,8 g", 640, 290),
+    )
+
+    /** Ingredient line starting with "proteine din lapte 3,5"; single-column table without a 100 g header. */
+    val ingredientsProteinNoHeader: List<OcrLine> = listOf(
+        line("Ingrediente: lapte smântânit, zahăr,", 20, 0),
+        line("proteine din lapte 3,5, cacao 2%.", 20, 36),
+        line("Energie 1550 kJ / 370 kcal", 20, 90),
+        line("Grăsimi 12 g", 20, 130),
+        line("Glucide 55 g", 20, 170),
+        line("Proteine 6,1 g", 20, 210),
+    )
+
+    /** Jam label: a prose sentence mentions "100 g" above a two-column table (100 g + portion). */
+    val jamProse100g: List<OcrLine> = listOf(
+        line("Preparat din 50 g fructe la 100 g produs", 20, 0),
+        line("Valori nutriționale", 20, 50),
+        line("100 g", 300, 90), line("Porție 20 g", 440, 90),
+        line("Energie", 20, 130), line("1046 kJ / 250 kcal", 300, 130), line("209 kJ / 50 kcal", 440, 131),
+        line("Grăsimi", 20, 210), line("0,2 g", 300, 210), line("0 g", 440, 211),
+        line("Glucide", 20, 250), line("60 g", 300, 250), line("12 g", 440, 250),
+        line("Proteine", 20, 290), line("0,5 g", 300, 290), line("0,1 g", 440, 290),
+    )
+
+    /** Piece unit with diacritics must keep its spelling. */
+    val pieceWithDiacritics: List<OcrLine> = listOf(
+        line("Valori nutriționale la 100 g", 20, 0),
+        line("Energie 1550 kJ / 370 kcal", 20, 40),
+        line("Grăsimi 12 g", 20, 80),
+        line("Glucide 55 g", 20, 120),
+        line("Proteine 6 g", 20, 160),
+        line("1 bucată = 20 g", 20, 210),
+    )
+
     /** Back of the pack without a nutrition table; the ingredient list even mentions "grăsimi". */
     val garbage: List<OcrLine> = listOf(
         line("Ingrediente: făină de grâu 45%, zahăr, grăsimi vegetale", 20, 0),
