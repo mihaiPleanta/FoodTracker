@@ -120,6 +120,8 @@ dependencies {
 
     // Barcode scanning via Google Play Services (no camera permission needed)
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
+    // OCR on-device pentru poza etichetei nutriționale
+    implementation("com.google.mlkit:text-recognition:16.0.1")
 
     // Unit / instrumentation tests
     testImplementation("junit:junit:4.13.2")
