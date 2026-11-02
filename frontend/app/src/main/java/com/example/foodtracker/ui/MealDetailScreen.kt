@@ -70,6 +70,8 @@ import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.util.CategoryEmojiMapper
 import com.example.foodtracker.util.findActivity
 import com.example.foodtracker.util.scaleNutrition
+import android.net.Uri
+import com.example.foodtracker.viewmodel.CustomFoodViewModel
 import com.example.foodtracker.viewmodel.FoodViewModel
 import com.example.foodtracker.viewmodel.QuickPicksViewModel
 import com.example.foodtracker.viewmodel.PortionsViewModel
@@ -89,6 +91,7 @@ fun MealDetailScreen(
     quickPicks: QuickPicksViewModel,
     portions: PortionsViewModel,
     copy: CopyViewModel,
+    customFoods: CustomFoodViewModel,
 ) {
     val loggedFoods by viewModel.getFoodsFlow(mealName).collectAsState()
     val searchState by viewModel.searchState.collectAsState()
@@ -117,6 +120,15 @@ fun MealDetailScreen(
 
     var sheetTarget by remember { mutableStateOf<Pair<FoodItem, Int>?>(null) }
     var editTarget by remember { mutableStateOf<Pair<Int, LoggedFood>?>(null) }
+    // A product just created via "Salvează și adaugă" opens straight in the add sheet.
+    val createdForMeal by customFoods.createdForMeal.collectAsState()
+    LaunchedEffect(createdForMeal) {
+        createdForMeal?.let {
+            sheetTarget = it to 100
+            customFoods.consumeCreated()
+        }
+    }
+    val lastLookupBarcode by viewModel.lastLookupBarcode.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(Unit) {
         quickPicks.toastEvents.collect { res -> snackbarHostState.showSnackbar(context.getString(res)) }
@@ -246,6 +258,16 @@ fun MealDetailScreen(
                         onLoadMore  = { viewModel.loadMore() },
                         favoriteBarcodes = favoriteBarcodes,
                         onToggleFavorite = { quickPicks.toggleFavorite(it) },
+                        onCreateCustom = {
+                            val barcode = lastLookupBarcode
+                            val name = if (barcode == null) searchQuery.trim() else ""
+                            val args = buildList {
+                                if (barcode != null) add("barcode=${Uri.encode(barcode)}")
+                                if (name.isNotEmpty()) add("name=${Uri.encode(name)}")
+                                add("forMeal=true")
+                            }
+                            navController.navigate("custom-food/new?" + args.joinToString("&"))
+                        },
                     )
                 } else {
                     LoggedFoodsList(
@@ -713,6 +735,7 @@ fun SearchResultsView(
     onLoadMore: () -> Unit,
     favoriteBarcodes: Set<String> = emptySet(),
     onToggleFavorite: ((FoodItem) -> Unit)? = null,
+    onCreateCustom: (() -> Unit)? = null,
 ) {
     when (state) {
         FoodViewModel.SearchUiState.Idle -> {
@@ -731,11 +754,30 @@ fun SearchResultsView(
         }
         FoodViewModel.SearchUiState.Empty -> {
             Box(Modifier.fillMaxSize(), Alignment.Center) {
-                Text(
-                    "Niciun produs găsit",
-                    color = GlassColors.textSecondary,
-                    fontSize = 14.sp,
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        stringResource(R.string.search_no_results),
+                        color = GlassColors.textSecondary,
+                        fontSize = 14.sp,
+                    )
+                    if (onCreateCustom != null) {
+                        Spacer(Modifier.height(10.dp))
+                        Box(
+                            Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(accentColor.copy(alpha = 0.18f))
+                                .clickable { onCreateCustom() }
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                        ) {
+                            Text(
+                                stringResource(R.string.custom_food_create),
+                                color = accentColor,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                }
             }
         }
         is FoodViewModel.SearchUiState.Error -> {
@@ -811,6 +853,25 @@ fun SearchResultsView(
                             }
                         }
                     }
+                    if (onCreateCustom != null && !state.hasMore) {
+                        item(key = "create-custom") {
+                            Box(
+                                Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    stringResource(R.string.custom_food_create_footer),
+                                    color = accentColor,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable { onCreateCustom() }
+                                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -856,13 +917,29 @@ fun SearchResultRow(
             Spacer(Modifier.width(12.dp))
 
             Column(Modifier.weight(1f)) {
-                Text(
-                    text = food.name,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = GlassColors.textPrimary,
-                    maxLines = 1,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = food.name,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = GlassColors.textPrimary,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (food.isCustom) {
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            stringResource(R.string.custom_food_badge_mine),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = GlassColors.accentGreen,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(GlassColors.accentGreen.copy(alpha = 0.15f))
+                                .padding(horizontal = 6.dp, vertical = 1.dp),
+                        )
+                    }
+                }
                 val subtitlePrefix = if (food.brand.isNullOrBlank()) "" else "${food.brand} · "
                 Text(
                     text = "${subtitlePrefix}per 100g · ${food.per100g} kcal · P${food.protein100g.toInt()} C${food.carbs100g.toInt()} F${food.fat100g.toInt()}",

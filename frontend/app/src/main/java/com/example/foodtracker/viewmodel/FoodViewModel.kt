@@ -99,6 +99,10 @@ class FoodViewModel(
     val searchState: StateFlow<SearchUiState> = _searchState.asStateFlow()
 
     private val _searchQuery = MutableStateFlow("")
+
+    /** Barcode of the last scan lookup; null once a text search or clear replaces it. */
+    private val _lastLookupBarcode = MutableStateFlow<String?>(null)
+    val lastLookupBarcode: StateFlow<String?> = _lastLookupBarcode.asStateFlow()
     private var currentQuery: String = ""
     private var currentPage: Int = 1
 
@@ -137,6 +141,7 @@ class FoodViewModel(
     }
 
     fun searchFoods(query: String) {
+        _lastLookupBarcode.value = null
         _searchQuery.value = query
     }
 
@@ -165,11 +170,13 @@ class FoodViewModel(
     }
 
     fun clearSearch() {
+        _lastLookupBarcode.value = null
         _searchQuery.value = ""
         _searchState.value = SearchUiState.Idle
     }
 
     fun lookupBarcode(barcode: String) {
+        _lastLookupBarcode.value = barcode
         viewModelScope.launch {
             _searchState.value = SearchUiState.Loading
             _searchState.value = try {
@@ -767,6 +774,7 @@ class FoodViewModel(
      */
     fun resetUserState() {
         _searchQuery.value = ""
+        _lastLookupBarcode.value = null
         currentQuery = ""
         currentPage = 1
         _searchState.value = SearchUiState.Idle

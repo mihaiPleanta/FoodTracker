@@ -268,6 +268,21 @@ class FoodViewModelTest {
     }
 
     @Test
+    fun lookupBarcode_setsLastLookupBarcode_andSearchClearsIt() = runTest(testDispatcher) {
+        assertEquals(null, viewModel.lastLookupBarcode.value)
+        viewModel.lookupBarcode("5941234567890")
+        assertEquals("5941234567890", viewModel.lastLookupBarcode.value)
+        viewModel.searchFoods("iaurt")
+        assertEquals(null, viewModel.lastLookupBarcode.value)
+
+        viewModel.lookupBarcode("12345678")
+        assertEquals("12345678", viewModel.lastLookupBarcode.value)
+        viewModel.clearSearch()
+        assertEquals(null, viewModel.lastLookupBarcode.value)
+        advanceUntilIdle()
+    }
+
+    @Test
     fun updateUserProfile_updatesValue() {
         val profile = UserProfile(name = "Ana", age = 25, gender = Gender.FEMALE)
         viewModel.updateUserProfile(profile)

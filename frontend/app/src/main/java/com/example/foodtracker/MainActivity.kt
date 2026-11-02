@@ -20,7 +20,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.*
+import androidx.navigation.navArgument
+import com.example.foodtracker.ui.customfood.CustomFoodMode
+import com.example.foodtracker.ui.customfood.CustomFoodScreen
 import com.example.foodtracker.ui.*
 import com.example.foodtracker.ui.theme.FoodTrackerTheme
 import com.example.foodtracker.ui.theme.GlassColors
@@ -319,6 +323,46 @@ class MainActivity : ComponentActivity() {
                                         quickPicks    = quickPicksViewModel,
                                         portions      = portionsViewModel,
                                         copy          = copyViewModel,
+                                        customFoods   = customFoodViewModel,
+                                    )
+                                }
+                                composable(
+                                    "custom-food/new?barcode={barcode}&name={name}&forMeal={forMeal}",
+                                    arguments = listOf(
+                                        navArgument("barcode") { type = NavType.StringType; nullable = true; defaultValue = null },
+                                        navArgument("name") { type = NavType.StringType; nullable = true; defaultValue = null },
+                                        navArgument("forMeal") { type = NavType.BoolType; defaultValue = false },
+                                    ),
+                                ) { entry ->
+                                    val args = entry.arguments
+                                    CustomFoodScreen(
+                                        vm = customFoodViewModel,
+                                        mode = CustomFoodMode.New(
+                                            barcode = args?.getString("barcode"),
+                                            name = args?.getString("name"),
+                                            forMeal = args?.getBoolean("forMeal") ?: false,
+                                        ),
+                                        onDone = { navController.popBackStack() },
+                                        onOpenExisting = { id ->
+                                            navController.navigate("custom-food/edit/$id") {
+                                                popUpTo(entry.destination.id) { inclusive = true }
+                                            }
+                                        },
+                                    )
+                                }
+                                composable(
+                                    "custom-food/edit/{id}",
+                                    arguments = listOf(navArgument("id") { type = NavType.IntType }),
+                                ) { entry ->
+                                    CustomFoodScreen(
+                                        vm = customFoodViewModel,
+                                        mode = CustomFoodMode.Edit(entry.arguments?.getInt("id") ?: -1),
+                                        onDone = { navController.popBackStack() },
+                                        onOpenExisting = { id ->
+                                            navController.navigate("custom-food/edit/$id") {
+                                                popUpTo(entry.destination.id) { inclusive = true }
+                                            }
+                                        },
                                     )
                                 }
                             }
