@@ -40,6 +40,8 @@ import com.example.foodtracker.util.AppLocale
 import com.example.foodtracker.viewmodel.AuthViewModel
 import com.example.foodtracker.viewmodel.CopyViewModel
 import com.example.foodtracker.viewmodel.FoodViewModel
+import com.example.foodtracker.viewmodel.CustomFoodViewModel
+import com.example.foodtracker.viewmodel.CustomFoodViewModelFactory
 import com.example.foodtracker.viewmodel.FoodViewModelFactory
 import com.example.foodtracker.viewmodel.PortionsViewModel
 import com.example.foodtracker.viewmodel.QuickPicksViewModel
@@ -63,14 +65,17 @@ class MainActivity : ComponentActivity() {
         NotificationChannels.ensureCreated(applicationContext)
         pendingDeepLink = readDeepLinkFromIntent(intent)
         setContent {
+            val foodRepository = remember {
+                FoodRepository(
+                    api = RetrofitInstance.api,
+                    cache = RoomFoodCache(FoodCacheDb.get(applicationContext).foodCacheDao()),
+                )
+            }
             val foodViewModelFactory = remember {
                 FoodViewModelFactory(
                     settingsRepository = DataStoreSettingsRepository(applicationContext.settingsDataStore),
                     mealLogTracker = MealLogTracker(applicationContext.mealLogTrackerDataStore),
-                    foodRepository = FoodRepository(
-                        api = RetrofitInstance.api,
-                        cache = RoomFoodCache(FoodCacheDb.get(applicationContext).foodCacheDao()),
-                    ),
+                    foodRepository = foodRepository,
                 )
             }
             val viewModel: FoodViewModel = viewModel(factory = foodViewModelFactory)
@@ -82,6 +87,14 @@ class MainActivity : ComponentActivity() {
             val quickPicksViewModel: QuickPicksViewModel = viewModel()
             val portionsViewModel: PortionsViewModel = viewModel()
             val copyViewModel: CopyViewModel = viewModel()
+            val customFoodViewModel: CustomFoodViewModel = viewModel(
+                factory = remember {
+                    CustomFoodViewModelFactory(
+                        defaultServingUnit = getString(R.string.custom_food_default_serving_unit),
+                        invalidate = foodRepository::invalidateCustomFoods,
+                    )
+                }
+            )
             val appSettings by viewModel.appSettings.collectAsState()
             // enableEdgeToEdge()'s auto() follows the *system* dark mode; keep the
             // status/nav bar icon contrast in sync with the in-app theme toggle.
@@ -274,6 +287,7 @@ class MainActivity : ComponentActivity() {
                                             quickPicksViewModel.resetUserState()
                                             portionsViewModel.resetUserState()
                                             copyViewModel.resetUserState()
+                                            customFoodViewModel.resetUserState()
                                             navController.navigate("login") {
                                                 popUpTo(0) { inclusive = true }
                                             }
@@ -284,6 +298,7 @@ class MainActivity : ComponentActivity() {
                                             quickPicksViewModel.resetUserState()
                                             portionsViewModel.resetUserState()
                                             copyViewModel.resetUserState()
+                                            customFoodViewModel.resetUserState()
                                             navController.navigate("login") {
                                                 popUpTo(0) { inclusive = true }
                                             }

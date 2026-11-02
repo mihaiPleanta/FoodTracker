@@ -416,4 +416,5 @@
     <string name="custom_food_error_serving_pair">Completează atât denumirea, cât și gramele porției</string>
     <string name="custom_food_warning_kcal_mismatch">Valorile nu par să se potrivească — verifică eticheta</string>
     <string name="custom_food_default_serving_unit">porție</string>
+    <string name="custom_food_ocr_nothing">Nu am putut citi eticheta — completează valorile manual</string>
 </resources>
