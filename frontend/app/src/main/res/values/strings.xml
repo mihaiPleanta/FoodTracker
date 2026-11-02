@@ -446,4 +446,11 @@
     <string name="custom_food_open_existing">Deschide produsul</string>
     <string name="custom_food_fill_from_label">Completează din etichetă</string>
     <string name="custom_food_delete_confirm">Ștergi produsul? Logurile vechi rămân.</string>
+    <string name="my_foods_title">Produsele mele</string>
+    <string name="my_foods_add">Adaugă produs</string>
+    <string name="my_foods_empty">Nu ai încă produse proprii. Creează unul cu valorile de pe etichetă și îl găsești la căutare.</string>
+    <string name="my_foods_create_first">Creează primul produs</string>
+    <string name="my_foods_kcal_per_100g">%1$d kcal / 100 g</string>
+    <string name="my_foods_row">Produsele mele</string>
+    <string name="my_foods_row_count">Produsele mele (%1$d)</string>
 </resources>

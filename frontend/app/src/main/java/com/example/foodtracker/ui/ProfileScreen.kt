@@ -49,12 +49,22 @@ import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.ui.theme.glassCard
 import com.example.foodtracker.viewmodel.AuthViewModel
 import com.example.foodtracker.viewmodel.FoodViewModel
+import com.example.foodtracker.viewmodel.CustomFoodViewModel
+import com.example.foodtracker.viewmodel.MyFoodsState
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.ui.res.stringResource
 import com.example.foodtracker.R
 import com.example.foodtracker.viewmodel.ProfileSaveState
 
 @Composable
-fun ProfileScreen(viewModel: FoodViewModel, authViewModel: AuthViewModel) {
+fun ProfileScreen(
+    viewModel: FoodViewModel,
+    authViewModel: AuthViewModel,
+    customFoods: CustomFoodViewModel,
+    onOpenMyFoods: () -> Unit,
+) {
+    LaunchedEffect(Unit) { customFoods.loadMyFoods() }
+    val myFoods by customFoods.myFoods.collectAsState()
     val profile by viewModel.userProfile.collectAsState()
     val saveState by authViewModel.profileSaveState.collectAsState()
     // Hydration prefs save on their own; changing them must not reset unsaved form edits.
@@ -191,6 +201,32 @@ fun ProfileScreen(viewModel: FoodViewModel, authViewModel: AuthViewModel) {
 
                 // Saves on its own (no Save button), like the other toggles.
                 HydrationSettingsSection(viewModel)
+
+                Spacer(Modifier.height(14.dp))
+
+                val myFoodsCount = (myFoods as? MyFoodsState.Loaded)?.items?.size
+                Row(
+                    Modifier
+                        .padding(horizontal = 20.dp)
+                        .fillMaxWidth()
+                        .glassCard(16)
+                        .clickable(onClick = onOpenMyFoods)
+                        .padding(horizontal = 16.dp, vertical = 15.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        if (myFoodsCount != null) stringResource(R.string.my_foods_row_count, myFoodsCount)
+                        else stringResource(R.string.my_foods_row),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = GlassColors.textPrimary,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Icon(
+                        Icons.AutoMirrored.Rounded.KeyboardArrowRight, null,
+                        tint = GlassColors.textTertiary,
+                    )
+                }
 
                 Spacer(Modifier.height(28.dp))
 

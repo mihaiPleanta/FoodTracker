@@ -25,6 +25,7 @@ import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import com.example.foodtracker.ui.customfood.CustomFoodMode
 import com.example.foodtracker.ui.customfood.CustomFoodScreen
+import com.example.foodtracker.ui.customfood.MyFoodsScreen
 import com.example.foodtracker.ui.*
 import com.example.foodtracker.ui.theme.FoodTrackerTheme
 import com.example.foodtracker.ui.theme.GlassColors
@@ -277,7 +278,10 @@ class MainActivity : ComponentActivity() {
                                     MealsScreen(foodViewModel = viewModel, viewModel = recipeViewModel)
                                 }
                                 composable("profile") {
-                                    ProfileScreen(viewModel, authViewModel)
+                                    ProfileScreen(
+                                        viewModel, authViewModel, customFoodViewModel,
+                                        onOpenMyFoods = { navController.navigate("my-foods") },
+                                    )
                                 }
                                 composable("settings") {
                                     SettingsScreen(
@@ -324,6 +328,14 @@ class MainActivity : ComponentActivity() {
                                         portions      = portionsViewModel,
                                         copy          = copyViewModel,
                                         customFoods   = customFoodViewModel,
+                                    )
+                                }
+                                composable("my-foods") {
+                                    MyFoodsScreen(
+                                        vm = customFoodViewModel,
+                                        onBack = { navController.popBackStack() },
+                                        onCreate = { navController.navigate("custom-food/new?forMeal=false") },
+                                        onEdit = { id -> navController.navigate("custom-food/edit/$id") },
                                     )
                                 }
                                 composable(

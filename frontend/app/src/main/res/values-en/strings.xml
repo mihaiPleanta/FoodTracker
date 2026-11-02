@@ -426,4 +426,11 @@
     <string name="custom_food_open_existing">Open product</string>
     <string name="custom_food_fill_from_label">Fill in from label</string>
     <string name="custom_food_delete_confirm">Delete the product? Past logs stay.</string>
+    <string name="my_foods_title">My products</string>
+    <string name="my_foods_add">Add product</string>
+    <string name="my_foods_empty">You have no products of your own yet. Create one from the label values and find it in search.</string>
+    <string name="my_foods_create_first">Create your first product</string>
+    <string name="my_foods_kcal_per_100g">%1$d kcal / 100 g</string>
+    <string name="my_foods_row">My products</string>
+    <string name="my_foods_row_count">My products (%1$d)</string>
 </resources>
