@@ -290,6 +290,7 @@ fun MealDetailScreen(
                 totalCarbs    = totalCarbs,
                 totalFat      = totalFat,
                 accentColor   = accentColor,
+                onDone        = goBackToHome,
             )
         }
 
@@ -1045,7 +1046,8 @@ fun MacroSummaryFooter(
     totalProtein: Float,
     totalCarbs: Float,
     totalFat: Float,
-    accentColor: Color
+    accentColor: Color,
+    onDone: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -1146,7 +1148,7 @@ fun MacroSummaryFooter(
                         listOf(GlassColors.accentGreen, GlassColors.accentGreenDim)
                     )
                 )
-                .clickable(interactionSource = interactionSource, indication = null) { },
+                .clickable(interactionSource = interactionSource, indication = null, onClick = onDone),
             contentAlignment = Alignment.Center
         ) {
             Text(
