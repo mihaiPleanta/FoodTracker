@@ -96,14 +96,16 @@ async def recent_foods(
         .order_by(FoodLog.created_at.desc(), FoodLog.id.desc())
         .limit(_RECENT_SCAN_ROWS)
     )
-    rows = result.scalars().all()
-    return [
-        RecentFoodDto(
-            food=FoodItemDto.model_validate(row, from_attributes=True),
-            last_grams=row.grams,
+    picked = pick_recent(result.scalars().all(), meal)
+    current = await custom_foods.load_for_keys(db, token["uid"], [r.barcode for r in picked])
+    out: List[RecentFoodDto] = []
+    for row in picked:
+        food = custom_foods.apply_current(
+            FoodItemDto.model_validate(row, from_attributes=True), current
         )
-        for row in pick_recent(rows, meal)
-    ]
+        if food is not None:
+            out.append(RecentFoodDto(food=food, last_grams=row.grams))
+    return out
 
 
 @router.get("/barcode/{barcode}", response_model=FoodItemDto)

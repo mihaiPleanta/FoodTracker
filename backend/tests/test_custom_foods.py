@@ -169,3 +169,55 @@ def test_delete_removes_units_presets_favorite_keeps_logs(client):
     day = client.get("/days/2026-05-20", headers=AUTH_HEADER).json()
     items = day["foods_by_meal"]["breakfast"]
     assert len(items) == 1 and items[0]["kcal_100g"] == 452 and items[0]["grams"] == 50
+
+
+# ── recente / favorite folosesc valorile curente ─────────────────────────────
+
+def _mk(client):
+    return client.post("/custom-foods", json=_body(), headers=AUTH_HEADER).json()
+
+
+def _log(client, key, grams=50, kcal=452, name="Biscuiți cu cacao"):
+    log = {"log_date": "2026-05-20", "meal": "BREAKFAST", "grams": grams, "barcode": key,
+           "name": name, "categories": [], "kcal_100g": kcal, "protein_100g": 6.1,
+           "carbs_100g": 68, "fat_100g": 17}
+    assert client.post("/food-logs", json=log, headers=AUTH_HEADER).status_code == 201
+
+
+def test_recent_uses_current_custom_values(client):
+    d = _mk(client)
+    _log(client, d["key"], grams=50)
+    r = client.put(f"/custom-foods/{d['id']}", json=_body(name="Nou", kcal_100g=400), headers=AUTH_HEADER)
+    assert r.status_code == 200
+    items = client.get("/foods/recent?meal=BREAKFAST", headers=AUTH_HEADER).json()
+    assert len(items) == 1
+    assert items[0]["food"]["barcode"] == d["key"]
+    assert items[0]["food"]["kcal_100g"] == 400
+    assert items[0]["food"]["name"] == "Nou"
+    assert items[0]["last_grams"] == 50
+
+
+def test_recent_drops_deleted_custom(client):
+    d = _mk(client)
+    _log(client, d["key"])
+    assert client.delete(f"/custom-foods/{d['id']}", headers=AUTH_HEADER).status_code == 204
+    items = client.get("/foods/recent?meal=BREAKFAST", headers=AUTH_HEADER).json()
+    assert all(i["food"]["barcode"] != d["key"] for i in items)
+    assert items == []
+
+
+def test_favorites_use_current_custom_values(client):
+    d = _mk(client)
+    fav = {"name": d["name"], "kcal_100g": 452, "protein_100g": 6.1, "carbs_100g": 68, "fat_100g": 17}
+    assert client.put(f"/favorites/{d['key']}", json=fav, headers=AUTH_HEADER).status_code == 200
+    client.put(f"/custom-foods/{d['id']}", json=_body(name="Nou", kcal_100g=400), headers=AUTH_HEADER)
+    items = client.get("/favorites", headers=AUTH_HEADER).json()
+    assert len(items) == 1
+    assert items[0]["kcal_100g"] == 400 and items[0]["name"] == "Nou"
+
+
+def test_recent_non_custom_untouched(client):
+    _log(client, "3017620422003", kcal=539, name="Nutella")
+    items = client.get("/foods/recent?meal=BREAKFAST", headers=AUTH_HEADER).json()
+    assert len(items) == 1
+    assert items[0]["food"]["kcal_100g"] == 539 and items[0]["food"]["name"] == "Nutella"

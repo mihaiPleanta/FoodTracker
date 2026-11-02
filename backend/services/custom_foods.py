@@ -65,6 +65,19 @@ async def load_for_keys(
     return {custom_key(r.id): r for r in result.scalars().all()}
 
 
+def apply_current(
+    item: FoodItemDto, current: dict[str, CustomFood]
+) -> Optional[FoodItemDto]:
+    """Swap a stored snapshot for the product's current values.
+
+    Non-custom keys pass through; custom keys missing from `current` (deleted)
+    return None so the caller can drop them."""
+    if parse_custom_key(item.barcode or "") is None:
+        return item
+    row = current.get(item.barcode)
+    return to_food_item(row) if row is not None else None
+
+
 async def search_custom(
     db: AsyncSession, uid: str, query: str, limit: int = 10
 ) -> list[FoodItemDto]:

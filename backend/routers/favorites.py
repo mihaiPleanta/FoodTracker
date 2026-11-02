@@ -9,6 +9,7 @@ from auth import verify_token
 from database import get_db
 from models import FavoriteFood
 from schemas import FoodItemDto
+from services import custom_foods
 
 router = APIRouter(prefix="/favorites", tags=["favorites"])
 
@@ -41,7 +42,10 @@ async def list_favorites(
         .where(FavoriteFood.uid == token["uid"])
         .order_by(FavoriteFood.created_at.desc(), FavoriteFood.id.desc())
     )
-    return [_to_dto(r) for r in result.scalars().all()]
+    rows = result.scalars().all()
+    current = await custom_foods.load_for_keys(db, token["uid"], [r.barcode for r in rows])
+    items = (custom_foods.apply_current(_to_dto(r), current) for r in rows)
+    return [i for i in items if i is not None]
 
 
 @router.put("/{barcode}", response_model=FoodItemDto)
