@@ -10,6 +10,7 @@ from auth import verify_token
 from database import get_db
 from models import FoodLog
 from schemas import FoodItemDto, MealValue, RecentFoodDto, SearchResponseDto
+from services import custom_foods
 from services.recent_foods import pick_recent
 from services.generic_foods import GenericFoodsClient, get_generic_client
 from services.open_food_facts import OpenFoodFactsClient, get_off_client
@@ -42,21 +43,25 @@ async def search_foods(
     off: OpenFoodFactsClient = Depends(get_off_client),
     generic: GenericFoodsClient = Depends(get_generic_client),
     token: dict = Depends(verify_token),
+    db: AsyncSession = Depends(get_db),
 ) -> SearchResponseDto:
     # Genericele sunt locale (in-memory) — mereu disponibile. Le folosim pentru nume la
     # dedup pe orice pagină, dar le includem în output doar pe pagina 1.
     generics = generic.search(q, page_size)
+    # Produsele proprii ale utilizatorului: încărcate pe orice pagină (pentru dedup),
+    # afișate doar pe pagina 1.
+    customs = await custom_foods.search_custom(db, token["uid"], q)
 
     # OFF e live și poate pica. Pe pagina 1, dacă avem generice, degradăm grațios și
     # întoarcem doar genericele. Pe paginile 2+ (load-more) lăsăm eroarea să propage.
     try:
         off_items, off_total = await off.search(q, page_size, page)
     except httpx.HTTPStatusError as exc:
-        if page > 1 or not generics:
+        if page > 1 or not (generics or customs):
             raise _translate_off_error(exc) from exc
         off_items, off_total = [], 0
     except httpx.RequestError as exc:
-        if page > 1 or not generics:
+        if page > 1 or not (generics or customs):
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Food database busy, try again",
@@ -64,11 +69,16 @@ async def search_foods(
         off_items, off_total = [], 0
 
     # Drop OFF products that duplicate a generic by name (pe orice pagină).
+    custom_names = {c.name.strip().lower() for c in customs}
+    generics = [g for g in generics if g.name.strip().lower() not in custom_names]
     generic_names = {g.name.strip().lower() for g in generics}
-    off_items = [it for it in off_items if it.name.strip().lower() not in generic_names]
+    off_items = [
+        it for it in off_items
+        if it.name.strip().lower() not in generic_names | custom_names
+    ]
 
     # Genericele se prepend doar pe pagina 1; paginile 2+ sunt doar OFF. Fără trim.
-    prefix = generics if page == 1 else []
+    prefix = (customs + generics) if page == 1 else []
     items = prefix + off_items
     has_more = page * page_size < off_total
     return SearchResponseDto(items=items, count=len(items), has_more=has_more)
@@ -101,9 +111,13 @@ async def get_food_by_barcode(
     barcode: str = Path(..., min_length=8, max_length=13),
     off: OpenFoodFactsClient = Depends(get_off_client),
     token: dict = Depends(verify_token),
+    db: AsyncSession = Depends(get_db),
 ) -> FoodItemDto:
     if not _BARCODE_RE.match(barcode):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid barcode format")
+    own = await custom_foods.find_by_barcode(db, token["uid"], barcode)
+    if own is not None:
+        return custom_foods.to_food_item(own)
     try:
         item = await off.get_by_barcode(barcode)
     except httpx.HTTPStatusError as exc:

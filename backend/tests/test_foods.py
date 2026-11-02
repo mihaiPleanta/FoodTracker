@@ -280,3 +280,98 @@ def test_has_more_false_on_last_page(client, fake_off, fake_generic):
     fake_off.search_total = 1
     response = client.get("/foods/search", params={"q": "xx"}, headers=AUTH_HEADER)
     assert response.json()["has_more"] is False
+
+
+# ---- produse proprii ----
+
+_PROFILE = {
+    "name": "Mihai", "age": 22, "gender": "MALE", "height_cm": 180,
+    "current_weight_kg": 78.0, "target_weight_kg": 75.0, "activity_level": "MODERATE",
+}
+
+
+def _make_custom(client, **kw):
+    client.post("/profile", json=_PROFILE, headers=AUTH_HEADER)
+    body = {"name": "Biscuiți cu cacao", "brand": "Eugenia", "barcode": "5941234567890",
+            "kcal_100g": 452, "protein_100g": 6.1, "carbs_100g": 68, "fat_100g": 17}
+    body.update(kw)
+    r = client.post("/custom-foods", json=body, headers=AUTH_HEADER)
+    assert r.status_code == 201, r.text
+    return r.json()
+
+
+def test_search_puts_custom_first(client, fake_off):
+    _make_custom(client)
+    fake_off.search_result = [_dto(barcode="111", name="Biscuiti simpli")]
+    body = client.get("/foods/search", params={"q": "biscuiti"}, headers=AUTH_HEADER).json()
+    assert body["items"][0]["barcode"].startswith("custom-")
+    assert body["items"][1]["barcode"] == "111"
+
+
+def test_search_custom_matches_without_diacritics(client, fake_off):
+    _make_custom(client)
+    body = client.get("/foods/search", params={"q": "biscuiti cacao"}, headers=AUTH_HEADER).json()
+    assert [i["name"] for i in body["items"]] == ["Biscuiți cu cacao"]
+
+
+def test_search_custom_does_not_match_unrelated(client, fake_off):
+    _make_custom(client)
+    body = client.get("/foods/search", params={"q": "lapte"}, headers=AUTH_HEADER).json()
+    assert body["items"] == []
+
+
+def test_search_dedups_off_with_same_name(client, fake_off):
+    _make_custom(client)
+    fake_off.search_result = [_dto(barcode="111", name="Biscuiți cu cacao")]
+    body = client.get("/foods/search", params={"q": "biscuiti"}, headers=AUTH_HEADER).json()
+    assert [i["barcode"].startswith("custom-") for i in body["items"]] == [True]
+
+
+def test_search_page2_has_no_custom(client, fake_off):
+    _make_custom(client)
+    fake_off.search_result = [_dto(barcode="111", name="Biscuiti simpli")]
+    fake_off.search_total = 60
+    body = client.get("/foods/search", params={"q": "biscuiti", "page": 2}, headers=AUTH_HEADER).json()
+    assert [i["barcode"] for i in body["items"]] == ["111"]
+
+
+def test_search_other_user_custom_not_visible(client, fake_off, mock_firebase_token):
+    _make_custom(client)
+    mock_firebase_token.return_value = {"uid": "other-uid", "email": "o@test.com"}
+    body = client.get("/foods/search", params={"q": "biscuiti"}, headers=AUTH_HEADER).json()
+    assert body["items"] == []
+
+
+def test_search_off_down_but_custom_match_returns_200(client, fake_off):
+    import httpx
+
+    _make_custom(client)
+
+    async def raise_503(*args, **kwargs):
+        request = httpx.Request("GET", "https://world.openfoodfacts.org/")
+        raise httpx.HTTPStatusError("down", request=request, response=httpx.Response(503, request=request))
+
+    fake_off.search = raise_503
+    response = client.get("/foods/search", params={"q": "biscuiti"}, headers=AUTH_HEADER)
+    assert response.status_code == 200
+    assert response.json()["items"][0]["name"] == "Biscuiți cu cacao"
+
+
+def test_barcode_prefers_custom_and_skips_off(client, fake_off):
+    created = _make_custom(client)
+
+    async def boom(barcode):
+        assert False, "OFF must not be called"
+
+    fake_off.get_by_barcode = boom
+    r = client.get("/foods/barcode/5941234567890", headers=AUTH_HEADER)
+    assert r.status_code == 200
+    assert r.json()["barcode"] == created["key"]
+
+
+def test_barcode_custom_of_other_user_not_visible(client, fake_off, mock_firebase_token):
+    _make_custom(client)
+    mock_firebase_token.return_value = {"uid": "other-uid", "email": "o@test.com"}
+    r = client.get("/foods/barcode/5941234567890", headers=AUTH_HEADER)
+    assert r.status_code == 404
+    assert fake_off.barcode_calls == ["5941234567890"]

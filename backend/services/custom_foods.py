@@ -8,8 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import CustomFood
 from schemas import FoodItemDto
+from services.text_match import relevance
 
 CUSTOM_PREFIX = "custom-"
+_MATCH_THRESHOLD = 4
 
 
 def custom_key(food_id: int) -> str:
@@ -61,3 +63,20 @@ async def load_for_keys(
         select(CustomFood).where(CustomFood.uid == uid, CustomFood.id.in_(ids))
     )
     return {custom_key(r.id): r for r in result.scalars().all()}
+
+
+async def search_custom(
+    db: AsyncSession, uid: str, query: str, limit: int = 10
+) -> list[FoodItemDto]:
+    q = normalize_name(query)
+    result = await db.execute(select(CustomFood).where(CustomFood.uid == uid))
+    scored = []
+    for row in result.scalars().all():
+        name = normalize_name(row.name)
+        score = relevance(name, [], q)
+        if row.brand:
+            score = min(score, relevance(normalize_name(f"{row.brand} {row.name}"), [], q))
+        if score[0] <= _MATCH_THRESHOLD:
+            scored.append((score, row))
+    scored.sort(key=lambda t: t[0])
+    return [to_food_item(r) for _, r in scored[:limit]]

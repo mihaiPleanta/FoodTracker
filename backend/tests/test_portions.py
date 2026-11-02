@@ -268,3 +268,16 @@ def test_portions_volume_package_marked_estimate(client, fake_off):
     fake_off.info = ProductPortionInfo([], None, 1000, package_is_volume=True)
     body = _get_portions(client)
     assert body["units"] == [{"unit": "package", "grams": 1000.0, "source": "estimate"}]
+
+
+def test_portions_for_custom_key_skips_off(client, fake_off):
+    _ensure_profile(client)
+    created = client.post(
+        "/custom-foods",
+        json={"name": "Biscuiți", "kcal_100g": 450, "protein_100g": 6, "carbs_100g": 68,
+              "fat_100g": 17, "serving": {"unit": "biscuit", "grams": 12}},
+        headers=AUTH_HEADER,
+    ).json()
+    body = _get_portions(client, created["key"])
+    assert {"unit": "biscuit", "grams": 12.0, "source": "user"} in body["units"]
+    assert fake_off.calls == []
