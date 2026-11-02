@@ -36,6 +36,36 @@ class CustomFoodFormTest {
         assertEquals(R.string.custom_food_error_range, valid().edit(FormField.CARBS, "101").validate()[FormField.CARBS])
     }
 
+    @Test fun macroSum_exactly100_withFloatNoise_isAccepted() {
+        val f = valid().edit(FormField.PROTEIN, "33.3").edit(FormField.CARBS, "33.3").edit(FormField.FAT, "33.4")
+        assertTrue(f.validate().isEmpty())
+        val g = valid().edit(FormField.PROTEIN, "0.2").edit(FormField.CARBS, "85.4").edit(FormField.FAT, "14.4")
+        assertTrue(g.validate().isEmpty())
+        val over = valid().edit(FormField.PROTEIN, "33.4").edit(FormField.CARBS, "33.3").edit(FormField.FAT, "33.4")
+        assertEquals(R.string.custom_food_error_macro_sum, over.validate()[FormField.FAT])
+    }
+
+    @Test fun lengthLimits_matchServer() {
+        assertNull(valid().edit(FormField.NAME, "a".repeat(100)).validate()[FormField.NAME])
+        assertEquals(R.string.custom_food_error_too_long, valid().edit(FormField.NAME, "a".repeat(101)).validate()[FormField.NAME])
+        assertNull(valid().edit(FormField.BRAND, "b".repeat(100)).validate()[FormField.BRAND])
+        assertEquals(R.string.custom_food_error_too_long, valid().edit(FormField.BRAND, "b".repeat(101)).validate()[FormField.BRAND])
+        val serving = valid().edit(FormField.SERVING_GRAMS, "30")
+        assertNull(serving.edit(FormField.SERVING_UNIT, "u".repeat(30)).validate()[FormField.SERVING_UNIT])
+        assertEquals(
+            R.string.custom_food_error_too_long,
+            serving.edit(FormField.SERVING_UNIT, "u".repeat(31)).validate()[FormField.SERVING_UNIT],
+        )
+        assertNull(valid().edit(FormField.NAME, "a".repeat(101)).toInDto())
+    }
+
+    @Test fun servingGrams_max2000() {
+        val unit = valid().edit(FormField.SERVING_UNIT, "pachet")
+        assertNull(unit.edit(FormField.SERVING_GRAMS, "2000").validate()[FormField.SERVING_GRAMS])
+        assertEquals(R.string.custom_food_error_range, unit.edit(FormField.SERVING_GRAMS, "2001").validate()[FormField.SERVING_GRAMS])
+        assertEquals(R.string.custom_food_error_serving_pair, unit.edit(FormField.SERVING_GRAMS, "0").validate()[FormField.SERVING_GRAMS])
+    }
+
     @Test fun barcode_format() {
         assertEquals(R.string.custom_food_error_barcode, valid().edit(FormField.BARCODE, "12ab").validate()[FormField.BARCODE])
         assertEquals(R.string.custom_food_error_barcode, valid().edit(FormField.BARCODE, "1234567").validate()[FormField.BARCODE])

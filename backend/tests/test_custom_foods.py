@@ -52,6 +52,19 @@ def test_create_validation_422(client, override):
     assert client.post("/custom-foods", json=_body(**override), headers=AUTH_HEADER).status_code == 422
 
 
+@pytest.mark.parametrize("p,c,f", [(33.3, 33.3, 33.4), (0.2, 85.4, 14.4)])
+def test_macro_sum_exactly_100_with_float_noise_accepted(client, p, c, f):
+    r = client.post("/custom-foods", json=_body(barcode=None, protein_100g=p, carbs_100g=c, fat_100g=f),
+                    headers=AUTH_HEADER)
+    assert r.status_code == 201, r.text
+
+
+def test_macro_sum_just_over_100_rejected(client):
+    r = client.post("/custom-foods", json=_body(protein_100g=33.4, carbs_100g=33.3, fat_100g=33.4),
+                    headers=AUTH_HEADER)
+    assert r.status_code == 422
+
+
 def test_blank_brand_and_barcode_become_null(client):
     d = client.post("/custom-foods", json=_body(brand="  ", barcode=""), headers=AUTH_HEADER).json()
     assert d["brand"] is None and d["barcode"] is None

@@ -410,7 +410,8 @@ class CustomFoodIn(BaseModel):
 
     @model_validator(mode="after")
     def _check_macro_sum(self):
-        if self.protein_100g + self.carbs_100g + self.fat_100g > 100:
+        # Epsilon: decimal inputs like 0.2 + 85.4 + 14.4 sum to 100.00000000000001 in float.
+        if self.protein_100g + self.carbs_100g + self.fat_100g > 100 + 0.001:
             raise ValueError("protein + carbs + fat must be <= 100 g per 100 g")
         return self
 

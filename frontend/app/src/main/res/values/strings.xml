@@ -413,6 +413,7 @@
     <string name="custom_food_error_range">Valoare în afara intervalului permis</string>
     <string name="custom_food_error_macro_sum">Proteine + carbohidrați + grăsimi depășesc 100 g</string>
     <string name="custom_food_error_barcode">Codul de bare trebuie să aibă 8–13 cifre</string>
+    <string name="custom_food_error_too_long">Text prea lung</string>
     <string name="custom_food_error_serving_pair">Completează atât denumirea, cât și gramele porției</string>
     <string name="custom_food_warning_kcal_mismatch">Valorile nu par să se potrivească — verifică eticheta</string>
     <string name="custom_food_default_serving_unit">porție</string>

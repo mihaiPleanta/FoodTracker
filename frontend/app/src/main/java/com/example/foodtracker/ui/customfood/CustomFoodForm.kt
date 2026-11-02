@@ -57,7 +57,11 @@ data class CustomFoodForm(
 
     fun validate(): Map<FormField, Int> {
         val errors = linkedMapOf<FormField, Int>()
-        if (text(FormField.NAME).isEmpty()) errors[FormField.NAME] = R.string.custom_food_error_required
+        when {
+            text(FormField.NAME).isEmpty() -> errors[FormField.NAME] = R.string.custom_food_error_required
+            text(FormField.NAME).length > MAX_NAME_LENGTH -> errors[FormField.NAME] = R.string.custom_food_error_too_long
+        }
+        if (text(FormField.BRAND).length > MAX_BRAND_LENGTH) errors[FormField.BRAND] = R.string.custom_food_error_too_long
 
         val kcal = number(FormField.KCAL)
         when {
@@ -73,7 +77,7 @@ data class CustomFoodForm(
         }
         if (FormField.PROTEIN !in errors && FormField.CARBS !in errors && FormField.FAT !in errors) {
             val sum = number(FormField.PROTEIN)!! + number(FormField.CARBS)!! + number(FormField.FAT)!!
-            if (sum > 100f) errors[FormField.FAT] = R.string.custom_food_error_macro_sum
+            if (sum > 100f + MACRO_SUM_EPSILON) errors[FormField.FAT] = R.string.custom_food_error_macro_sum
         }
 
         val barcode = text(FormField.BARCODE)
@@ -85,8 +89,14 @@ data class CustomFoodForm(
         val gramsText = text(FormField.SERVING_GRAMS)
         if (unit.isNotEmpty() || gramsText.isNotEmpty()) {
             val grams = number(FormField.SERVING_GRAMS)
-            if (unit.isEmpty()) errors[FormField.SERVING_UNIT] = R.string.custom_food_error_serving_pair
-            if (grams == null || grams <= 0f) errors[FormField.SERVING_GRAMS] = R.string.custom_food_error_serving_pair
+            when {
+                unit.isEmpty() -> errors[FormField.SERVING_UNIT] = R.string.custom_food_error_serving_pair
+                unit.length > MAX_SERVING_UNIT_LENGTH -> errors[FormField.SERVING_UNIT] = R.string.custom_food_error_too_long
+            }
+            when {
+                grams == null || grams <= 0f -> errors[FormField.SERVING_GRAMS] = R.string.custom_food_error_serving_pair
+                grams > MAX_SERVING_GRAMS -> errors[FormField.SERVING_GRAMS] = R.string.custom_food_error_range
+            }
         }
         return errors
     }
@@ -120,6 +130,14 @@ data class CustomFoodForm(
 
     companion object {
         private val BARCODE_REGEX = Regex("^\\d{8,13}$")
+
+        // Same limits as the server (schemas.CustomFoodIn / ServingIn).
+        private const val MAX_NAME_LENGTH = 100
+        private const val MAX_BRAND_LENGTH = 100
+        private const val MAX_SERVING_UNIT_LENGTH = 30
+        private const val MAX_SERVING_GRAMS = 2000f
+        /** 33.3 + 33.3 + 33.4 must count as exactly 100 despite float rounding. */
+        private const val MACRO_SUM_EPSILON = 0.001f
 
         private fun formatNumber(f: Float): String =
             BigDecimal(f.toString()).stripTrailingZeros().toPlainString()
