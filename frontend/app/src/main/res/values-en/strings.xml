@@ -389,4 +389,11 @@
     <string name="copy_pick_date">Pick a date</string>
     <string name="action_ok">OK</string>
     <string name="action_more_options">More options</string>
+    <string name="custom_food_error_required">Required field</string>
+    <string name="custom_food_error_range">Value is out of the allowed range</string>
+    <string name="custom_food_error_macro_sum">Protein + carbs + fat exceed 100 g</string>
+    <string name="custom_food_error_barcode">Barcode must have 8–13 digits</string>
+    <string name="custom_food_error_serving_pair">Fill in both the serving name and its grams</string>
+    <string name="custom_food_warning_kcal_mismatch">The values don\'t seem to match — check the label</string>
+    <string name="custom_food_default_serving_unit">serving</string>
 </resources>

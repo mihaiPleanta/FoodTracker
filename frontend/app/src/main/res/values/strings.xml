@@ -409,4 +409,11 @@
     <string name="copy_pick_date">Alege o dată</string>
     <string name="action_ok">OK</string>
     <string name="action_more_options">Mai multe opțiuni</string>
+    <string name="custom_food_error_required">Câmp obligatoriu</string>
+    <string name="custom_food_error_range">Valoare în afara intervalului permis</string>
+    <string name="custom_food_error_macro_sum">Proteine + carbohidrați + grăsimi depășesc 100 g</string>
+    <string name="custom_food_error_barcode">Codul de bare trebuie să aibă 8–13 cifre</string>
+    <string name="custom_food_error_serving_pair">Completează atât denumirea, cât și gramele porției</string>
+    <string name="custom_food_warning_kcal_mismatch">Valorile nu par să se potrivească — verifică eticheta</string>
+    <string name="custom_food_default_serving_unit">porție</string>
 </resources>
