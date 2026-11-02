@@ -72,6 +72,8 @@ class CustomFoodViewModel(
     val createdForMeal: StateFlow<FoodItem?> = _createdForMeal.asStateFlow()
 
     private var editing: CustomFoodDto? = null
+    private var editId: Int? = null
+    private var editJob: Job? = null
     private var forMeal = false
     private var listJob: Job? = null
     private var saveJob: Job? = null
@@ -87,12 +89,24 @@ class CustomFoodViewModel(
         _form.value = CustomFoodForm.prefilled(barcode, name)
     }
 
+    /** Loads the list first when needed; an unknown id puts the flow in an Error state (save is a no-op). */
     fun startEdit(id: Int) {
         clearFlow()
-        val item = (_myFoods.value as? MyFoodsState.Loaded)?.items?.firstOrNull { it.id == id } ?: return
-        editing = item
-        _form.value = CustomFoodForm.fromDto(item)
+        editId = id
+        editJob = viewModelScope.launch {
+            if (findLoaded(id) == null) fetchList()
+            val item = findLoaded(id)
+            if (item == null) {
+                _saveState.value = SaveState.Error(R.string.error_generic)
+            } else {
+                editing = item
+                _form.value = CustomFoodForm.fromDto(item)
+            }
+        }
     }
+
+    private fun findLoaded(id: Int): CustomFoodDto? =
+        (_myFoods.value as? MyFoodsState.Loaded)?.items?.firstOrNull { it.id == id }
 
     fun onField(field: FormField, text: String) {
         _form.value = _form.value.edit(field, text)
@@ -115,6 +129,7 @@ class CustomFoodViewModel(
 
     fun save() {
         if (_saveState.value is SaveState.Saving) return
+        if (editId != null && editing == null) return
         _showErrors.value = true
         val body = _form.value.toInDto() ?: return
         val old = editing
@@ -123,17 +138,22 @@ class CustomFoodViewModel(
             try {
                 if (old == null) {
                     val created = api.create(body)
-                    invalidate(listOfNotNull(created.key, created.barcode))
+                    safeInvalidate(listOfNotNull(created.key, created.barcode))
                     val food = created.toFoodItem()
                     if (forMeal) _createdForMeal.value = food
                     _saveState.value = SaveState.Saved(food)
                 } else {
                     val updated = api.update(old.id, body)
-                    syncServingUnit(updated.key, old.serving, updated.serving)
-                    invalidate(listOfNotNull(updated.key, old.barcode, updated.barcode).distinct())
+                    try {
+                        syncServingUnit(updated.key, old.serving, updated.serving)
+                    } finally {
+                        // The server already has the new data: refresh local state even if the unit sync failed.
+                        safeInvalidate(listOfNotNull(updated.key, old.barcode, updated.barcode).distinct())
+                        fetchList()
+                    }
                     _saveState.value = SaveState.Saved(updated.toFoodItem())
                 }
-                fetchList()
+                if (old == null) fetchList()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: HttpException) {
@@ -154,7 +174,7 @@ class CustomFoodViewModel(
                 val item = (_myFoods.value as? MyFoodsState.Loaded)?.items?.firstOrNull { it.id == id }
                 val response = api.delete(id)
                 if (!response.isSuccessful) throw HttpException(response)
-                invalidate(listOfNotNull(item?.key ?: "custom-$id", item?.barcode))
+                safeInvalidate(listOfNotNull(item?.key ?: "custom-$id", item?.barcode))
                 fetchList()
             } catch (e: CancellationException) {
                 throw e
@@ -173,7 +193,9 @@ class CustomFoodViewModel(
     /** Leaves the form flow (screen closed); keeps the loaded list. */
     fun clearFlow() {
         saveJob?.cancel()
+        editJob?.cancel()
         editing = null
+        editId = null
         forMeal = false
         _form.value = CustomFoodForm()
         _labelImage.value = null
@@ -196,6 +218,16 @@ class CustomFoodViewModel(
         }
         if (new != null && (old?.unit != new.unit || old.grams != new.grams)) {
             portionsApi.putUnit(key, PortionUnitInDto(new.unit, new.grams))
+        }
+    }
+
+    /** A local cache error must not turn a successful server write into a failed save. */
+    private suspend fun safeInvalidate(keys: List<String>) {
+        try {
+            invalidate(keys)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
         }
     }
 

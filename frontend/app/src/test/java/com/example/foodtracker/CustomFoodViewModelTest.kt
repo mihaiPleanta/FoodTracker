@@ -73,10 +73,12 @@ private class FakeCustomFoodsApi : CustomFoodsApi {
 }
 
 private class FakeCfPortionsApi : PortionsApi {
+    var failPut = false
     val puts = mutableListOf<Triple<String, String, Float>>()
     val deletes = mutableListOf<Pair<String, String>>()
     override suspend fun getPortions(barcode: String): PortionsDto = throw UnsupportedOperationException()
     override suspend fun putUnit(barcode: String, body: PortionUnitInDto): PortionUnitInDto {
+        if (failPut) throw java.io.IOException("offline")
         puts += Triple(barcode, body.unit, body.grams)
         return body
     }
@@ -195,6 +197,7 @@ class CustomFoodViewModelTest {
         val vm = vm().startEditOf(dto(serving = ServingDto("felie", 30f)))
         advanceUntilIdle()
         vm.startEdit(1)
+        advanceUntilIdle()
         vm.onField(FormField.SERVING_UNIT, "bucată")
         vm.onField(FormField.SERVING_GRAMS, "50")
         vm.save()
@@ -208,6 +211,7 @@ class CustomFoodViewModelTest {
         val vm = vm().startEditOf(dto(serving = ServingDto("felie", 30f)))
         advanceUntilIdle()
         vm.startEdit(1)
+        advanceUntilIdle()
         vm.onField(FormField.SERVING_UNIT, "")
         vm.onField(FormField.SERVING_GRAMS, "")
         vm.save()
@@ -220,6 +224,7 @@ class CustomFoodViewModelTest {
         val vm = vm().startEditOf(dto(barcode = "11111111"))
         advanceUntilIdle()
         vm.startEdit(1)
+        advanceUntilIdle()
         vm.onField(FormField.BARCODE, "22222222")
         vm.save()
         advanceUntilIdle()
@@ -255,12 +260,72 @@ class CustomFoodViewModelTest {
         assertEquals(MyFoodsState.Loaded(emptyList()), vm.myFoods.value)
     }
 
+    @Test fun edit_unitSyncFails_stillInvalidatesAndRefreshes() = runTest(dispatcher) {
+        val vm = vm().startEditOf(dto(barcode = "11111111", serving = ServingDto("felie", 30f)))
+        advanceUntilIdle()
+        vm.startEdit(1)
+        advanceUntilIdle()
+        portions.failPut = true
+        foods.items = mutableListOf(dto(id = 1, barcode = "11111111").copy(name = "Nou"))
+        vm.onField(FormField.SERVING_UNIT, "bucată")
+        vm.onField(FormField.SERVING_GRAMS, "50")
+        vm.save()
+        advanceUntilIdle()
+        assertEquals(SaveState.Error(R.string.error_no_internet), vm.saveState.value)
+        assertEquals(listOf(listOf("custom-1", "11111111")), invalidated)
+        assertEquals("Nou", (vm.myFoods.value as MyFoodsState.Loaded).items.single().name)
+    }
+
+    @Test fun save_new_invalidateThrows_stillSaved() = runTest(dispatcher) {
+        val vm = CustomFoodViewModel(
+            api = foods, portionsApi = portions, defaultServingUnit = "porție",
+            invalidate = { throw IllegalStateException("db") },
+        )
+        vm.startNew(null, null, forMeal = false)
+        vm.fillValid()
+        vm.save()
+        advanceUntilIdle()
+        assertTrue(vm.saveState.value is SaveState.Saved)
+        assertEquals(1, foods.createCalls)
+    }
+
+    @Test fun startEdit_unknownId_neverCreates() = runTest(dispatcher) {
+        val vm = vm()
+        vm.startEdit(99)
+        vm.fillValid()
+        vm.save()
+        advanceUntilIdle()
+        vm.save()
+        assertEquals(0, foods.createCalls)
+        assertEquals(0, foods.updateCalls)
+        assertEquals(SaveState.Error(R.string.error_generic), vm.saveState.value)
+    }
+
+    @Test fun startEdit_listNotLoaded_fetchesThenEdits() = runTest(dispatcher) {
+        foods.items = mutableListOf(dto(id = 3))
+        val vm = vm()
+        vm.startEdit(3)
+        advanceUntilIdle()
+        assertEquals("Tort", vm.form.value.values[FormField.NAME])
+        vm.save()
+        advanceUntilIdle()
+        assertEquals(1, foods.updateCalls)
+        assertEquals(0, foods.createCalls)
+    }
+
     @Test fun resetUserState_clearsEverything() = runTest(dispatcher) {
         val vm = vm().startEditOf(dto())
         advanceUntilIdle()
         vm.startNew("12345678", "x", forMeal = true)
+        vm.fillValid()
         vm.onLabelRecognized("content://x", ParsedLabel(null, null, null, null, null, null))
         vm.save()
+        advanceUntilIdle()
+        assertTrue(vm.saveState.value is SaveState.Saved)
+        assertNotNull(vm.createdForMeal.value)
+        assertNotNull(vm.labelImage.value)
+        assertNotNull(vm.ocrMessage.value)
+        assertTrue(vm.showErrors.value)
         vm.resetUserState()
         advanceUntilIdle()
         assertEquals(MyFoodsState.Loading, vm.myFoods.value)
