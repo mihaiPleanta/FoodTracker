@@ -38,5 +38,6 @@ object RetrofitInstance {
     val logsApi: LogsApi by lazy { retrofit.create(LogsApi::class.java) }
     val recipeApi: RecipeApi by lazy { retrofit.create(RecipeApi::class.java) }
     val quickPicksApi: QuickPicksApi by lazy { retrofit.create(QuickPicksApi::class.java) }
+    val customFoodsApi: CustomFoodsApi by lazy { retrofit.create(CustomFoodsApi::class.java) }
     val portionsApi: PortionsApi by lazy { retrofit.create(PortionsApi::class.java) }
 }

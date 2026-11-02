@@ -48,6 +48,8 @@ private class FakeCache : FoodCache {
         products[item.barcode] = CachedProduct(item, now)
     }
     override suspend fun touchProduct(barcode: String, now: Long) { touchedProduct++ }
+    override suspend fun clearSearches() { searches.clear() }
+    override suspend fun deleteProducts(barcodes: List<String>) { barcodes.forEach { products.remove(it) } }
 }
 
 /** Fake FoodApi: cozi de răspunsuri/erori. */
@@ -241,5 +243,21 @@ class FoodRepositoryTest {
         val result = repo.lookupBarcode("1")
         assertTrue(result.stale)
         assertEquals("vechi", result.items.single().name)
+    }
+
+    @Test fun invalidateCustomFoods_clearsSearchesAndProducts() = runTest {
+        val cache = FakeCache()
+        cache.putSearch("biscuiti", listOf(item("X")), 0)
+        cache.putProduct(item("X"), 0)
+        cache.putProduct(item("custom-1"), 0)
+        cache.putProduct(item("other"), 0)
+        val repo = FoodRepository(FakeApi(), cache, now = { 0 })
+
+        repo.invalidateCustomFoods(listOf("custom-1", "X"))
+
+        assertNull(cache.getSearch("biscuiti"))
+        assertNull(cache.getProduct("X"))
+        assertNull(cache.getProduct("custom-1"))
+        assertEquals("other", cache.getProduct("other")!!.item.barcode)
     }
 }

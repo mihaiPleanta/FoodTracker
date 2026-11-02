@@ -28,7 +28,11 @@ data class FoodItem(
     val fat100g: Float,
     // Non-null ⇒ this is a recipe portion composed of these ingredients.
     val ingredients: List<FoodIngredient>? = null,
-)
+) {
+    val isCustom: Boolean get() = barcode.startsWith(CUSTOM_KEY_PREFIX)
+}
+
+const val CUSTOM_KEY_PREFIX = "custom-"
 
 /** Sum of ingredient grams, floored at 1 so per-100g division is always defined. */
 fun List<FoodIngredient>.totalGrams(): Double =

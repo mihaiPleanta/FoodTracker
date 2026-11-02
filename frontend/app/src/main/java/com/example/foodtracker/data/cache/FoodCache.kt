@@ -17,6 +17,9 @@ interface FoodCache {
     suspend fun getProduct(barcode: String): CachedProduct?
     suspend fun putProduct(item: FoodItem, now: Long)
     suspend fun touchProduct(barcode: String, now: Long)
+
+    suspend fun clearSearches()
+    suspend fun deleteProducts(barcodes: List<String>)
 }
 
 private const val MAX_PRODUCTS = 200
@@ -90,4 +93,10 @@ class RoomFoodCache(private val dao: FoodCacheDao) : FoodCache {
 
     override suspend fun touchProduct(barcode: String, now: Long) =
         dao.touchProducts(listOf(barcode), now)
+
+    override suspend fun clearSearches() = dao.clearSearches()
+
+    override suspend fun deleteProducts(barcodes: List<String>) {
+        if (barcodes.isNotEmpty()) dao.deleteProducts(barcodes)
+    }
 }

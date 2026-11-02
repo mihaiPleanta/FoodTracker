@@ -62,4 +62,10 @@ class FoodRepository(
             else throw e
         }
     }
+
+    /** Golește căutările și șterge produsele cu cheile date (custom-<id> + coduri reale vechi/noi). */
+    suspend fun invalidateCustomFoods(keys: List<String>) {
+        cache.clearSearches()
+        cache.deleteProducts(keys)
+    }
 }

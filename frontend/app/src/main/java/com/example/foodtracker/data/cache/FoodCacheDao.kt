@@ -26,6 +26,12 @@ interface FoodCacheDao {
     )
     suspend fun evictProducts(cap: Int)
 
+    @Query("DELETE FROM cached_products WHERE barcode IN (:barcodes)")
+    suspend fun deleteProducts(barcodes: List<String>)
+
+    @Query("DELETE FROM cached_searches")
+    suspend fun clearSearches()
+
     // ── Search-uri ──
     @Query("SELECT * FROM cached_searches WHERE `query` = :query LIMIT 1")
     suspend fun getSearch(query: String): CachedSearchEntity?
