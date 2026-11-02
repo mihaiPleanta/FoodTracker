@@ -118,7 +118,7 @@ class CustomFoodViewModel(
             _ocrMessage.value = R.string.custom_food_ocr_nothing
         } else {
             _ocrMessage.value = null
-            _form.value = _form.value.applyParsed(parsed, defaultServingUnit)
+            _form.value = _form.value.applyParsed(parsed, defaultServingUnit, overwrite = editId != null)
         }
     }
 
@@ -138,7 +138,9 @@ class CustomFoodViewModel(
             try {
                 if (old == null) {
                     val created = api.create(body)
+                    // Refresh before Saved: the screen leaves on Saved and clearFlow() cancels this job.
                     safeInvalidate(listOfNotNull(created.key, created.barcode))
+                    fetchList()
                     val food = created.toFoodItem()
                     if (forMeal) _createdForMeal.value = food
                     _saveState.value = SaveState.Saved(food)
@@ -153,7 +155,6 @@ class CustomFoodViewModel(
                     }
                     _saveState.value = SaveState.Saved(updated.toFoodItem())
                 }
-                if (old == null) fetchList()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: HttpException) {

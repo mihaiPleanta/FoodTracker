@@ -94,6 +94,26 @@ class CustomFoodFormTest {
         assertEquals(setOf(FormField.SERVING_GRAMS), t.autoFilled)
     }
 
+    @Test fun applyParsed_overwrite_replacesNonNullAndMarks() {
+        val start = form(FormField.KCAL to "300", FormField.FAT to "20", FormField.PROTEIN to "5", FormField.SERVING_UNIT to "felie", FormField.SERVING_GRAMS to "40")
+        val r = start.applyParsed(ParsedLabel(kcal = 452f, fat = 17f, protein = null, carbs = 60f, servingGrams = 30f, servingUnit = null), "porție", overwrite = true)
+        assertEquals("452", r.values[FormField.KCAL])
+        assertEquals("17", r.values[FormField.FAT])
+        assertEquals("60", r.values[FormField.CARBS])
+        assertEquals("5", r.values[FormField.PROTEIN]) // null in the label: kept
+        assertEquals("30", r.values[FormField.SERVING_GRAMS])
+        assertEquals("felie", r.values[FormField.SERVING_UNIT]) // generic default never replaces a named unit
+        assertEquals(setOf(FormField.KCAL, FormField.FAT, FormField.CARBS, FormField.SERVING_GRAMS), r.autoFilled)
+        val named = start.applyParsed(ParsedLabel(kcal = null, fat = null, protein = null, carbs = null, servingGrams = 12f, servingUnit = "biscuit"), "porție", overwrite = true)
+        assertEquals("biscuit", named.values[FormField.SERVING_UNIT])
+    }
+
+    @Test fun applyParsed_defaultIsNoOverwrite() {
+        val r = form(FormField.KCAL to "300").applyParsed(ParsedLabel(kcal = 452f, fat = null, protein = null, carbs = null, servingGrams = null, servingUnit = null), "porție")
+        assertEquals("300", r.values[FormField.KCAL])
+        assertTrue(r.autoFilled.isEmpty())
+    }
+
     @Test fun edit_clearsAutoFilledMark() {
         val r = CustomFoodForm().applyParsed(ParsedLabel(kcal = 452f, protein = null, carbs = null, fat = null, servingGrams = null, servingUnit = null), "porție")
         assertTrue(FormField.KCAL in r.autoFilled)

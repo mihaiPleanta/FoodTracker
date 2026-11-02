@@ -26,15 +26,17 @@ data class CustomFoodForm(
         copy(values = values + (field to text), autoFilled = autoFilled - field)
 
     /**
-     * Completează doar câmpurile non-null și goale; nu suprascrie ce a tastat utilizatorul.
+     * Completează câmpurile cu valori non-null din etichetă și le marchează „verifică”.
+     * Implicit doar câmpurile goale (nu suprascrie ce a tastat utilizatorul); cu [overwrite]
+     * (re-scanare în modul editare) le înlocuiește și pe cele completate.
      * [defaultServingUnit] (localizat de apelant) înlocuiește unitatea lipsă când parserul
      * găsește doar o porție generică („porție = 30 g”).
      */
-    fun applyParsed(p: ParsedLabel, defaultServingUnit: String): CustomFoodForm {
+    fun applyParsed(p: ParsedLabel, defaultServingUnit: String, overwrite: Boolean = false): CustomFoodForm {
         var v = values
         val filled = autoFilled.toMutableSet()
-        fun fill(f: FormField, value: String?) {
-            if (value != null && text(f).isEmpty()) {
+        fun fill(f: FormField, value: String?, replace: Boolean = overwrite) {
+            if (value != null && (replace || text(f).isEmpty())) {
                 v = v + (f to value)
                 filled += f
             }
@@ -44,8 +46,12 @@ data class CustomFoodForm(
         fill(FormField.CARBS, p.carbs?.let(::formatNumber))
         fill(FormField.FAT, p.fat?.let(::formatNumber))
         fill(FormField.SERVING_GRAMS, p.servingGrams?.let(::formatNumber))
-        val unit = p.servingUnit ?: if (p.servingGrams != null) defaultServingUnit else null
-        fill(FormField.SERVING_UNIT, unit)
+        if (p.servingUnit != null) {
+            fill(FormField.SERVING_UNIT, p.servingUnit)
+        } else if (p.servingGrams != null) {
+            // The generic default never replaces a unit the user named.
+            fill(FormField.SERVING_UNIT, defaultServingUnit, replace = false)
+        }
         return copy(values = v, autoFilled = filled)
     }
 

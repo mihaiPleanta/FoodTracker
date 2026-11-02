@@ -15,6 +15,7 @@ import com.example.foodtracker.viewmodel.MyFoodsState
 import com.example.foodtracker.viewmodel.SaveState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -46,8 +47,12 @@ private class FakeCustomFoodsApi : CustomFoodsApi {
     val deleted = mutableListOf<Int>()
     var createError: Exception? = null
     var nextId = 7
+    var listDelayMs = 0L
 
-    override suspend fun list(): List<CustomFoodDto> = items.toList()
+    override suspend fun list(): List<CustomFoodDto> {
+        if (listDelayMs > 0) kotlinx.coroutines.delay(listDelayMs)
+        return items.toList()
+    }
     override suspend fun create(body: CustomFoodInDto): CustomFoodDto {
         createCalls++
         createError?.let { throw it }
@@ -248,6 +253,43 @@ class CustomFoodViewModelTest {
         assertNull(vm.ocrMessage.value)
         assertEquals("250", vm.form.value.values[FormField.KCAL])
         assertEquals("porție", vm.form.value.values[FormField.SERVING_UNIT])
+    }
+
+    @Test fun onLabelRecognized_editMode_overwritesAndMarks() = runTest(dispatcher) {
+        val vm = vm().startEditOf(dto())
+        advanceUntilIdle()
+        vm.startEdit(1)
+        advanceUntilIdle()
+        vm.onLabelRecognized("content://x", ParsedLabel(250f, 6f, null, 10f, null, null))
+        val form = vm.form.value
+        assertEquals("250", form.values[FormField.KCAL])
+        assertEquals("6", form.values[FormField.PROTEIN])
+        assertEquals("40", form.values[FormField.CARBS])
+        assertEquals("10", form.values[FormField.FAT])
+        assertEquals(setOf(FormField.KCAL, FormField.PROTEIN, FormField.FAT), form.autoFilled)
+    }
+
+    @Test fun save_new_listContainsProductWhenSavedObserved() = runTest(dispatcher) {
+        foods.listDelayMs = 50
+        val vm = vm()
+        vm.loadMyFoods()
+        advanceUntilIdle()
+        vm.startNew(null, null, forMeal = false)
+        vm.fillValid()
+        var listAtSaved: MyFoodsState? = null
+        val observer = launch {
+            vm.saveState.collect {
+                if (it is SaveState.Saved) {
+                    listAtSaved = vm.myFoods.value
+                    vm.clearFlow() // what the screen does when it leaves on Saved
+                }
+            }
+        }
+        vm.save()
+        advanceUntilIdle()
+        observer.cancel()
+        assertEquals(listOf(7), (listAtSaved as MyFoodsState.Loaded).items.map { it.id })
+        assertEquals(listOf(7), (vm.myFoods.value as MyFoodsState.Loaded).items.map { it.id })
     }
 
     @Test fun delete_reloadsListAndInvalidates() = runTest(dispatcher) {

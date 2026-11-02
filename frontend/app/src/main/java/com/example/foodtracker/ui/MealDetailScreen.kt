@@ -129,6 +129,17 @@ fun MealDetailScreen(
         }
     }
     val lastLookupBarcode by viewModel.lastLookupBarcode.collectAsState()
+    // Scan → barcode pre-filled; text search → name pre-filled with the query.
+    val openCreateCustom: () -> Unit = {
+        val barcode = lastLookupBarcode
+        val name = if (barcode == null) searchQuery.trim() else ""
+        val args = buildList {
+            if (barcode != null) add("barcode=${Uri.encode(barcode)}")
+            if (name.isNotEmpty()) add("name=${Uri.encode(name)}")
+            add("forMeal=true")
+        }
+        navController.navigate("custom-food/new?" + args.joinToString("&"))
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(Unit) {
         quickPicks.toastEvents.collect { res -> snackbarHostState.showSnackbar(context.getString(res)) }
@@ -258,16 +269,10 @@ fun MealDetailScreen(
                         onLoadMore  = { viewModel.loadMore() },
                         favoriteBarcodes = favoriteBarcodes,
                         onToggleFavorite = { quickPicks.toggleFavorite(it) },
-                        onCreateCustom = {
-                            val barcode = lastLookupBarcode
-                            val name = if (barcode == null) searchQuery.trim() else ""
-                            val args = buildList {
-                                if (barcode != null) add("barcode=${Uri.encode(barcode)}")
-                                if (name.isNotEmpty()) add("name=${Uri.encode(name)}")
-                                add("forMeal=true")
-                            }
-                            navController.navigate("custom-food/new?" + args.joinToString("&"))
-                        },
+                        // R6: no "create" footer under scan results; the Empty-state button stays.
+                        onCreateCustom = if (lastLookupBarcode != null &&
+                            searchState is FoodViewModel.SearchUiState.Results
+                        ) null else openCreateCustom,
                     )
                 } else {
                     LoggedFoodsList(
