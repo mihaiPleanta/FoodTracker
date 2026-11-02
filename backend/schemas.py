@@ -360,7 +360,7 @@ class PortionsDto(BaseModel):
     last: Optional[LastPortionDto] = None
 
 
-_BARCODE_RE = re.compile(r"^\d{8,13}$")
+_BARCODE_RE = re.compile(r"^[0-9]{8,13}$")
 
 
 class ServingIn(BaseModel):
