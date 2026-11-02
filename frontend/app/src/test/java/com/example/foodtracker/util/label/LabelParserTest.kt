@@ -64,6 +64,25 @@ class LabelParserTest {
     }
 
     @Test
+    fun kjThousandsSeparator_neverZero() {
+        for (fixture in listOf(
+            LabelFixtures.kjThousandsDot, LabelFixtures.kjThousandsComma,
+            LabelFixtures.kjThousandsSpace, LabelFixtures.kjThousandsNarrowSpace,
+        )) {
+            val label = LabelParser.parse(fixture)
+            assertTrue("kcal = ${label.kcal}", label.kcal == null || label.kcal == 250f)
+            assertEquals(9f, label.fat)
+        }
+    }
+
+    @Test
+    fun kjOnly_belowTenKcal_isNull() {
+        val label = LabelParser.parse(LabelFixtures.kjOnlyTiny)
+        assertNull(label.kcal)
+        assertEquals(9f, label.fat)
+    }
+
+    @Test
     fun lessThan_readsTheBound() {
         val label = LabelParser.parse(LabelFixtures.lessThan)
         assertMacros(label, kcal = 4f, fat = 0.5f, carbs = 0.9f, protein = 0f)

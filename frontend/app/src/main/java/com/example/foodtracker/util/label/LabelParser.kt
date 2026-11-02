@@ -34,6 +34,9 @@ object LabelParser {
     private const val MAX_SERVING_GRAMS = 1000f
     private const val KJ_PER_KCAL = 4.184f
 
+    /** A kJ-only reading below this is more likely a misread than a real value. */
+    private const val MIN_KJ_ONLY_KCAL = 10f
+
     private enum class Nutrient { ENERGY, FAT, CARBS, PROTEIN }
 
     private val keywords = mapOf(
@@ -48,6 +51,7 @@ object LabelParser {
     private val tokenRegex = Regex("""[^\s/()*:;=,]+""")
     private val numericCoreRegex = Regex("""^(<?)([0-9oil.,]*\d[0-9oil.,]*)(.*)$""")
     private val numberTokenRegex = Regex("""^<?(\d+(?:\.\d+)?)(.*)$""")
+    private val kjThousandsRegex = Regex("""(?<![\d.])\d{1,3}[., \u00A0\u202F]\d{3}(?!\d)\s?kj""")
 
     private val pieceRegex = Regex("""\b1\s+([a-z]+)\s*=\s*(\d+(?:\.\d+)?)\s*g\b""")
     private val portionRegex = Regex("""\bportie\s*[=:(]?\s*\(?\s*(\d+(?:\.\d+)?)\s*g\b""")
@@ -265,8 +269,12 @@ object LabelParser {
             if (kcalNext.isNotEmpty()) return pick(kcalNext, columns)
         }
 
-        val kj = pick(nums.filter { it.isFollowedBy("kj") }, columns) ?: return null
-        return (kj / KJ_PER_KCAL).roundToInt().toFloat()
+        val kjNums = nums.filter { it.isFollowedBy("kj") }
+        // "1.046 kJ" / "1 046 kJ" is 1046 kJ split by a thousands separator: never read 1.046 or 46.
+        if (kjNums.any { kjThousandsRegex.containsMatchIn(it.line.text) }) return null
+        val kj = pick(kjNums, columns) ?: return null
+        val kcal = (kj / KJ_PER_KCAL).roundToInt().toFloat()
+        return kcal.takeIf { it >= MIN_KJ_ONLY_KCAL }
     }
 
     // --- serving --------------------------------------------------------------------------

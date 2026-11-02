@@ -71,6 +71,21 @@ object LabelFixtures {
         line("Proteine 4,5 g", 20, 160),
     )
 
+    /** kJ-only with a thousands separator: "1.046 kJ" is 1046 kJ, never 1.046 kJ (= 0 kcal). */
+    private fun kjOnlyWith(energy: String): List<OcrLine> = listOf(
+        line("Valori nutriționale / 100 g", 20, 0),
+        line("Energie $energy", 20, 40),
+        line("Grăsimi 9 g", 20, 80),
+        line("Glucide 35 g", 20, 120),
+        line("Proteine 4,5 g", 20, 160),
+    )
+    val kjThousandsDot: List<OcrLine> = kjOnlyWith("1.046 kJ")
+    val kjThousandsComma: List<OcrLine> = kjOnlyWith("1,046 kJ")
+    val kjThousandsSpace: List<OcrLine> = kjOnlyWith("1 046 kJ")
+    val kjThousandsNarrowSpace: List<OcrLine> = kjOnlyWith("1\u202F046 kJ")
+    /** kJ-only below 10 kcal: too likely a misread to fill in silently. */
+    val kjOnlyTiny: List<OcrLine> = kjOnlyWith("17 kJ")
+
     /** "<0,5 g" means "less than 0.5 g". */
     val lessThan: List<OcrLine> = listOf(
         line("Valori nutriționale per 100 ml", 20, 0),
