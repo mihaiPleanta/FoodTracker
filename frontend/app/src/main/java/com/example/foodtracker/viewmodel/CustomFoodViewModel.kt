@@ -11,6 +11,7 @@ import com.example.foodtracker.api.RetrofitInstance
 import com.example.foodtracker.model.CustomFoodDto
 import com.example.foodtracker.model.FoodItem
 import com.example.foodtracker.model.PortionUnitInDto
+import com.example.foodtracker.model.ServingDto
 import com.example.foodtracker.model.parseBarcodeTaken
 import com.example.foodtracker.ui.customfood.CustomFoodForm
 import com.example.foodtracker.ui.customfood.FormField
@@ -145,9 +146,11 @@ class CustomFoodViewModel(
                     if (forMeal) _createdForMeal.value = food
                     _saveState.value = SaveState.Saved(food)
                 } else {
+                    // PUT /custom-foods ignores body.serving (it returns the stored first unit):
+                    // the serving the user submitted is the source of truth for the unit sync.
                     val updated = api.update(old.id, body)
                     try {
-                        syncServingUnit(updated.key, old.serving, updated.serving)
+                        syncServingUnit(updated.key, old.serving, body.serving)
                     } finally {
                         // The server already has the new data: refresh local state even if the unit sync failed.
                         safeInvalidate(listOfNotNull(updated.key, old.barcode, updated.barcode).distinct())
@@ -212,13 +215,17 @@ class CustomFoodViewModel(
         _myFoods.value = MyFoodsState.Loading
     }
 
-    private suspend fun syncServingUnit(key: String, old: com.example.foodtracker.model.ServingDto?, new: com.example.foodtracker.model.ServingDto?) {
-        if (old != null && old.unit != new?.unit) {
-            val r = portionsApi.deleteUnit(key, old.unit)
-            if (!r.isSuccessful) throw HttpException(r)
-        }
+    /**
+     * Put first, delete second: a failed put must not lose the old unit. The server upserts by
+     * casefolded unit name, so a grams-only (or case-only) change is a single put.
+     */
+    private suspend fun syncServingUnit(key: String, old: ServingDto?, new: ServingDto?) {
         if (new != null && (old?.unit != new.unit || old.grams != new.grams)) {
             portionsApi.putUnit(key, PortionUnitInDto(new.unit, new.grams))
+        }
+        if (old != null && old.unit.lowercase() != new?.unit?.lowercase()) {
+            val r = portionsApi.deleteUnit(key, old.unit)
+            if (!r.isSuccessful) throw HttpException(r)
         }
     }
 

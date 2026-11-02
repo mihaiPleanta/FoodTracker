@@ -64,10 +64,12 @@ private class FakeCustomFoodsApi : CustomFoodsApi {
     }
     override suspend fun update(id: Int, body: CustomFoodInDto): CustomFoodDto {
         updateCalls++
+        // Like the server: body.serving is ignored, the existing first user unit is returned.
+        val existing = items.firstOrNull { it.id == id }?.serving
         return CustomFoodDto(
             id = id, key = "custom-$id", name = body.name, brand = body.brand, barcode = body.barcode,
             kcal100g = body.kcal100g, protein100g = body.protein100g, carbs100g = body.carbs100g,
-            fat100g = body.fat100g, serving = body.serving,
+            fat100g = body.fat100g, serving = existing,
         )
     }
     override suspend fun delete(id: Int): Response<Unit> {
@@ -83,11 +85,14 @@ private class FakeCfPortionsApi : PortionsApi {
     val deletes = mutableListOf<Pair<String, String>>()
     override suspend fun getPortions(barcode: String): PortionsDto = throw UnsupportedOperationException()
     override suspend fun putUnit(barcode: String, body: PortionUnitInDto): PortionUnitInDto {
+        calls += "put:${body.unit}"
         if (failPut) throw java.io.IOException("offline")
         puts += Triple(barcode, body.unit, body.grams)
         return body
     }
+    val calls = mutableListOf<String>()
     override suspend fun deleteUnit(barcode: String, unit: String): Response<Unit> {
+        calls += "delete:$unit"
         deletes += barcode to unit
         return Response.success(null)
     }
@@ -210,6 +215,59 @@ class CustomFoodViewModelTest {
         assertTrue(vm.saveState.value is SaveState.Saved)
         assertEquals(listOf("custom-1" to "felie"), portions.deletes)
         assertEquals(listOf(Triple("custom-1", "bucată", 50f)), portions.puts)
+        assertEquals(listOf("put:bucată", "delete:felie"), portions.calls)
+    }
+
+    @Test fun edit_gramsOnlyChanged_singlePutNoDelete() = runTest(dispatcher) {
+        val vm = vm().startEditOf(dto(serving = ServingDto("felie", 30f)))
+        advanceUntilIdle()
+        vm.startEdit(1)
+        advanceUntilIdle()
+        vm.onField(FormField.SERVING_GRAMS, "45")
+        vm.save()
+        advanceUntilIdle()
+        assertTrue(vm.saveState.value is SaveState.Saved)
+        assertEquals(listOf(Triple("custom-1", "felie", 45f)), portions.puts)
+        assertTrue(portions.deletes.isEmpty())
+    }
+
+    @Test fun edit_unitCaseOnlyChanged_putWithoutDelete() = runTest(dispatcher) {
+        val vm = vm().startEditOf(dto(serving = ServingDto("felie", 30f)))
+        advanceUntilIdle()
+        vm.startEdit(1)
+        advanceUntilIdle()
+        vm.onField(FormField.SERVING_UNIT, "Felie")
+        vm.save()
+        advanceUntilIdle()
+        assertEquals(listOf(Triple("custom-1", "Felie", 30f)), portions.puts)
+        assertTrue(portions.deletes.isEmpty())
+    }
+
+    @Test fun edit_servingAdded_putsUnit() = runTest(dispatcher) {
+        val vm = vm().startEditOf(dto())
+        advanceUntilIdle()
+        vm.startEdit(1)
+        advanceUntilIdle()
+        vm.onField(FormField.SERVING_UNIT, "felie")
+        vm.onField(FormField.SERVING_GRAMS, "30")
+        vm.save()
+        advanceUntilIdle()
+        assertTrue(vm.saveState.value is SaveState.Saved)
+        assertEquals(listOf(Triple("custom-1", "felie", 30f)), portions.puts)
+    }
+
+    @Test fun edit_putFails_oldUnitNotDeleted() = runTest(dispatcher) {
+        val vm = vm().startEditOf(dto(serving = ServingDto("felie", 30f)))
+        advanceUntilIdle()
+        vm.startEdit(1)
+        advanceUntilIdle()
+        portions.failPut = true
+        vm.onField(FormField.SERVING_UNIT, "bucată")
+        vm.onField(FormField.SERVING_GRAMS, "50")
+        vm.save()
+        advanceUntilIdle()
+        assertEquals(SaveState.Error(R.string.error_no_internet), vm.saveState.value)
+        assertTrue(portions.deletes.isEmpty())
     }
 
     @Test fun edit_servingCleared_deletesUnit() = runTest(dispatcher) {
