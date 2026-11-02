@@ -1,3 +1,4 @@
+import re
 from datetime import date as _date, datetime as _datetime
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Dict, List, Literal, Optional
@@ -357,3 +358,71 @@ class PortionsDto(BaseModel):
     gram_presets: List[int]
     presets_custom: bool
     last: Optional[LastPortionDto] = None
+
+
+_BARCODE_RE = re.compile(r"^\d{8,13}$")
+
+
+class ServingIn(BaseModel):
+    unit: str = Field(min_length=1, max_length=30)
+    grams: float = Field(gt=0, le=2000)
+
+    @field_validator("unit", mode="before")
+    @classmethod
+    def _strip_unit(cls, v):
+        return v.strip() if isinstance(v, str) else v
+
+
+class ServingOut(BaseModel):
+    unit: str
+    grams: float
+
+
+class CustomFoodIn(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    brand: Optional[str] = Field(default=None, max_length=100)
+    barcode: Optional[str] = None
+    kcal_100g: float = Field(ge=0, le=900)
+    protein_100g: float = Field(ge=0, le=100)
+    carbs_100g: float = Field(ge=0, le=100)
+    fat_100g: float = Field(ge=0, le=100)
+    serving: Optional[ServingIn] = None
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _strip_name(cls, v):
+        return v.strip() if isinstance(v, str) else v
+
+    @field_validator("brand", "barcode", mode="before")
+    @classmethod
+    def _blank_to_none(cls, v):
+        if isinstance(v, str):
+            v = v.strip()
+            return v or None
+        return v
+
+    @field_validator("barcode")
+    @classmethod
+    def _check_barcode(cls, v):
+        if v is not None and not _BARCODE_RE.match(v):
+            raise ValueError("barcode must be 8-13 digits")
+        return v
+
+    @model_validator(mode="after")
+    def _check_macro_sum(self):
+        if self.protein_100g + self.carbs_100g + self.fat_100g > 100:
+            raise ValueError("protein + carbs + fat must be <= 100 g per 100 g")
+        return self
+
+
+class CustomFoodDto(BaseModel):
+    id: int
+    key: str
+    name: str
+    brand: Optional[str] = None
+    barcode: Optional[str] = None
+    kcal_100g: float
+    protein_100g: float
+    carbs_100g: float
+    fat_100g: float
+    serving: Optional[ServingOut] = None

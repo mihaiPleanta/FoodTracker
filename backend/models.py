@@ -15,6 +15,7 @@ from sqlalchemy import (
     UniqueConstraint,
     false,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -190,4 +191,39 @@ class UserGramPresets(Base):
     presets: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class CustomFood(Base):
+    __tablename__ = "custom_foods"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    uid: Mapped[str] = mapped_column(
+        String, ForeignKey("profiles.uid", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    brand: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    barcode: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    kcal_100g: Mapped[float] = mapped_column(Float, nullable=False)
+    protein_100g: Mapped[float] = mapped_column(Float, nullable=False)
+    carbs_100g: Mapped[float] = mapped_column(Float, nullable=False)
+    fat_100g: Mapped[float] = mapped_column(Float, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="private", server_default="private")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index("idx_custom_foods_uid", "uid"),
+        Index(
+            "uq_custom_foods_uid_barcode",
+            "uid",
+            "barcode",
+            unique=True,
+            postgresql_where=text("barcode IS NOT NULL"),
+            sqlite_where=text("barcode IS NOT NULL"),
+        ),
     )

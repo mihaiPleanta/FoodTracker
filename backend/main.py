@@ -15,6 +15,7 @@ from routers.goals import router as goals_router
 from routers.recipes import router as recipes_router
 from routers.favorites import router as favorites_router
 from routers.portions import router as portions_router
+from routers.custom_foods import router as custom_foods_router
 
 if os.getenv("TESTING") != "1":
     _cred_path = os.getenv("FIREBASE_SERVICE_ACCOUNT", "serviceAccountKey.json")
@@ -33,3 +34,4 @@ app.include_router(goals_router)
 app.include_router(recipes_router)
 app.include_router(favorites_router)
 app.include_router(portions_router)
+app.include_router(custom_foods_router)
