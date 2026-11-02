@@ -29,6 +29,9 @@ interface FoodCacheDao {
     @Query("DELETE FROM cached_products WHERE barcode IN (:barcodes)")
     suspend fun deleteProducts(barcodes: List<String>)
 
+    @Query("DELETE FROM cached_products")
+    suspend fun clearProducts()
+
     @Query("DELETE FROM cached_searches")
     suspend fun clearSearches()
 

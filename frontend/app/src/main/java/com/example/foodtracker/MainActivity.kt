@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
@@ -54,6 +55,7 @@ import com.example.foodtracker.viewmodel.RecipeViewModel
 import java.net.URLDecoder
 import java.net.URLEncoder
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private var pendingDeepLink by mutableStateOf<DeepLink?>(null)
@@ -63,6 +65,18 @@ class MainActivity : ComponentActivity() {
         val mealIcon: String,
         val accentHex: String,
     )
+
+    /** Private custom foods must not survive in the Room cache for the next account on this device. */
+    private fun clearFoodCache(repository: FoodRepository) {
+        lifecycleScope.launch {
+            try {
+                repository.clearAll()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -296,6 +310,7 @@ class MainActivity : ComponentActivity() {
                                             portionsViewModel.resetUserState()
                                             copyViewModel.resetUserState()
                                             customFoodViewModel.resetUserState()
+                                            clearFoodCache(foodRepository)
                                             navController.navigate("login") {
                                                 popUpTo(0) { inclusive = true }
                                             }
@@ -307,6 +322,7 @@ class MainActivity : ComponentActivity() {
                                             portionsViewModel.resetUserState()
                                             copyViewModel.resetUserState()
                                             customFoodViewModel.resetUserState()
+                                            clearFoodCache(foodRepository)
                                             navController.navigate("login") {
                                                 popUpTo(0) { inclusive = true }
                                             }

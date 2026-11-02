@@ -50,6 +50,7 @@ private class FakeCache : FoodCache {
     override suspend fun touchProduct(barcode: String, now: Long) { touchedProduct++ }
     override suspend fun clearSearches() { searches.clear() }
     override suspend fun deleteProducts(barcodes: List<String>) { barcodes.forEach { products.remove(it) } }
+    override suspend fun clearAll() { searches.clear(); products.clear() }
 }
 
 /** Fake FoodApi: cozi de răspunsuri/erori. */
@@ -259,5 +260,41 @@ class FoodRepositoryTest {
         assertNull(cache.getProduct("X"))
         assertNull(cache.getProduct("custom-1"))
         assertEquals("other", cache.getProduct("other")!!.item.barcode)
+    }
+
+    @Test fun clearAll_removesSearchesAndProducts() = runTest {
+        val cache = FakeCache().apply {
+            searches["tort"] = CachedSearch(listOf(item("1")), cachedAt = 0)
+            products["1"] = CachedProduct(item("1"), cachedAt = 0)
+        }
+        val repo = FoodRepository(FakeApi(), cache, now = { 0 })
+
+        repo.clearAll()
+
+        assertTrue(cache.searches.isEmpty())
+        assertTrue(cache.products.isEmpty())
+    }
+
+    @Test fun search_resultWithCustomItem_notCached() = runTest {
+        val cache = FakeCache()
+        val api = FakeApi(searchResult = { SearchResponseDto(listOf(dto("custom-3"), dto("1")), 2) })
+        val repo = FoodRepository(api, cache, now = { 5_000 })
+
+        val result = repo.search("tort")
+
+        assertEquals(listOf("custom-3", "1"), result.items.map { it.barcode })
+        assertNull(cache.searches["tort"])
+        assertTrue(cache.products.isEmpty())
+    }
+
+    @Test fun barcode_customResult_notCached() = runTest {
+        val cache = FakeCache()
+        val api = FakeApi(barcodeResult = { dto("custom-3") })
+        val repo = FoodRepository(api, cache, now = { 5_000 })
+
+        val result = repo.lookupBarcode("12345678")
+
+        assertEquals("custom-3", result.items.single().barcode)
+        assertTrue(cache.products.isEmpty())
     }
 }

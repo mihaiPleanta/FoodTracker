@@ -51,6 +51,7 @@ private object NoOpCache : FoodCache {
     override suspend fun touchProduct(barcode: String, now: Long) {}
     override suspend fun clearSearches() {}
     override suspend fun deleteProducts(barcodes: List<String>) {}
+    override suspend fun clearAll() {}
 }
 
 private object NoOpFoodApi : FoodApi {

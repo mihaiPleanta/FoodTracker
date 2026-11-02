@@ -20,6 +20,9 @@ interface FoodCache {
 
     suspend fun clearSearches()
     suspend fun deleteProducts(barcodes: List<String>)
+
+    /** Șterge tot cache-ul (căutări + produse); la logout / ștergerea contului. */
+    suspend fun clearAll()
 }
 
 private const val MAX_PRODUCTS = 200
@@ -98,5 +101,10 @@ class RoomFoodCache(private val dao: FoodCacheDao) : FoodCache {
 
     override suspend fun deleteProducts(barcodes: List<String>) {
         if (barcodes.isNotEmpty()) dao.deleteProducts(barcodes)
+    }
+
+    override suspend fun clearAll() {
+        dao.clearSearches()
+        dao.clearProducts()
     }
 }

@@ -35,7 +35,8 @@ class FoodRepository(
         return try {
             val resp = api.searchFoods(query, page)
             val items = resp.items.map { it.toDomain() }
-            cache.putSearch(query, items, now())
+            // Produsele proprii sunt private: o căutare care le conține nu ajunge în cache.
+            if (items.none { it.isCustom }) cache.putSearch(query, items, now())
             SearchResult(items, stale = false, hasMore = resp.hasMore)
         } catch (e: IOException) {
             cached?.let { SearchResult(it.items, stale = true, hasMore = false) } ?: throw e
@@ -53,7 +54,7 @@ class FoodRepository(
         }
         return try {
             val item = api.getFoodByBarcode(barcode).toDomain()
-            cache.putProduct(item, now())
+            if (!item.isCustom) cache.putProduct(item, now())
             SearchResult(listOf(item), stale = false)
         } catch (e: IOException) {
             cached?.let { SearchResult(listOf(it.item), stale = true) } ?: throw e
@@ -68,4 +69,7 @@ class FoodRepository(
         cache.clearSearches()
         cache.deleteProducts(keys)
     }
+
+    /** Logout / ștergerea contului: nimic din cache nu trece la următorul cont de pe dispozitiv. */
+    suspend fun clearAll() = cache.clearAll()
 }
