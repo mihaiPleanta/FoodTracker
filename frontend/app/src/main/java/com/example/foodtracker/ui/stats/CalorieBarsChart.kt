@@ -51,18 +51,17 @@ fun CalorieBarsChart(
     val maxKcal = (bars.maxOfOrNull { maxOf(it.kcal, it.goalKcal ?: fallbackGoalKcal ?: 0) }
         ?: fallbackGoalKcal ?: 0).coerceAtLeast(1)
     val clickHandler by rememberUpdatedState(onBarClick)
-    val dates by rememberUpdatedState(slotDates)
+    val currentDates by rememberUpdatedState(slotDates)
+    val currentBars by rememberUpdatedState(bars)
 
     Column(modifier.fillMaxWidth()) {
         Canvas(
             Modifier
                 .fillMaxWidth()
                 .height(140.dp)
-                .pointerInput(slots) {
+                .pointerInput(Unit) {
                     detectTapGestures { pos ->
-                        val idx = (pos.x / (size.width / slots)).toInt().coerceIn(0, slots - 1)
-                        val date = dates.getOrNull(idx) ?: return@detectTapGestures
-                        if (byDate[date]?.state?.let { it != DayBarState.MISSING } == true) clickHandler(date)
+                        hitTestBar(pos.x, size.width.toFloat(), currentDates, currentBars)?.let { clickHandler(it) }
                     }
                 }
         ) {
@@ -118,4 +117,13 @@ fun CalorieBarsChart(
             }
         }
     }
+}
+
+/** Maps a tap at [x] (of [width] px) to the tapped day, or null when that day has no bar to open. */
+fun hitTestBar(x: Float, width: Float, slotDates: List<LocalDate>, bars: List<DayBar>): LocalDate? {
+    if (slotDates.isEmpty() || width <= 0f) return null
+    val idx = (x / (width / slotDates.size)).toInt().coerceIn(0, slotDates.size - 1)
+    val date = slotDates[idx]
+    val state = bars.firstOrNull { it.date == date }?.state ?: return null
+    return if (state == DayBarState.MISSING) null else date
 }
