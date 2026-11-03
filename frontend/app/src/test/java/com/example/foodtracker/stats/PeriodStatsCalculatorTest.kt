@@ -37,7 +37,7 @@ class PeriodStatsCalculatorTest {
 
     @Test fun completeDayWithNoKcal_isIgnored() {
         val s = sum(week, listOf(
-            day("2026-11-02", 2000),
+            day("2026-11-02", 2000, water = 2f),
             day("2026-11-03", 0, hasFood = false, water = 3f),
         ))
         assertEquals(1, s.completeDays)
