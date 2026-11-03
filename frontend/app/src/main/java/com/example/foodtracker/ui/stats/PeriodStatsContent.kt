@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -25,12 +26,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.foodtracker.R
+import com.example.foodtracker.stats.WeightTrend
 import com.example.foodtracker.ui.EmptyStateCard
 import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.ui.theme.glassCard
 import com.example.foodtracker.util.LocalAppLanguage
 import com.example.foodtracker.util.toLocale
 import com.example.foodtracker.viewmodel.PeriodUiState
+import com.example.foodtracker.viewmodel.StatsMode
 import java.time.LocalDate
 
 @Composable
@@ -40,6 +43,8 @@ fun PeriodStatsContent(
     onNext: () -> Unit,
     onRetry: () -> Unit,
     onOpenDay: (LocalDate) -> Unit,
+    mode: StatsMode,
+    today: LocalDate,
     fallbackGoalKcal: Int? = null,
 ) {
     when (state) {
@@ -54,7 +59,7 @@ fun PeriodStatsContent(
             Text(stringResource(state.message), fontSize = 13.sp, color = GlassColors.textSecondary, textAlign = TextAlign.Center)
             Button(onClick = onRetry) { Text(stringResource(R.string.action_retry)) }
         }
-        is PeriodUiState.Loaded -> Loaded(state, onPrev, onNext, onOpenDay, fallbackGoalKcal)
+        is PeriodUiState.Loaded -> Loaded(state, onPrev, onNext, onOpenDay, mode, today, fallbackGoalKcal)
     }
 }
 
@@ -64,10 +69,14 @@ private fun Loaded(
     onPrev: () -> Unit,
     onNext: () -> Unit,
     onOpenDay: (LocalDate) -> Unit,
+    mode: StatsMode,
+    today: LocalDate,
     fallbackGoalKcal: Int?,
 ) {
     val locale = LocalAppLanguage.current.toLocale()
     val s = state.summary
+    val trendPoints = remember(state.raw.weights) { WeightTrend.compute(state.raw.weights) }
+    val weightChange = WeightTrend.periodChange(trendPoints, state.period)
     Column {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onPrev) {
@@ -107,7 +116,8 @@ private fun Loaded(
             )
         }
         Spacer(Modifier.height(12.dp))
-        if (s.completeDays == 0) {
+        val complete = s.completeDays > 0
+        if (!complete) {
             EmptyStateCard(
                 emoji = "📅",
                 title = stringResource(R.string.stats_period_empty_title),
@@ -116,7 +126,23 @@ private fun Loaded(
         } else {
             s.macros?.let { PeriodMacroCard(it) }
             Spacer(Modifier.height(12.dp))
-            PeriodBalanceCard(s)
+            PeriodBalanceCard(s, weightChange)
+        }
+        Spacer(Modifier.height(12.dp))
+        WeightTrendCard(state.period, pointsInPeriod(trendPoints, state.period))
+        if (complete) {
+            if (state.raw.topFoods.byKcal.isNotEmpty() || state.raw.topFoods.byProtein.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                TopFoodsCard(state.raw.topFoods)
+            }
+            if (s.avgHydrationL != null) {
+                Spacer(Modifier.height(12.dp))
+                HydrationPeriodCard(s)
+            }
+        }
+        if (mode == StatsMode.MONTH) {
+            Spacer(Modifier.height(12.dp))
+            CalendarHeatmap(state.period, s.bars, today, onOpenDay)
         }
     }
 }

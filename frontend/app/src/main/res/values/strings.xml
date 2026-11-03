@@ -491,4 +491,20 @@
     <string name="stats_balance_estimated_kg">≈ %1$s kg estimat</string>
     <string name="stats_period_empty_title">Nicio zi completă în perioada asta</string>
     <string name="stats_period_empty_subtitle">Marchează zilele terminate de pe Home.</string>
+    <string name="stats_balance_weight_trend">· trendul greutății: %1$s kg</string>
+    <string name="stats_weight_title">Greutate</string>
+    <string name="stats_weight_no_data">Nicio cântărire în perioada asta</string>
+    <string name="stats_weight_latest">Ultima: %1$s kg · trend %2$s kg</string>
+    <string name="stats_top_title">Top alimente</string>
+    <string name="stats_top_by_kcal">Calorii</string>
+    <string name="stats_top_by_protein">Proteine</string>
+    <plurals name="stats_top_days">
+        <item quantity="one">în %d zi</item>
+        <item quantity="few">în %d zile</item>
+        <item quantity="other">în %d de zile</item>
+    </plurals>
+    <string name="stats_hydration_title">Hidratare</string>
+    <string name="stats_hydration_avg">%1$s L/zi în medie</string>
+    <string name="stats_hydration_goal_days">%1$d/%2$d zile cu ținta atinsă</string>
+    <string name="stats_calendar_title">Calendar</string>
 </resources>

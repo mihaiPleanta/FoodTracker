@@ -92,7 +92,7 @@ fun PeriodMacroCard(macros: MacroAverages) {
 }
 
 @Composable
-fun PeriodBalanceCard(summary: PeriodSummary) {
+fun PeriodBalanceCard(summary: PeriodSummary, weightTrendKg: Float? = null) {
     val balance = summary.balanceVsPlanKcal ?: return
     val locale = LocalAppLanguage.current.toLocale()
     Column(Modifier.fillMaxWidth().glassCard(20).padding(16.dp)) {
@@ -108,12 +108,14 @@ fun PeriodBalanceCard(summary: PeriodSummary) {
             ),
             fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = GlassColors.textPrimary,
         )
-        summary.estimatedKgChange?.let {
+        val estimate = summary.estimatedKgChange?.let {
+            stringResource(R.string.stats_balance_estimated_kg, signedKg(it, locale))
+        }
+        val trend = weightTrendKg?.let { stringResource(R.string.stats_balance_weight_trend, signedKg(it, locale)) }
+        val line = listOfNotNull(estimate, trend).joinToString(" ")
+        if (line.isNotEmpty()) {
             Spacer(Modifier.height(4.dp))
-            Text(
-                text = stringResource(R.string.stats_balance_estimated_kg, signedKg(it, locale)),
-                fontSize = 13.sp, color = GlassColors.textSecondary,
-            )
+            Text(text = line, fontSize = 13.sp, color = GlassColors.textSecondary)
         }
     }
 }

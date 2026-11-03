@@ -56,6 +56,7 @@ import com.example.foodtracker.ui.stats.PeriodStatsContent
 import com.example.foodtracker.viewmodel.StatsMode
 import com.example.foodtracker.viewmodel.StatsViewModel
 import java.text.SimpleDateFormat
+import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Date
 import java.util.Locale
@@ -176,6 +177,8 @@ fun StatsScreen(
                         )
                         statsViewModel.setMode(StatsMode.DAY, date)
                     },
+                    mode = mode,
+                    today = LocalDate.now(),
                     fallbackGoalKcal = goals.calorieGoal,
                 )
             } else {

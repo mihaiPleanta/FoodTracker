@@ -71,13 +71,9 @@ fun CalorieBarsChart(
                 val bar = byDate[date] ?: return@forEachIndexed
                 val x = i * slotW + (slotW - barW) / 2f
                 val goal = bar.goalKcal ?: fallbackGoalKcal
-                if (bar.state != DayBarState.MISSING) {
+                val color = dayStateColor(bar.state, green, blue, grey)
+                if (color != null) {
                     val h = size.height * bar.kcal / maxKcal
-                    val color = when (bar.state) {
-                        DayBarState.IN_TARGET -> green
-                        DayBarState.OFF_TARGET -> blue
-                        else -> grey
-                    }
                     drawRoundRect(
                         color = color,
                         topLeft = Offset(x, size.height - h),

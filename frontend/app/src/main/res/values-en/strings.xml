@@ -471,4 +471,19 @@
     <string name="stats_balance_estimated_kg">≈ %1$s kg estimated</string>
     <string name="stats_period_empty_title">No complete days in this period</string>
     <string name="stats_period_empty_subtitle">Mark finished days from Home.</string>
+    <string name="stats_balance_weight_trend">· weight trend: %1$s kg</string>
+    <string name="stats_weight_title">Weight</string>
+    <string name="stats_weight_no_data">No weigh-ins in this period</string>
+    <string name="stats_weight_latest">Latest: %1$s kg · trend %2$s kg</string>
+    <string name="stats_top_title">Top foods</string>
+    <string name="stats_top_by_kcal">Calories</string>
+    <string name="stats_top_by_protein">Protein</string>
+    <plurals name="stats_top_days">
+        <item quantity="one">on %d day</item>
+        <item quantity="other">on %d days</item>
+    </plurals>
+    <string name="stats_hydration_title">Hydration</string>
+    <string name="stats_hydration_avg">%1$s L/day on average</string>
+    <string name="stats_hydration_goal_days">%1$d/%2$d days at goal</string>
+    <string name="stats_calendar_title">Calendar</string>
 </resources>
