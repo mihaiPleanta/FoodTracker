@@ -112,6 +112,9 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
     var editTarget by remember { mutableStateOf<Triple<String, Int, LoggedFood>?>(null) }
     val loadingDay by viewModel.loadingDay.collectAsState()
     val userProfile by viewModel.userProfile.collectAsState()
+    val dayStatus by viewModel.selectedDayStatus.collectAsState()
+    val dayHasFood by viewModel.selectedDayHasFood.collectAsState()
+    val showYesterdayPrompt by viewModel.showYesterdayPrompt.collectAsState()
 
     val resources = LocalContext.current.resources
     LaunchedEffect(resources) {
@@ -260,6 +263,15 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
                 modifier = Modifier.padding(horizontal = 20.dp)
             )
 
+            if (showYesterdayPrompt) {
+                Spacer(Modifier.height(12.dp))
+                YesterdayCompletePrompt(
+                    onYes = { viewModel.answerYesterdayPrompt(true) },
+                    onNo = { viewModel.answerYesterdayPrompt(false) },
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                )
+            }
+
             Spacer(Modifier.height(20.dp))
 
             WeekCalendar(days = calendarDays, selectedDate = selectedDate,
@@ -339,6 +351,16 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
                     modifier = Modifier.padding(horizontal = 20.dp)
                 )
                 Spacer(Modifier.height(12.dp))
+            }
+
+            if (dayHasFood) {
+                DayCompleteButton(
+                    status = dayStatus,
+                    onComplete = { viewModel.setDayComplete(selectedDate, true) },
+                    onUndo = { viewModel.clearDayStatus(selectedDate) },
+                    isPastDay = !isSameDay(selectedDate, Date()),
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                )
             }
 
             Spacer(Modifier.height(100.dp))

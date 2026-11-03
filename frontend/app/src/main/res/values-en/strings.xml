@@ -435,4 +435,11 @@
     <string name="my_foods_kcal_per_100g">%1$d kcal / 100 g</string>
     <string name="my_foods_row">My products</string>
     <string name="my_foods_row_count">My products (%1$d)</string>
+    <string name="day_complete_action">I\'m done for today</string>
+    <string name="day_complete_action_past">Mark day complete</string>
+    <string name="day_complete_done">Day complete ✓</string>
+    <string name="day_complete_undo">Undo</string>
+    <string name="yesterday_prompt_title">Yesterday looks finished — include it in stats?</string>
+    <string name="yesterday_prompt_yes">Yes</string>
+    <string name="yesterday_prompt_no">No, it was incomplete</string>
 </resources>

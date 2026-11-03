@@ -455,4 +455,11 @@
     <string name="my_foods_kcal_per_100g">%1$d kcal / 100 g</string>
     <string name="my_foods_row">Produsele mele</string>
     <string name="my_foods_row_count">Produsele mele (%1$d)</string>
+    <string name="day_complete_action">Am terminat ziua</string>
+    <string name="day_complete_action_past">Marchează ziua completă</string>
+    <string name="day_complete_done">Zi completă ✓</string>
+    <string name="day_complete_undo">Anulează</string>
+    <string name="yesterday_prompt_title">Ieri pare terminată — o includ în statistici?</string>
+    <string name="yesterday_prompt_yes">Da</string>
+    <string name="yesterday_prompt_no">Nu, era incompletă</string>
 </resources>
