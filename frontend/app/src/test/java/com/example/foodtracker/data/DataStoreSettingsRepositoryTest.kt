@@ -111,4 +111,17 @@ class DataStoreSettingsRepositoryTest {
         assertEquals(MealReminder(enabled = true, minuteOfDay = 480), read.breakfastReminder)
         assertEquals(MealReminder(enabled = true, minuteOfDay = 1140), read.dinnerReminder)
     }
+
+    @Test
+    fun dayCompleteReminder_defaultsToDisabled2130() = runTest {
+        val r = repo.settings.first().dayCompleteReminder
+        assertEquals(MealReminder(enabled = false, minuteOfDay = 21 * 60 + 30), r)
+    }
+
+    @Test
+    fun dayCompleteReminder_roundTrips() = runTest {
+        val custom = AppSettings(dayCompleteReminder = MealReminder(enabled = true, minuteOfDay = 22 * 60))
+        repo.update(custom)
+        assertEquals(custom.dayCompleteReminder, repo.settings.first().dayCompleteReminder)
+    }
 }

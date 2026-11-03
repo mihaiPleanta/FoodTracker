@@ -71,6 +71,7 @@ fun SettingsScreen(
 
     var showLogoutDialog by remember { mutableStateOf(false) }
     var editingMeal by remember { mutableStateOf<MealReminderScheduler.Meal?>(null) }
+    var editingDayComplete by remember { mutableStateOf(false) }
     val is24Hour = DateFormat.is24HourFormat(context)
     var showDeleteDialog by remember { mutableStateOf(false) }
     val deleteAccountState by authViewModel.deleteAccountState.collectAsState()
@@ -159,6 +160,19 @@ fun SettingsScreen(
                         }
                     )
                 }
+                MealReminderRow(
+                    emoji = "🌙",
+                    label = stringResource(R.string.settings_day_complete_reminder),
+                    time = formatMinuteOfDay(settings.dayCompleteReminder.minuteOfDay, is24Hour),
+                    checked = settings.dayCompleteReminder.enabled,
+                    enabled = settings.notificationsEnabled,
+                    onTimeClick = { editingDayComplete = true },
+                    onCheckedChange = {
+                        viewModel.updateAppSettings(
+                            settings.copy(dayCompleteReminder = settings.dayCompleteReminder.copy(enabled = it))
+                        )
+                    }
+                )
                 Spacer(Modifier.height(4.dp))
             }
 
@@ -356,6 +370,21 @@ fun SettingsScreen(
                 editingMeal = null
                 viewModel.updateAppSettings(
                     settings.withReminder(meal, reminder.copy(minuteOfDay = minuteOfDay))
+                )
+            }
+        )
+    }
+
+    if (editingDayComplete) {
+        val reminder = settings.dayCompleteReminder
+        ReminderTimeDialog(
+            initialMinuteOfDay = reminder.minuteOfDay,
+            is24Hour = is24Hour,
+            onDismiss = { editingDayComplete = false },
+            onConfirm = { minuteOfDay ->
+                editingDayComplete = false
+                viewModel.updateAppSettings(
+                    settings.copy(dayCompleteReminder = reminder.copy(minuteOfDay = minuteOfDay))
                 )
             }
         )

@@ -45,6 +45,7 @@ class DataStoreSettingsRepository(
     private val lunchKeys     = ReminderKeys("lunch")
     private val snacksKeys    = ReminderKeys("snacks")
     private val dinnerKeys    = ReminderKeys("dinner")
+    private val dayCompleteKeys = ReminderKeys("day_complete")
 
     private val defaults = AppSettings()
 
@@ -73,7 +74,8 @@ class DataStoreSettingsRepository(
                 breakfastReminder = prefs.reminder(breakfastKeys, defaults.breakfastReminder),
                 lunchReminder     = prefs.reminder(lunchKeys, defaults.lunchReminder),
                 snacksReminder    = prefs.reminder(snacksKeys, defaults.snacksReminder),
-                dinnerReminder    = prefs.reminder(dinnerKeys, defaults.dinnerReminder)
+                dinnerReminder    = prefs.reminder(dinnerKeys, defaults.dinnerReminder),
+                dayCompleteReminder = prefs.reminder(dayCompleteKeys, defaults.dayCompleteReminder)
             )
         }
 
@@ -86,6 +88,7 @@ class DataStoreSettingsRepository(
             prefs.setReminder(lunchKeys, settings.lunchReminder)
             prefs.setReminder(snacksKeys, settings.snacksReminder)
             prefs.setReminder(dinnerKeys, settings.dinnerReminder)
+            prefs.setReminder(dayCompleteKeys, settings.dayCompleteReminder)
         }
     }
 }

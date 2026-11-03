@@ -29,6 +29,17 @@ class ScheduledReminderStore(
         return Meal.values().associateWith { prefs[minutesKey(it)] }
     }
 
+    private val dayCompleteKey = intPreferencesKey("scheduled_day_complete_minutes")
+
+    /** `null` = day-complete reminder not scheduled. */
+    suspend fun readDayComplete(): Int? = dataStore.data.first()[dayCompleteKey]
+
+    suspend fun writeDayComplete(minute: Int?) {
+        dataStore.edit { prefs ->
+            if (minute == null) prefs.remove(dayCompleteKey) else prefs[dayCompleteKey] = minute
+        }
+    }
+
     suspend fun write(schedule: ReminderSchedule) {
         dataStore.edit { prefs ->
             prefs[initialized] = true

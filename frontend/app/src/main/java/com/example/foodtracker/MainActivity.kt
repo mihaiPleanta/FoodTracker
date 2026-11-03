@@ -41,6 +41,9 @@ import com.example.foodtracker.data.settingsDataStore
 import com.example.foodtracker.util.notifications.MealReminderScheduler
 import com.example.foodtracker.util.notifications.desiredSchedule
 import com.example.foodtracker.util.notifications.MealReminderWorker
+import com.example.foodtracker.util.notifications.DayCompleteReminderScheduler
+import com.example.foodtracker.util.notifications.DayCompleteReminderWorker
+import com.example.foodtracker.util.notifications.desiredDayCompleteMinute
 import com.example.foodtracker.util.notifications.NotificationChannels
 import com.example.foodtracker.util.AppLocale
 import com.example.foodtracker.viewmodel.AuthViewModel
@@ -59,6 +62,7 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private var pendingDeepLink by mutableStateOf<DeepLink?>(null)
+    private var pendingOpenToday by mutableStateOf(false)
 
     data class DeepLink(
         val mealName: String,
@@ -83,6 +87,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         NotificationChannels.ensureCreated(applicationContext)
         pendingDeepLink = readDeepLinkFromIntent(intent)
+        pendingOpenToday = intent?.getBooleanExtra(DayCompleteReminderWorker.EXTRA_OPEN_TODAY, false) == true
         setContent {
             val foodRepository = remember {
                 FoodRepository(
@@ -150,6 +155,27 @@ class MainActivity : ComponentActivity() {
                         .collect { settings ->
                             MealReminderScheduler.sync(applicationContext, settings)
                         }
+                }
+
+                // Evening "done for today?" reminder — separate effect, same diff-based approach.
+                LaunchedEffect(Unit) {
+                    viewModel.persistedSettings
+                        .distinctUntilChanged { a, b -> desiredDayCompleteMinute(a) == desiredDayCompleteMinute(b) }
+                        .collect { settings ->
+                            DayCompleteReminderScheduler.sync(applicationContext, settings)
+                        }
+                }
+
+                // Open-today deep link (day-complete reminder): Home on today's date.
+                LaunchedEffect(pendingOpenToday, currentRoute) {
+                    if (!pendingOpenToday) return@LaunchedEffect
+                    if (currentRoute !in setOf("home", "stats", "profile")) return@LaunchedEffect
+                    viewModel.setSelectedHomeDate(java.util.Date())
+                    navController.navigate("home") {
+                        popUpTo("home") { inclusive = false }
+                        launchSingleTop = true
+                    }
+                    pendingOpenToday = false
                 }
 
                 // Consume notification deep-link — only after we reach a logged-in route.
@@ -422,6 +448,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         pendingDeepLink = readDeepLinkFromIntent(intent)
+        pendingOpenToday = intent.getBooleanExtra(DayCompleteReminderWorker.EXTRA_OPEN_TODAY, false)
     }
 
     private fun readDeepLinkFromIntent(intent: Intent?): DeepLink? {

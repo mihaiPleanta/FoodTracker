@@ -15,5 +15,6 @@ data class AppSettings(
     val breakfastReminder: MealReminder = MealReminder(minuteOfDay = 8 * 60),
     val lunchReminder: MealReminder = MealReminder(minuteOfDay = 13 * 60),
     val snacksReminder: MealReminder = MealReminder(minuteOfDay = 16 * 60),
-    val dinnerReminder: MealReminder = MealReminder(minuteOfDay = 19 * 60)
+    val dinnerReminder: MealReminder = MealReminder(minuteOfDay = 19 * 60),
+    val dayCompleteReminder: MealReminder = MealReminder(enabled = false, minuteOfDay = 21 * 60 + 30)
 )

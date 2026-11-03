@@ -206,6 +206,9 @@
     <string name="settings_title">Setări</string>
     <string name="settings_notifications">NOTIFICĂRI</string>
     <string name="settings_meal_reminders">Remindere mese</string>
+    <string name="settings_day_complete_reminder">Reminder „Ai terminat ziua?”</string>
+    <string name="notif_day_complete_title">Ai terminat ziua?</string>
+    <string name="notif_day_complete_body">Marchează ziua completă ca să intre în statistici.</string>
     <string name="settings_reminder_time_title">Ora reminderului</string>
     <string name="settings_hydration">HIDRATARE</string>
     <string name="hydration_mode_auto">Automat</string>
