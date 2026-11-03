@@ -97,6 +97,7 @@ data class DayResponseDto(
     @SerializedName("foods_by_meal") val foodsByMeal: Map<String, List<FoodLogDto>>,
     @SerializedName("hydration_liters") val hydrationLiters: Float,
     @SerializedName("weight_check_in") val weightCheckIn: WeightCheckInDto?,
+    val status: String? = null,
 )
 
 data class MealSummaryDto(val count: Int, val kcal: Int)

@@ -263,6 +263,7 @@
     <string name="error_save_hydration">Failed to save hydration</string>
     <string name="error_save_hydration_prefs">Couldn\'t save hydration settings</string>
     <string name="error_load_day">Failed to load day</string>
+    <string name="error_day_status">Couldn\'t save the day status</string>
     <string name="error_weight_history">Failed to load weight history</string>
     <string name="error_weight_checkin">Failed to save weight check-in</string>
     <string name="error_save">Failed to save</string>

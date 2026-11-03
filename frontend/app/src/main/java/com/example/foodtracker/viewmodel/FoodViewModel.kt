@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.foodtracker.R
+import com.example.foodtracker.api.DaysApi
 import com.example.foodtracker.api.LogsApi
 import com.example.foodtracker.api.ProfileApi
 import com.example.foodtracker.api.RetrofitInstance
@@ -11,9 +12,12 @@ import com.example.foodtracker.data.FoodRepository
 import com.example.foodtracker.data.MealLogTracker
 import com.example.foodtracker.data.SettingsRepository
 import com.example.foodtracker.model.AppSettings
+import com.example.foodtracker.model.DayStatus
+import com.example.foodtracker.model.DayStatusUpdateDto
 import com.example.foodtracker.model.FoodIngredient
 import com.example.foodtracker.model.FoodItem
 import com.example.foodtracker.model.FoodLogCreateDto
+import com.example.foodtracker.model.toDayStatus
 import com.example.foodtracker.model.FoodLogDeleteBatchDto
 import com.example.foodtracker.model.FoodLogDto
 import com.example.foodtracker.model.FoodLogUpdateDto
@@ -76,6 +80,8 @@ class FoodViewModel(
     private val foodRepository: FoodRepository,
     private val logsApi: LogsApi = RetrofitInstance.retrofit.create(LogsApi::class.java),
     private val profileApi: ProfileApi = RetrofitInstance.retrofit.create(ProfileApi::class.java),
+    private val daysApi: DaysApi = RetrofitInstance.retrofit.create(DaysApi::class.java),
+    private val clock: () -> Date = { Date() },
 ) : ViewModel() {
 
     // ── Search state ──────────────────────────────────────────────────────────
@@ -260,7 +266,7 @@ class FoodViewModel(
 
     private fun dateKey(date: Date): String = dateFormatter.format(date)
 
-    private fun todayKey(): String = dateKey(Date())
+    private fun todayKey(): String = dateKey(clock())
 
     private val _loadingDay = MutableStateFlow(false)
     val loadingDay: StateFlow<Boolean> = _loadingDay.asStateFlow()
@@ -270,7 +276,7 @@ class FoodViewModel(
     private val _toastEvents = MutableSharedFlow<ToastEvent>(extraBufferCapacity = 8)
     val toastEvents: SharedFlow<ToastEvent> = _toastEvents.asSharedFlow()
 
-    private val _selectedHomeDate = MutableStateFlow(Date())
+    private val _selectedHomeDate = MutableStateFlow(clock())
     val selectedHomeDate: StateFlow<Date> = _selectedHomeDate.asStateFlow()
 
     private val _foodsByDate = MutableStateFlow<Map<String, DayMeals>>(emptyMap())
@@ -363,6 +369,7 @@ class FoodViewModel(
             )
             _foodsByDate.value = _foodsByDate.value + (key to meals)
             _hydrationByDate.value = _hydrationByDate.value + (key to day.hydrationLiters)
+            _dayStatusByDate.value = _dayStatusByDate.value + (key to day.status.toDayStatus())
             day.weightCheckIn?.let { wc ->
                 val parsed = dateFormatter.parse(wc.date) ?: return@let
                 val existing = _weightHistory.value.filterNot { sameDay(it.date, parsed) }
@@ -378,6 +385,83 @@ class FoodViewModel(
             _toastEvents.tryEmit(ToastEvent(R.string.error_load_day))
         } finally {
             _loadingDay.value = false
+        }
+    }
+
+    // ── Day completion status ─────────────────────────────────────────────────
+    private val _dayStatusByDate = MutableStateFlow<Map<String, DayStatus?>>(emptyMap())
+    private val _yesterdayHasFood = MutableStateFlow(false)
+    private val _yesterdayPromptAnswered = MutableStateFlow(false)
+    private var yesterdayRequested = false
+
+    private val _dayStatusChanged = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
+    /** Emits after every successful status write (set, answer, clear). */
+    val dayStatusChanged: SharedFlow<Unit> = _dayStatusChanged.asSharedFlow()
+
+    val selectedDayStatus: StateFlow<DayStatus?> = combine(_selectedHomeDate, _dayStatusByDate) { date, all ->
+        all[dateKey(date)]
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    val selectedDayHasFood: StateFlow<Boolean> = combine(_selectedHomeDate, _foodsByDate) { date, all ->
+        all[dateKey(date)]?.let { it.breakfast.isNotEmpty() || it.lunch.isNotEmpty() || it.dinner.isNotEmpty() || it.snacks.isNotEmpty() } ?: false
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    private fun yesterday(): Date =
+        Calendar.getInstance().apply { time = clock(); add(Calendar.DAY_OF_YEAR, -1) }.time
+
+    private fun yesterdayKey(): String = dateKey(yesterday())
+
+    val showYesterdayPrompt: StateFlow<Boolean> = combine(
+        _selectedHomeDate, _dayStatusByDate, _yesterdayHasFood, _yesterdayPromptAnswered,
+    ) { selected, statuses, yesterdayHasFood, answered ->
+        dateKey(selected) == todayKey() && yesterdayHasFood && !answered && statuses[yesterdayKey()] == null
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /** Fetches yesterday once per session (without touching the selected date or [loadingDay]). */
+    private fun loadYesterdayIfToday() {
+        if (yesterdayRequested || dateKey(_selectedHomeDate.value) != todayKey()) return
+        yesterdayRequested = true
+        val key = yesterdayKey()
+        viewModelScope.launch {
+            try {
+                val day = logsApi.getDay(key)
+                _yesterdayHasFood.value = day.foodsByMeal.values.any { it.isNotEmpty() }
+                _dayStatusByDate.value = _dayStatusByDate.value + (key to day.status.toDayStatus())
+            } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                yesterdayRequested = false // best-effort prompt: stay silent, retry on the next visit to today
+            }
+        }
+    }
+
+    fun setDayComplete(date: Date, complete: Boolean) =
+        writeStatus(dateKey(date), if (complete) DayStatus.COMPLETE else DayStatus.INCOMPLETE) {
+            daysApi.putStatus(it, DayStatusUpdateDto(complete))
+        }
+
+    fun clearDayStatus(date: Date) = writeStatus(dateKey(date), null) { daysApi.deleteStatus(it) }
+
+    fun answerYesterdayPrompt(complete: Boolean) {
+        _yesterdayPromptAnswered.value = true
+        setDayComplete(yesterday(), complete)
+    }
+
+    private fun writeStatus(key: String, target: DayStatus?, call: suspend (String) -> Unit) {
+        val previous = _dayStatusByDate.value[key]
+        _dayStatusByDate.value = _dayStatusByDate.value + (key to target)
+        viewModelScope.launch {
+            try {
+                call(key)
+                _dayStatusChanged.tryEmit(Unit)
+            } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                _dayStatusByDate.value = _dayStatusByDate.value + (key to previous)
+                _toastEvents.tryEmit(
+                    ToastEvent(if (e is java.io.IOException) R.string.error_no_internet else R.string.error_day_status)
+                )
+            }
         }
     }
 
@@ -449,6 +533,7 @@ class FoodViewModel(
         }
         _selectedHomeDate.value = date
         viewModelScope.launch { loadDay(date) }
+        loadYesterdayIfToday()
     }
 
     val breakfastFoods: StateFlow<List<LoggedFood>> = combine(_selectedHomeDate, _foodsByDate) { date, all ->
@@ -786,15 +871,20 @@ class FoodViewModel(
         hydrationSaveJob = null
         hydrationPrefsBeforeEdit = null
         _loadedDates.clear()
+        _dayStatusByDate.value = emptyMap()
+        _yesterdayHasFood.value = false
+        yesterdayRequested = false
+        _yesterdayPromptAnswered.value = false
         _loadingDay.value = false
-        _selectedHomeDate.value = Date()
+        _selectedHomeDate.value = clock()
         _foodsByDate.value = emptyMap()
         _hydrationByDate.value = emptyMap()
         _weightHistory.value = emptyList()
     }
 
     init {
-        viewModelScope.launch { loadDay(Date()) }
+        viewModelScope.launch { loadDay(clock()) }
+        loadYesterdayIfToday()
         loadGoals()
     }
 }
