@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import com.example.foodtracker.model.AppLanguage
+import com.example.foodtracker.data.TOLERANCE_OPTIONS
 import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.ui.theme.glassCard
 import androidx.compose.ui.res.stringResource
@@ -241,6 +242,56 @@ fun SettingsScreen(
                         }
                     }
                 }
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            // ── Toleranță „în țintă” ──────────────────────────────────────────
+            SettingsSectionTitle(stringResource(R.string.settings_in_target_tolerance))
+            Spacer(Modifier.height(8.dp))
+            Column(
+                Modifier
+                    .padding(horizontal = 20.dp)
+                    .fillMaxWidth()
+                    .glassCard(16)
+                    .padding(16.dp)
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    TOLERANCE_OPTIONS.forEach { pct ->
+                        val isSelected = settings.inTargetTolerancePct == pct
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(
+                                    if (isSelected) GlassColors.accentGreen
+                                    else GlassColors.cardBackground
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isSelected) GlassColors.accentGreen else GlassColors.cardBorder,
+                                    RoundedCornerShape(20.dp)
+                                )
+                                .clickable {
+                                    viewModel.updateAppSettings(settings.copy(inTargetTolerancePct = pct))
+                                }
+                                .padding(horizontal = 20.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "$pct%",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isSelected) Color.Black else GlassColors.textSecondary
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    stringResource(R.string.settings_in_target_tolerance_hint),
+                    fontSize = 12.sp,
+                    color = GlassColors.textSecondary
+                )
             }
 
             Spacer(Modifier.height(14.dp))

@@ -124,4 +124,23 @@ class DataStoreSettingsRepositoryTest {
         repo.update(custom)
         assertEquals(custom.dayCompleteReminder, repo.settings.first().dayCompleteReminder)
     }
+
+    @Test
+    fun tolerance_defaultsTo10() = runTest {
+        assertEquals(10, repo.settings.first().inTargetTolerancePct)
+    }
+
+    @Test
+    fun tolerance_roundTrips15() = runTest {
+        repo.update(AppSettings(inTargetTolerancePct = 15))
+        assertEquals(15, repo.settings.first().inTargetTolerancePct)
+    }
+
+    @Test
+    fun tolerance_invalidStoredValue_readsAs10() = runTest {
+        dataStore.edit { prefs ->
+            prefs[androidx.datastore.preferences.core.intPreferencesKey("in_target_tolerance_pct")] = 7
+        }
+        assertEquals(10, repo.settings.first().inTargetTolerancePct)
+    }
 }

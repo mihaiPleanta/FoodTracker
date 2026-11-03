@@ -206,6 +206,8 @@
     <string name="settings_title">Setări</string>
     <string name="settings_notifications">NOTIFICĂRI</string>
     <string name="settings_meal_reminders">Remindere mese</string>
+    <string name="settings_in_target_tolerance">Toleranță „în țintă”</string>
+    <string name="settings_in_target_tolerance_hint">O zi e în țintă dacă ai mâncat cu cel mult atât peste sau sub obiectiv.</string>
     <string name="settings_day_complete_reminder">Reminder „Ai terminat ziua?”</string>
     <string name="notif_day_complete_title">Ai terminat ziua?</string>
     <string name="notif_day_complete_body">Marchează ziua completă ca să intre în statistici.</string>

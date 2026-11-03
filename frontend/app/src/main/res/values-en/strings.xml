@@ -203,6 +203,8 @@
     <string name="settings_title">Settings</string>
     <string name="settings_notifications">NOTIFICATIONS</string>
     <string name="settings_meal_reminders">Meal reminders</string>
+    <string name="settings_in_target_tolerance">“On target” tolerance</string>
+    <string name="settings_in_target_tolerance_hint">A day is on target if you ate at most this much above or below your goal.</string>
     <string name="settings_day_complete_reminder">“Done for today?” reminder</string>
     <string name="notif_day_complete_title">Done for today?</string>
     <string name="notif_day_complete_body">Mark the day complete so it counts in your stats.</string>

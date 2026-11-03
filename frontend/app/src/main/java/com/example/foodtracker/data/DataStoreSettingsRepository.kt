@@ -25,6 +25,8 @@ internal val Context.settingsDataStore: DataStore<Preferences> by preferencesDat
     name = "app_settings"
 )
 
+val TOLERANCE_OPTIONS = listOf(5, 10, 15)
+
 class DataStoreSettingsRepository(
     private val dataStore: DataStore<Preferences>
 ) : SettingsRepository {
@@ -33,6 +35,7 @@ class DataStoreSettingsRepository(
         val NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
         val IS_DARK_THEME         = booleanPreferencesKey("is_dark_theme")
         val LANGUAGE              = stringPreferencesKey("language")
+        val IN_TARGET_TOLERANCE   = intPreferencesKey("in_target_tolerance_pct")
     }
 
     /** Pair of keys per meal: `reminder_<meal>_enabled` + `reminder_<meal>_minutes`. */
@@ -75,7 +78,9 @@ class DataStoreSettingsRepository(
                 lunchReminder     = prefs.reminder(lunchKeys, defaults.lunchReminder),
                 snacksReminder    = prefs.reminder(snacksKeys, defaults.snacksReminder),
                 dinnerReminder    = prefs.reminder(dinnerKeys, defaults.dinnerReminder),
-                dayCompleteReminder = prefs.reminder(dayCompleteKeys, defaults.dayCompleteReminder)
+                dayCompleteReminder = prefs.reminder(dayCompleteKeys, defaults.dayCompleteReminder),
+                inTargetTolerancePct = prefs[Keys.IN_TARGET_TOLERANCE]
+                    ?.takeIf { it in TOLERANCE_OPTIONS } ?: defaults.inTargetTolerancePct
             )
         }
 
@@ -89,6 +94,7 @@ class DataStoreSettingsRepository(
             prefs.setReminder(snacksKeys, settings.snacksReminder)
             prefs.setReminder(dinnerKeys, settings.dinnerReminder)
             prefs.setReminder(dayCompleteKeys, settings.dayCompleteReminder)
+            prefs[Keys.IN_TARGET_TOLERANCE] = settings.inTargetTolerancePct
         }
     }
 }
