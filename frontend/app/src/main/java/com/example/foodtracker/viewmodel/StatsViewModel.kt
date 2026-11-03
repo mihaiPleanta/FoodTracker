@@ -56,6 +56,8 @@ class StatsViewModel(
     private var hydrationGoalL = 2.5f
 
     fun setMode(mode: StatsMode, anchor: LocalDate) {
+        // Coming back from DAY: logs may have changed meanwhile, so start from a fresh cache.
+        if (_mode.value == StatsMode.DAY && mode != StatsMode.DAY) cache.clear()
         _mode.value = mode
         when (mode) {
             StatsMode.DAY -> loadJob?.cancel()
@@ -82,6 +84,15 @@ class StatsViewModel(
     fun invalidate() {
         cache.clear()
         retry()
+    }
+
+    /** Logout / account deletion: drop all per-account data. */
+    fun resetUserState() {
+        loadJob?.cancel()
+        cache.clear()
+        currentPeriod = null
+        _mode.value = StatsMode.DAY
+        _state.value = PeriodUiState.Loading
     }
 
     fun setTolerance(pct: Int) {

@@ -131,4 +131,25 @@ class StatsViewModelTest {
         slow.complete(Unit); dispatcher.scheduler.advanceUntilIdle()
         assertEquals(LocalDate.of(2026, 10, 19), (vm.state.value as PeriodUiState.Loaded).period.start)
     }
+
+    @Test fun resetUserState_clearsCacheAndReturnsToDay() {
+        val api = FakeDaysApi(); val vm = vm(api)
+        vm.setMode(StatsMode.WEEK, today); dispatcher.scheduler.advanceUntilIdle()
+        val n = api.calls.size
+        vm.resetUserState()
+        assertEquals(StatsMode.DAY, vm.mode.value)
+        assertEquals(PeriodUiState.Loading, vm.state.value)
+        vm.setMode(StatsMode.WEEK, today); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(n * 2, api.calls.size)
+    }
+
+    @Test fun setMode_fromDay_refetches() {
+        val api = FakeDaysApi(); val vm = vm(api)
+        vm.setMode(StatsMode.WEEK, today); dispatcher.scheduler.advanceUntilIdle()
+        val n = api.calls.size
+        vm.setMode(StatsMode.MONTH, today); dispatcher.scheduler.advanceUntilIdle() // no DAY in between
+        vm.setMode(StatsMode.DAY, today)
+        vm.setMode(StatsMode.WEEK, today); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(n + 2 + n, api.calls.size)
+    }
 }

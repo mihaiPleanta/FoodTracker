@@ -348,6 +348,7 @@ class MainActivity : ComponentActivity() {
                                             quickPicksViewModel.resetUserState()
                                             portionsViewModel.resetUserState()
                                             copyViewModel.resetUserState()
+                                            statsViewModel.resetUserState()
                                             customFoodViewModel.resetUserState()
                                             clearFoodCache(foodRepository)
                                             navController.navigate("login") {
@@ -360,6 +361,7 @@ class MainActivity : ComponentActivity() {
                                             quickPicksViewModel.resetUserState()
                                             portionsViewModel.resetUserState()
                                             copyViewModel.resetUserState()
+                                            statsViewModel.resetUserState()
                                             customFoodViewModel.resetUserState()
                                             clearFoodCache(foodRepository)
                                             navController.navigate("login") {
