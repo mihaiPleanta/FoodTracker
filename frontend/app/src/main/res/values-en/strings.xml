@@ -448,4 +448,27 @@
     <string name="yesterday_prompt_title">Yesterday looks finished — include it in stats?</string>
     <string name="yesterday_prompt_yes">Yes</string>
     <string name="yesterday_prompt_no">No, it was incomplete</string>
+    <string name="stats_mode_day">Day</string>
+    <string name="stats_mode_week">Week</string>
+    <string name="stats_mode_month">Month</string>
+    <string name="stats_prev_period">Previous period</string>
+    <string name="stats_next_period">Next period</string>
+    <string name="stats_complete_days">%1$d of %2$d days complete</string>
+    <string name="stats_kpi_avg_kcal">Avg kcal/day</string>
+    <string name="stats_kpi_in_target">On target</string>
+    <string name="stats_kpi_balance">Balance vs plan</string>
+    <string name="stats_in_target_value">%1$d/%2$d</string>
+    <string name="stats_delta_kcal">%1$s kcal</string>
+    <string name="stats_delta_kcal_day">%1$s kcal/day</string>
+    <string name="stats_delta_pp">%1$s pp</string>
+    <string name="stats_delta_vs_prev_week">%1$s vs last week</string>
+    <string name="stats_delta_vs_prev_month">%1$s vs last month</string>
+    <string name="stats_bars_title">Calories per day</string>
+    <string name="stats_macro_avg_title">Macros, daily average</string>
+    <string name="stats_balance_title">Energy balance</string>
+    <string name="stats_balance_over_plan">%1$s kcal over plan</string>
+    <string name="stats_balance_under_plan">%1$s kcal under plan</string>
+    <string name="stats_balance_estimated_kg">≈ %1$s kg estimated</string>
+    <string name="stats_period_empty_title">No complete days in this period</string>
+    <string name="stats_period_empty_subtitle">Mark finished days from Home.</string>
 </resources>

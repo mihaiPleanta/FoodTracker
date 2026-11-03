@@ -49,7 +49,15 @@ import com.example.foodtracker.util.LocalAppLanguage
 import com.example.foodtracker.util.toLocale
 import com.example.foodtracker.viewmodel.FoodViewModel
 import com.example.foodtracker.viewmodel.WeightCheckIn
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import com.example.foodtracker.ui.stats.PeriodStatsContent
+import com.example.foodtracker.viewmodel.StatsMode
+import com.example.foodtracker.viewmodel.StatsViewModel
 import java.text.SimpleDateFormat
+import java.time.ZoneId
+import java.util.Date
 import java.util.Locale
 import kotlin.math.max
 
@@ -61,8 +69,11 @@ private data class MealSplit(
 
 @Composable
 fun StatsScreen(
-    viewModel: FoodViewModel
+    viewModel: FoodViewModel,
+    statsViewModel: StatsViewModel,
 ) {
+    val mode by statsViewModel.mode.collectAsState()
+    val periodState by statsViewModel.state.collectAsState()
     val selectedDate by viewModel.selectedHomeDate.collectAsState()
     val breakfastFoods by viewModel.breakfastFoods.collectAsState()
     val lunchFoods by viewModel.lunchFoods.collectAsState()
@@ -75,6 +86,7 @@ fun StatsScreen(
 
     LaunchedEffect(Unit) {
         viewModel.loadWeightHistory()
+        statsViewModel.invalidate()
     }
     var showWeightSheet by remember { mutableStateOf(false) }
 
@@ -135,6 +147,38 @@ fun StatsScreen(
                 fontWeight = FontWeight.ExtraBold,
                 color = GlassColors.textPrimary
             )
+            Spacer(Modifier.height(12.dp))
+            val modes = listOf(StatsMode.DAY, StatsMode.WEEK, StatsMode.MONTH)
+            val modeLabels = listOf(R.string.stats_mode_day, R.string.stats_mode_week, R.string.stats_mode_month)
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                modes.forEachIndexed { i, m ->
+                    SegmentedButton(
+                        selected = mode == m,
+                        onClick = {
+                            val anchor = selectedDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate()
+                            statsViewModel.setMode(m, anchor)
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(i, modes.size),
+                    ) { Text(stringResource(modeLabels[i])) }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+
+            if (mode != StatsMode.DAY) {
+                PeriodStatsContent(
+                    state = periodState,
+                    onPrev = statsViewModel::previous,
+                    onNext = statsViewModel::next,
+                    onRetry = statsViewModel::retry,
+                    onOpenDay = { date ->
+                        viewModel.setSelectedHomeDate(
+                            Date.from(date.atStartOfDay(ZoneId.systemDefault()).toInstant())
+                        )
+                        statsViewModel.setMode(StatsMode.DAY, date)
+                    },
+                    fallbackGoalKcal = goals.calorieGoal,
+                )
+            } else {
             Spacer(Modifier.height(4.dp))
             Text(
                 text = dateLabel,
@@ -203,6 +247,8 @@ fun StatsScreen(
                 }
             } else {
                 WeightTrendCard(weightHistory = weightHistory)
+            }
+
             }
 
             Spacer(Modifier.height(100.dp))
@@ -323,7 +369,7 @@ private fun MacroProgressCard(
 }
 
 @Composable
-private fun MacroLine(label: String, value: Int, goal: Int, color: Color) {
+internal fun MacroLine(label: String, value: Int, goal: Int, color: Color) {
     val progress = if (goal > 0) (value.toFloat() / goal).coerceIn(0f, 1f) else 0f
 
     Column {

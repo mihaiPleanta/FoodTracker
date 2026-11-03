@@ -325,7 +325,7 @@ class MainActivity : ComponentActivity() {
                                     HomeScreen(navController, viewModel, portionsViewModel, copyViewModel)
                                 }
                                 composable("stats") {
-                                    StatsScreen(viewModel)
+                                    StatsScreen(viewModel, statsViewModel)
                                 }
                                 composable("meals") {
                                     MealsScreen(foodViewModel = viewModel, viewModel = recipeViewModel)
