@@ -114,6 +114,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
     val userProfile by viewModel.userProfile.collectAsState()
     val dayStatus by viewModel.selectedDayStatus.collectAsState()
     val dayHasFood by viewModel.selectedDayHasFood.collectAsState()
+    val dayIsFuture by viewModel.selectedDayIsFuture.collectAsState()
     val showYesterdayPrompt by viewModel.showYesterdayPrompt.collectAsState()
 
     val resources = LocalContext.current.resources
@@ -353,7 +354,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
                 Spacer(Modifier.height(12.dp))
             }
 
-            if (dayHasFood) {
+            if (dayHasFood && !dayIsFuture) {
                 DayCompleteButton(
                     status = dayStatus,
                     onComplete = { viewModel.setDayComplete(selectedDate, true) },

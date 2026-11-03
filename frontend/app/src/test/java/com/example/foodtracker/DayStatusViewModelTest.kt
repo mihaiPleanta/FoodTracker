@@ -152,7 +152,7 @@ class DayStatusViewModelTest {
     private val dataStoreScope = CoroutineScope(testDispatcher + SupervisorJob())
     private val today = "2026-11-03"
     private val yesterday = "2026-11-02"
-    private val now: Date = Calendar.getInstance().apply { clear(); set(2026, Calendar.NOVEMBER, 3, 12, 0) }.time
+    private var now: Date = Calendar.getInstance().apply { clear(); set(2026, Calendar.NOVEMBER, 3, 12, 0) }.time
     private val logs = DsLogsApi()
     private val days = DsDaysApi()
 
@@ -186,6 +186,7 @@ class DayStatusViewModelTest {
         vm.selectedDayStatus.launchIn(backgroundScope)
         vm.selectedDayHasFood.launchIn(backgroundScope)
         vm.showYesterdayPrompt.launchIn(backgroundScope)
+        vm.selectedDayIsFuture.launchIn(backgroundScope)
         advanceUntilIdle()
         return vm
     }
@@ -328,6 +329,79 @@ class DayStatusViewModelTest {
         vm.setSelectedHomeDate(now)
         advanceUntilIdle()
         assertEquals(1, logs.requested.count { it == yesterday })
+    }
+
+    @Test
+    fun selectedDayIsFuture_trueOnlyAfterToday() = runTest(testDispatcher) {
+        val vm = newVm()
+        assertFalse(vm.selectedDayIsFuture.value)
+        vm.setSelectedHomeDate(date(2026, 11, 4))
+        advanceUntilIdle()
+        assertTrue(vm.selectedDayIsFuture.value)
+        vm.setSelectedHomeDate(date(2026, 11, 2))
+        advanceUntilIdle()
+        assertFalse(vm.selectedDayIsFuture.value)
+    }
+
+    @Test
+    fun setDayComplete_futureDate_isNoOp() = runTest(testDispatcher) {
+        val vm = newVm()
+        val tomorrow = date(2026, 11, 4)
+        vm.setSelectedHomeDate(tomorrow)
+        advanceUntilIdle()
+
+        vm.setDayComplete(tomorrow, true)
+        advanceUntilIdle()
+
+        assertTrue(days.puts.isEmpty())
+        assertNull(vm.selectedDayStatus.value)
+    }
+
+    @Test
+    fun yesterdayPrompt_afterMidnight_asksAboutNewYesterday() = runTest(testDispatcher) {
+        logs.days[yesterday] = dsDay(withFood = true)
+        logs.days[today] = dsDay(withFood = true)
+        val vm = newVm()
+        assertTrue(vm.showYesterdayPrompt.value)
+
+        now = date(2026, 11, 4)
+        vm.setSelectedHomeDate(now)
+        advanceUntilIdle()
+
+        assertTrue(today in logs.requested.drop(1))
+        assertTrue(vm.showYesterdayPrompt.value)
+        vm.answerYesterdayPrompt(true)
+        advanceUntilIdle()
+        assertEquals(listOf(today to true), days.puts)
+    }
+
+    @Test
+    fun yesterdayPrompt_afterMidnight_staleHasFoodDoesNotLeak() = runTest(testDispatcher) {
+        logs.days[yesterday] = dsDay(withFood = true)
+        val vm = newVm()
+        assertTrue(vm.showYesterdayPrompt.value)
+
+        now = date(2026, 11, 4) // new yesterday (11-03) has no food
+        vm.setSelectedHomeDate(now)
+        advanceUntilIdle()
+
+        assertFalse(vm.showYesterdayPrompt.value)
+    }
+
+    @Test
+    fun yesterdayPrompt_answerForDayD_doesNotSuppressDayDPlus1() = runTest(testDispatcher) {
+        logs.days[yesterday] = dsDay(withFood = true)
+        logs.days[today] = dsDay(withFood = true)
+        val vm = newVm()
+        vm.answerYesterdayPrompt(false)
+        advanceUntilIdle()
+        assertFalse(vm.showYesterdayPrompt.value)
+
+        now = date(2026, 11, 4)
+        vm.setSelectedHomeDate(now)
+        advanceUntilIdle()
+
+        assertTrue(vm.showYesterdayPrompt.value)
     }
 
     @Test

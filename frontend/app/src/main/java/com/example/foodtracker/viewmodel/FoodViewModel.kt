@@ -390,9 +390,10 @@ class FoodViewModel(
 
     // ── Day completion status ─────────────────────────────────────────────────
     private val _dayStatusByDate = MutableStateFlow<Map<String, DayStatus?>>(emptyMap())
-    private val _yesterdayHasFood = MutableStateFlow(false)
-    private val _yesterdayPromptAnswered = MutableStateFlow(false)
-    private var yesterdayRequested = false
+    // Yesterday-prompt state is keyed to the date it was computed for, so it can't go stale after midnight.
+    private val _yesterdayHasFood = MutableStateFlow<Pair<String, Boolean>?>(null)
+    private val _yesterdayAnsweredFor = MutableStateFlow<String?>(null)
+    private var yesterdayRequestedFor: String? = null
 
     private val _dayStatusChanged = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
     /** Emits after every successful status write (set, answer, clear). */
@@ -406,44 +407,53 @@ class FoodViewModel(
         all[dateKey(date)]?.let { it.breakfast.isNotEmpty() || it.lunch.isNotEmpty() || it.dinner.isNotEmpty() || it.snacks.isNotEmpty() } ?: false
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    /** True when the selected Home date is after today (day keys are ISO, so string order = date order). */
+    val selectedDayIsFuture: StateFlow<Boolean> = _selectedHomeDate.map { dateKey(it) > todayKey() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     private fun yesterday(): Date =
         Calendar.getInstance().apply { time = clock(); add(Calendar.DAY_OF_YEAR, -1) }.time
 
     private fun yesterdayKey(): String = dateKey(yesterday())
 
     val showYesterdayPrompt: StateFlow<Boolean> = combine(
-        _selectedHomeDate, _dayStatusByDate, _yesterdayHasFood, _yesterdayPromptAnswered,
-    ) { selected, statuses, yesterdayHasFood, answered ->
-        dateKey(selected) == todayKey() && yesterdayHasFood && !answered && statuses[yesterdayKey()] == null
+        _selectedHomeDate, _dayStatusByDate, _yesterdayHasFood, _yesterdayAnsweredFor,
+    ) { selected, statuses, yesterdayHasFood, answeredFor ->
+        val key = yesterdayKey()
+        dateKey(selected) == todayKey() &&
+            yesterdayHasFood?.first == key && yesterdayHasFood.second &&
+            answeredFor != key && statuses[key] == null
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
-    /** Fetches yesterday once per session (without touching the selected date or [loadingDay]). */
+    /** Fetches yesterday once per date (without touching the selected date or [loadingDay]). */
     private fun loadYesterdayIfToday() {
-        if (yesterdayRequested || dateKey(_selectedHomeDate.value) != todayKey()) return
-        yesterdayRequested = true
         val key = yesterdayKey()
+        if (yesterdayRequestedFor == key || dateKey(_selectedHomeDate.value) != todayKey()) return
+        yesterdayRequestedFor = key
         viewModelScope.launch {
             try {
                 val day = logsApi.getDay(key)
-                _yesterdayHasFood.value = day.foodsByMeal.values.any { it.isNotEmpty() }
+                _yesterdayHasFood.value = key to day.foodsByMeal.values.any { it.isNotEmpty() }
                 _dayStatusByDate.value = _dayStatusByDate.value + (key to day.status.toDayStatus())
             } catch (e: kotlin.coroutines.cancellation.CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                yesterdayRequested = false // best-effort prompt: stay silent, retry on the next visit to today
+                if (yesterdayRequestedFor == key) yesterdayRequestedFor = null // best-effort prompt: stay silent, retry on the next visit to today
             }
         }
     }
 
-    fun setDayComplete(date: Date, complete: Boolean) =
+    fun setDayComplete(date: Date, complete: Boolean) {
+        if (complete && dateKey(date) > todayKey()) return // a future day cannot be finished yet
         writeStatus(dateKey(date), if (complete) DayStatus.COMPLETE else DayStatus.INCOMPLETE) {
             daysApi.putStatus(it, DayStatusUpdateDto(complete))
         }
+    }
 
     fun clearDayStatus(date: Date) = writeStatus(dateKey(date), null) { daysApi.deleteStatus(it) }
 
     fun answerYesterdayPrompt(complete: Boolean) {
-        _yesterdayPromptAnswered.value = true
+        _yesterdayAnsweredFor.value = yesterdayKey()
         setDayComplete(yesterday(), complete)
     }
 
@@ -872,9 +882,9 @@ class FoodViewModel(
         hydrationPrefsBeforeEdit = null
         _loadedDates.clear()
         _dayStatusByDate.value = emptyMap()
-        _yesterdayHasFood.value = false
-        yesterdayRequested = false
-        _yesterdayPromptAnswered.value = false
+        _yesterdayHasFood.value = null
+        yesterdayRequestedFor = null
+        _yesterdayAnsweredFor.value = null
         _loadingDay.value = false
         _selectedHomeDate.value = clock()
         _foodsByDate.value = emptyMap()
