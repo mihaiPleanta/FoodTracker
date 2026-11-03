@@ -55,9 +55,11 @@ import com.example.foodtracker.viewmodel.FoodViewModelFactory
 import com.example.foodtracker.viewmodel.PortionsViewModel
 import com.example.foodtracker.viewmodel.QuickPicksViewModel
 import com.example.foodtracker.viewmodel.RecipeViewModel
+import com.example.foodtracker.viewmodel.StatsViewModel
 import java.net.URLDecoder
 import java.net.URLEncoder
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -111,6 +113,7 @@ class MainActivity : ComponentActivity() {
             val quickPicksViewModel: QuickPicksViewModel = viewModel()
             val portionsViewModel: PortionsViewModel = viewModel()
             val copyViewModel: CopyViewModel = viewModel()
+            val statsViewModel: StatsViewModel = viewModel()
             val customFoodViewModel: CustomFoodViewModel = viewModel(
                 factory = remember {
                     CustomFoodViewModelFactory(
@@ -164,6 +167,16 @@ class MainActivity : ComponentActivity() {
                         .collect { settings ->
                             DayCompleteReminderScheduler.sync(applicationContext, settings)
                         }
+                }
+
+                // Keep period stats in sync with day status changes, tolerance and hydration goal.
+                LaunchedEffect(Unit) { viewModel.dayStatusChanged.collect { statsViewModel.invalidate() } }
+                LaunchedEffect(Unit) {
+                    viewModel.appSettings.map { it.inTargetTolerancePct }.distinctUntilChanged()
+                        .collect { statsViewModel.setTolerance(it) }
+                }
+                LaunchedEffect(Unit) {
+                    viewModel.hydrationGoalLiters.collect { statsViewModel.setHydrationGoal(it) }
                 }
 
                 // Open-today deep link (day-complete reminder): Home on today's date.

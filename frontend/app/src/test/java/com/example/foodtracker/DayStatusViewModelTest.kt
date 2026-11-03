@@ -119,6 +119,7 @@ private class DsDaysApi : DaysApi {
     var failure: Throwable? = null
     var gate: CompletableDeferred<Unit>? = null
 
+    override suspend fun getStatsDays(from: String, to: String): com.example.foodtracker.model.StatsDaysResponseDto = error("unused")
     override suspend fun putStatus(date: String, body: DayStatusUpdateDto): DayStatusResponseDto {
         puts += date to body.complete
         gate?.await()

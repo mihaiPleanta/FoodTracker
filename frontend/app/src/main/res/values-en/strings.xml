@@ -261,6 +261,7 @@
 
     <!-- Errors -->
     <string name="error_no_internet">Check your internet connection</string>
+    <string name="error_load_stats">Couldn\'t load stats</string>
     <string name="error_recipe_insufficient">Log more foods so we can generate recipes</string>
     <string name="error_ai_unavailable">AI service unavailable, try again</string>
     <string name="error_ai_invalid">Invalid AI response, try again</string>

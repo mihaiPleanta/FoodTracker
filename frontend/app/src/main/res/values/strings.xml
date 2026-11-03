@@ -264,6 +264,7 @@
 
     <!-- Errors -->
     <string name="error_no_internet">Verifică conexiunea la internet</string>
+    <string name="error_load_stats">Nu am putut încărca statisticile</string>
     <string name="error_recipe_insufficient">Loghează mai multe alimente ca să generăm rețete</string>
     <string name="error_ai_unavailable">Serviciul AI nu e disponibil, încearcă din nou</string>
     <string name="error_ai_invalid">Răspuns AI invalid, încearcă din nou</string>
