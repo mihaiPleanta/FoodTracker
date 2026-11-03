@@ -161,3 +161,24 @@ def test_hydration_override_wins_and_ignores_creatine():
 
 def test_hydration_override_independent_of_weight():
     assert calculate_hydration_goal(_hp(95, "ACTIVE", override=2.2)).goal_l == 2.2
+
+
+def test_calculate_goals_exposes_tdee():
+    profile = _FakeProfile(
+        age=22, gender="MALE", height_cm=180,
+        current_weight_kg=78.0, target_weight_kg=78.0,
+        activity_level="MODERATE",
+    )
+    bmr = mifflin_st_jeor(age=22, gender="MALE", height_cm=180, weight_kg=78.0)
+    goals = calculate_goals(profile)
+    assert goals.tdee == round(bmr * 1.55)
+    assert goals.calorie_goal == goals.tdee
+
+    deficit = _FakeProfile(
+        age=22, gender="MALE", height_cm=180,
+        current_weight_kg=78.0, target_weight_kg=70.0,
+        activity_level="MODERATE",
+    )
+    deficit_goals = calculate_goals(deficit)
+    assert deficit_goals.tdee == goals.tdee
+    assert abs(deficit_goals.calorie_goal - max(1200, min(deficit_goals.tdee - 500, 5000))) <= 1

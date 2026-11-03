@@ -120,6 +120,7 @@ DEFAULT_GOALS = Goals(
     carbs_goal_g=180,
     fat_goal_g=53,
     mode="DEFICIT",
+    tdee=2400,
 )
 
 SCENARIOS: list[Scenario] = [

@@ -34,6 +34,7 @@ class Goals:
     carbs_goal_g: int
     fat_goal_g: int
     mode: GoalMode
+    tdee: int
 
 
 class _ProfileLike(Protocol):
@@ -101,6 +102,7 @@ def calculate_goals(profile: _ProfileLike) -> Goals:
         carbs_goal_g=carbs_goal_g,
         fat_goal_g=fat_goal_g,
         mode=mode,
+        tdee=round(tdee),
     )
 
 
