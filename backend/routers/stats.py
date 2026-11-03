@@ -15,6 +15,7 @@ from schemas import (
     StatsDaysResponse,
     StatsGoalsDto,
     StatsWeightDto,
+    TopFoodStatDto,
     TopFoodsDto,
 )
 
@@ -22,6 +23,40 @@ router = APIRouter()
 
 _MAX_STATS_DAYS = 62
 _WEIGHT_WARMUP_DAYS = 60
+_TOP_FOODS_LIMIT = 5
+
+
+def _top_foods(logs, complete_days) -> TopFoodsDto:
+    groups: Dict[str, dict] = {}
+    for row in logs:
+        if row.log_date not in complete_days:
+            continue
+        key = "recipe:" + row.name if row.barcode == "recipe" else row.barcode
+        g = groups.setdefault(
+            key, {"kcal": 0.0, "protein": 0.0, "dates": set(), "latest": None, "row": None}
+        )
+        f = row.grams / 100
+        g["kcal"] += row.kcal_100g * f
+        g["protein"] += row.protein_100g * f
+        g["dates"].add(row.log_date)
+        order = (row.log_date, row.created_at)
+        if g["latest"] is None or order >= g["latest"]:
+            g["latest"] = order
+            g["row"] = row
+    stats = [
+        TopFoodStatDto(
+            key=key,
+            name=g["row"].name,
+            brand=g["row"].brand,
+            total_kcal=round(g["kcal"]),
+            total_protein_g=round(g["protein"], 1),
+            days_count=len(g["dates"]),
+        )
+        for key, g in groups.items()
+    ]
+    by_kcal = sorted(stats, key=lambda s: (-s.total_kcal, s.name))[:_TOP_FOODS_LIMIT]
+    by_protein = sorted(stats, key=lambda s: (-s.total_protein_g, s.name))[:_TOP_FOODS_LIMIT]
+    return TopFoodsDto(by_kcal=by_kcal, by_protein=by_protein)
 
 
 @router.get("/stats/days", response_model=StatsDaysResponse)
@@ -129,5 +164,7 @@ async def stats_days(
     return StatsDaysResponse(
         days=days,
         weights=[StatsWeightDto(date=w.log_date, weight_kg=w.weight_kg) for w in weights],
-        top_foods=TopFoodsDto(by_kcal=[], by_protein=[]),
+        top_foods=_top_foods(
+            logs, {d for d, r in status_by_day.items() if status_label(r) == "complete"}
+        ),
     )

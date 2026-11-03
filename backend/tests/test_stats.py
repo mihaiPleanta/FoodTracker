@@ -156,3 +156,61 @@ def test_stats_days_per_user(client):
         s.commit()
     days = _get(client, "2026-05-20", "2026-05-23").json()["days"]
     assert [d["date"] for d in days] == ["2026-05-20"]
+
+
+def _top(client, frm="2026-05-01", to="2026-05-31"):
+    r = _get(client, frm, to)
+    assert r.status_code == 200, r.text
+    return r.json()["top_foods"]
+
+
+def test_top_foods_only_from_complete_days(client):
+    _profile(client)
+    _log(client, log_date="2026-05-20")
+    _log(client, log_date="2026-05-21", barcode="222", name="Bar")
+    _status(client, "2026-05-20", True)
+    top = _top(client)
+    assert [f["key"] for f in top["by_kcal"]] == ["111"]
+
+
+def test_top_foods_sum_across_days_and_count_days(client):
+    _profile(client)
+    for d in ("2026-05-20", "2026-05-21"):
+        _log(client, log_date=d)
+        _status(client, d, True)
+    _log(client, log_date="2026-05-21")  # second log same day
+    top = _top(client)
+    f = top["by_kcal"][0]
+    assert f["key"] == "111"
+    assert f["total_kcal"] == 360  # 3 x 200g x 60/100
+    assert f["total_protein_g"] == 24.0
+    assert f["days_count"] == 2
+
+
+def test_top_foods_groups_recipes_by_name(client):
+    _profile(client)
+    _log(client, barcode="recipe", name="Pasta")
+    _log(client, barcode="recipe", name="Soup")
+    _status(client, "2026-05-20", True)
+    top = _top(client)
+    assert sorted(f["key"] for f in top["by_kcal"]) == ["recipe:Pasta", "recipe:Soup"]
+
+
+def test_top_foods_limit_5(client):
+    _profile(client)
+    for i in range(7):
+        _log(client, barcode="b%d" % i, name="F%d" % i)
+    _status(client, "2026-05-20", True)
+    top = _top(client)
+    assert len(top["by_kcal"]) == 5
+    assert len(top["by_protein"]) == 5
+
+
+def test_top_foods_by_protein_order(client):
+    _profile(client)
+    _log(client, barcode="a", name="A", kcal_100g=500.0, protein_100g=1.0)
+    _log(client, barcode="b", name="B", kcal_100g=50.0, protein_100g=30.0)
+    _status(client, "2026-05-20", True)
+    top = _top(client)
+    assert [f["key"] for f in top["by_kcal"]] == ["a", "b"]
+    assert [f["key"] for f in top["by_protein"]] == ["b", "a"]
