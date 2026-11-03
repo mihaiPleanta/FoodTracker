@@ -194,6 +194,24 @@ class UserGramPresets(Base):
     )
 
 
+class DayStatus(Base):
+    __tablename__ = "day_status"
+
+    uid: Mapped[str] = mapped_column(
+        String, ForeignKey("profiles.uid", ondelete="CASCADE"), primary_key=True
+    )
+    log_date: Mapped[date] = mapped_column(Date, primary_key=True)
+    complete: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    calorie_goal: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    protein_goal_g: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    carbs_goal_g: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    fat_goal_g: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    tdee: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
 class CustomFood(Base):
     __tablename__ = "custom_foods"
 

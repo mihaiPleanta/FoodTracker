@@ -183,10 +183,20 @@ class WeightCheckInListDto(BaseModel):
     items: List[WeightCheckInDto]
 
 
+class DayStatusUpdate(BaseModel):
+    complete: bool
+
+
+class DayStatusResponse(BaseModel):
+    date: _date
+    status: Literal["complete", "incomplete"]
+
+
 class DayResponse(BaseModel):
     foods_by_meal: Dict[str, List[FoodLogDto]]
     hydration_liters: float
     weight_check_in: Optional[WeightCheckInDto] = None
+    status: Optional[Literal["complete", "incomplete"]] = None
 
 
 MEAL_KEYS = {
