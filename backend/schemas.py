@@ -437,3 +437,48 @@ class CustomFoodDto(BaseModel):
     carbs_100g: float
     fat_100g: float
     serving: Optional[ServingOut] = None
+
+
+class StatsGoalsDto(BaseModel):
+    calorie_goal: int
+    protein_goal_g: int
+    carbs_goal_g: int
+    fat_goal_g: int
+    tdee: int
+
+
+class StatsDayDto(BaseModel):
+    date: _date
+    kcal: int
+    protein_g: float
+    carbs_g: float
+    fat_g: float
+    has_food: bool
+    status: Optional[Literal["complete", "incomplete"]] = None
+    goals: Optional[StatsGoalsDto] = None
+    hydration_l: float
+
+
+class StatsWeightDto(BaseModel):
+    date: _date
+    weight_kg: float
+
+
+class TopFoodStatDto(BaseModel):
+    key: str
+    name: str
+    brand: Optional[str] = None
+    total_kcal: int
+    total_protein_g: float
+    days_count: int
+
+
+class TopFoodsDto(BaseModel):
+    by_kcal: List[TopFoodStatDto] = []
+    by_protein: List[TopFoodStatDto] = []
+
+
+class StatsDaysResponse(BaseModel):
+    days: List[StatsDayDto]
+    weights: List[StatsWeightDto]
+    top_foods: TopFoodsDto
