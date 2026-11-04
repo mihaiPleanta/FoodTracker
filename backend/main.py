@@ -17,6 +17,7 @@ from routers.favorites import router as favorites_router
 from routers.portions import router as portions_router
 from routers.custom_foods import router as custom_foods_router
 from routers.stats import router as stats_router
+from routers.streak import router as streak_router
 
 if os.getenv("TESTING") != "1":
     _cred_path = os.getenv("FIREBASE_SERVICE_ACCOUNT", "serviceAccountKey.json")
@@ -37,3 +38,4 @@ app.include_router(favorites_router)
 app.include_router(portions_router)
 app.include_router(custom_foods_router)
 app.include_router(stats_router)
+app.include_router(streak_router)

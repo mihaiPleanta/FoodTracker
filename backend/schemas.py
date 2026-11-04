@@ -482,3 +482,32 @@ class StatsDaysResponse(BaseModel):
     days: List[StatsDayDto]
     weights: List[StatsWeightDto]
     top_foods: TopFoodsDto
+
+
+class StreakDayDto(BaseModel):
+    date: _date
+    state: str
+
+
+class RecoveryOfferDto(BaseModel):
+    previous_streak: int
+    gap_start: _date
+    gap_end: _date
+
+
+class StreakTodayRequest(BaseModel):
+    today: _date
+
+
+class StreakResponse(BaseModel):
+    current: int
+    best: int
+    total_logged_days: int
+    today_logged: bool
+    pause_used_this_week: bool
+    pause_used_on: Optional[_date] = None
+    recovery_available_this_month: bool
+    recovery_used_on: Optional[_date] = None
+    last_14_days: List[StreakDayDto]
+    next_milestone: int
+    recovery_offer: Optional[RecoveryOfferDto] = None

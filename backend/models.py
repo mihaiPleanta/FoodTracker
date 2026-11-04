@@ -245,3 +245,21 @@ class CustomFood(Base):
             sqlite_where=text("barcode IS NOT NULL"),
         ),
     )
+
+
+class StreakRecovery(Base):
+    __tablename__ = "streak_recoveries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    uid: Mapped[str] = mapped_column(
+        String, ForeignKey("profiles.uid", ondelete="CASCADE"), nullable=False
+    )
+    gap_start: Mapped[date] = mapped_column(Date, nullable=False)
+    gap_end: Mapped[date] = mapped_column(Date, nullable=False)
+    kind: Mapped[str] = mapped_column(String, nullable=False)  # "recovered" | "declined"
+    used_on: Mapped[date] = mapped_column(Date, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (Index("idx_streak_recoveries_uid", "uid"),)
