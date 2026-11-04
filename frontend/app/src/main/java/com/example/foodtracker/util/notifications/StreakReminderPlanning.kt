@@ -1,6 +1,7 @@
 package com.example.foodtracker.util.notifications
 
 import com.example.foodtracker.data.StreakSnapshot
+import com.example.foodtracker.data.isSnapshotPlausible
 import com.example.foodtracker.model.AppSettings
 import java.time.LocalDate
 
@@ -24,10 +25,5 @@ fun reconcileStreak(desired: Int?, scheduled: Int?): ReminderAction = when {
 fun shouldSendStreakReminder(snapshot: StreakSnapshot?, today: LocalDate): Boolean {
     if (snapshot == null || snapshot.current <= 0) return false
     if (snapshot.lastLoggedDate == today) return false
-    val yesterday = today.minusDays(1)
-    return when (snapshot.snapshotDate) {
-        today -> true
-        yesterday -> snapshot.lastLoggedDate == yesterday
-        else -> false
-    }
+    return isSnapshotPlausible(snapshot, today)
 }

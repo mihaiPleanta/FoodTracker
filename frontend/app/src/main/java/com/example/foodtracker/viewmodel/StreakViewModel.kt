@@ -6,6 +6,7 @@ import com.example.foodtracker.api.RetrofitInstance
 import com.example.foodtracker.api.StreakApi
 import com.example.foodtracker.data.StreakSnapshot
 import com.example.foodtracker.data.StreakSnapshotStorage
+import com.example.foodtracker.data.isSnapshotPlausible
 import com.example.foodtracker.model.RecoveryOfferDto
 import com.example.foodtracker.model.StreakResponseDto
 import com.example.foodtracker.model.StreakTodayDto
@@ -66,7 +67,7 @@ class StreakViewModel(
         launchCall { api.getStreak(today().toString()) }
     }
 
-    fun recover() = launchCall(mutation = true) { api.recover(StreakTodayDto(today().toString())) }
+    fun recover() = launchCall(mutation = true, restored = true) { api.recover(StreakTodayDto(today().toString())) }
 
     fun decline() = launchCall(mutation = true) { api.decline(StreakTodayDto(today().toString())) }
 
@@ -85,12 +86,12 @@ class StreakViewModel(
         viewModelScope.launch { snapshots.clear() }
     }
 
-    private fun launchCall(mutation: Boolean = false, call: suspend () -> StreakResponseDto) {
+    private fun launchCall(mutation: Boolean = false, restored: Boolean = false, call: suspend () -> StreakResponseDto) {
         job?.cancel()
         mutating = mutation
         job = viewModelScope.launch {
             try {
-                apply(call())
+                apply(call(), restored)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: HttpException) {
@@ -116,18 +117,24 @@ class StreakViewModel(
         }
     }
 
-    private suspend fun apply(data: StreakResponseDto) {
+    private suspend fun apply(data: StreakResponseDto, restored: Boolean = false) {
         val now = today()
         val lastLogged = if (data.todayLogged) now
         else data.last14Days.filter { it.state == "logged" }.maxOfOrNull { LocalDate.parse(it.date) }
         snapshots.write(StreakSnapshot(data.current, now, lastLogged))
-        crossedMilestone(lastCurrent, data.current)?.let { _milestones.trySend(it) }
+        // A recovery restores a streak, it does not "reach" a milestone.
+        if (!restored) crossedMilestone(lastCurrent, data.current)?.let { _milestones.trySend(it) }
         lastCurrent = data.current
         _state.value = StreakUiState.Loaded(data)
     }
 
     private suspend fun fallBackToSnapshot() {
         val snap = snapshots.read() ?: return
-        _state.value = StreakUiState.Offline(snap.current, snap.lastLoggedDate == today())
+        val now = today()
+        _state.value = if (isSnapshotPlausible(snap, now)) {
+            StreakUiState.Offline(snap.current, snap.lastLoggedDate == now)
+        } else {
+            StreakUiState.Offline(0, todayLogged = false)
+        }
     }
 }

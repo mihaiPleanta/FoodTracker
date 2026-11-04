@@ -53,6 +53,7 @@ class StreakViewModelTest {
         var getResponses = ArrayDeque<StreakResponseDto>()
         var getFailure: Throwable? = null
         var recoverResult: Result<StreakResponseDto>? = null
+        var declineResult: Result<StreakResponseDto>? = null
         var getCalls = 0
         var gate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
         override suspend fun getStreak(today: String): StreakResponseDto {
@@ -61,7 +62,7 @@ class StreakViewModelTest {
             return if (getResponses.size > 1) getResponses.removeFirst() else getResponses.first()
         }
         override suspend fun recover(body: StreakTodayDto): StreakResponseDto { gate?.await(); return recoverResult!!.getOrThrow() }
-        override suspend fun decline(body: StreakTodayDto): StreakResponseDto = recoverResult!!.getOrThrow()
+        override suspend fun decline(body: StreakTodayDto): StreakResponseDto = declineResult!!.getOrThrow()
     }
 
     private class FakeSnapshots(var snap: StreakSnapshot? = null) : StreakSnapshotStorage {
@@ -190,6 +191,49 @@ class StreakViewModelTest {
         assertNull(vm.showOffer.value)
         vm.refresh(); dispatcher.scheduler.advanceUntilIdle()
         assertEquals(offer, vm.showOffer.value)
+    }
+
+    @Test fun recoverFromZeroDoesNotEmitMilestone() = runTest(dispatcher) {
+        val api = FakeStreakApi().apply {
+            getResponses += resp(current = 0, offer = offer)
+            recoverResult = Result.success(resp(current = 13))
+        }
+        val vm = vm(api)
+        val got = mutableListOf<Int>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.milestones.collect { got += it } }
+        vm.refresh(); advanceUntilIdle()
+        vm.recover(); advanceUntilIdle()
+        assertEquals(13, (vm.state.value as StreakUiState.Loaded).data.current)
+        assertTrue(got.isEmpty())
+    }
+
+    @Test fun declineUpdatesStateAndHidesOffer() {
+        val api = FakeStreakApi().apply {
+            getResponses += resp(current = 0, offer = offer)
+            declineResult = Result.success(resp(current = 0, offer = null))
+        }
+        val vm = vm(api)
+        vm.refresh(); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(offer, vm.showOffer.value)
+        vm.decline(); dispatcher.scheduler.advanceUntilIdle()
+        assertTrue(vm.state.value is StreakUiState.Loaded)
+        assertNull((vm.state.value as StreakUiState.Loaded).data.recoveryOffer)
+        assertNull(vm.showOffer.value)
+    }
+
+    @Test fun offlineStaleSnapshotShowsZero() {
+        val old = LocalDate.of(2026, 11, 1)
+        val api = FakeStreakApi().apply { getFailure = IOException("down") }
+        val vm = vm(api, FakeSnapshots(StreakSnapshot(12, old, old)))
+        vm.refresh(); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(StreakUiState.Offline(0, todayLogged = false), vm.state.value)
+    }
+
+    @Test fun offlineSnapshotFromTodayIsPlausible() {
+        val api = FakeStreakApi().apply { getFailure = IOException("down") }
+        val vm = vm(api, FakeSnapshots(StreakSnapshot(12, today, today)))
+        vm.refresh(); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(StreakUiState.Offline(12, todayLogged = true), vm.state.value)
     }
 
     @Test fun resetClearsSnapshot() = runTest(dispatcher) {

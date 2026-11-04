@@ -21,6 +21,19 @@ data class StreakSnapshot(
     val lastLoggedDate: LocalDate?,
 )
 
+/**
+ * A snapshot still describes a live streak: taken today, or yesterday with yesterday logged
+ * (so today is still open). Anything older may be a broken streak.
+ */
+fun isSnapshotPlausible(snapshot: StreakSnapshot, today: LocalDate): Boolean {
+    val yesterday = today.minusDays(1)
+    return when (snapshot.snapshotDate) {
+        today -> true
+        yesterday -> snapshot.lastLoggedDate == yesterday
+        else -> false
+    }
+}
+
 interface StreakSnapshotStorage {
     suspend fun read(): StreakSnapshot?
     suspend fun write(s: StreakSnapshot)
