@@ -54,12 +54,13 @@ class StreakViewModelTest {
         var getFailure: Throwable? = null
         var recoverResult: Result<StreakResponseDto>? = null
         var getCalls = 0
+        var gate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
         override suspend fun getStreak(today: String): StreakResponseDto {
             getCalls++
             getFailure?.let { throw it }
             return if (getResponses.size > 1) getResponses.removeFirst() else getResponses.first()
         }
-        override suspend fun recover(body: StreakTodayDto): StreakResponseDto = recoverResult!!.getOrThrow()
+        override suspend fun recover(body: StreakTodayDto): StreakResponseDto { gate?.await(); return recoverResult!!.getOrThrow() }
         override suspend fun decline(body: StreakTodayDto): StreakResponseDto = recoverResult!!.getOrThrow()
     }
 
@@ -149,6 +150,23 @@ class StreakViewModelTest {
         vm.recover(); dispatcher.scheduler.advanceUntilIdle()
         assertEquals(11, (vm.state.value as StreakUiState.Loaded).data.current)
         assertNull(vm.showOffer.value)
+    }
+
+    @Test fun refreshIsNoOpWhileRecoverInFlight() {
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val api = FakeStreakApi().apply {
+            getResponses += resp(current = 3, offer = offer)
+            recoverResult = Result.success(resp(current = 11))
+            this.gate = gate
+        }
+        val vm = vm(api)
+        vm.refresh(); dispatcher.scheduler.advanceUntilIdle()
+        val getsBefore = api.getCalls
+        vm.recover(); dispatcher.scheduler.advanceUntilIdle()
+        vm.refresh(); dispatcher.scheduler.advanceUntilIdle()
+        gate.complete(Unit); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(11, (vm.state.value as StreakUiState.Loaded).data.current)
+        assertEquals(getsBefore, api.getCalls)
     }
 
     @Test fun recoverConflictRefreshesAndHidesOffer() {

@@ -39,10 +39,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.foodtracker.R
@@ -64,13 +65,15 @@ import java.util.Locale
 private val CircleSize = 42.dp
 
 /** Dashed circle outline (Compose borders can't be dashed). */
-private fun Modifier.dashedCircle(color: Color, width: Float = 2f): Modifier = drawBehind {
+private fun Modifier.dashedCircle(color: Color, width: Dp = 2.dp): Modifier = drawBehind {
+    val w = width.toPx()
+    val dash = 3.dp.toPx()
     drawCircle(
         color = color,
-        radius = (size.minDimension - width) / 2f,
+        radius = (size.minDimension - w) / 2f,
         style = Stroke(
-            width = width,
-            pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)),
+            width = w,
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(dash, dash)),
         ),
     )
 }
@@ -100,7 +103,7 @@ fun StreakBadge(state: StreakUiState, onClick: () -> Unit) {
                 else Modifier.dashedCircle(grey.copy(alpha = 0.7f))
             )
             .then(if (state is StreakUiState.Loaded) Modifier.clickable(onClick = onClick) else Modifier)
-            .semantics { contentDescription = cd },
+            .clearAndSetSemantics { contentDescription = cd },
         Alignment.Center,
     ) {
         if (current == null) {
@@ -295,7 +298,7 @@ private fun DayCell(day: StreakDayDto, locale: Locale) {
                 Alignment.Center,
             ) { Text("↺", fontSize = 13.sp, color = GlassColors.accentGreen) }
             "today_pending" -> Box(Modifier.size(size).dashedCircle(orange), Alignment.Center) {}
-            else -> Box(Modifier.size(size).dashedCircle(grey, 1.5f), Alignment.Center) {} // missed
+            else -> Box(Modifier.size(size).dashedCircle(grey, 1.5.dp), Alignment.Center) {} // missed
         }
         Text(letter, fontSize = 11.sp, color = GlassColors.textSecondary)
     }

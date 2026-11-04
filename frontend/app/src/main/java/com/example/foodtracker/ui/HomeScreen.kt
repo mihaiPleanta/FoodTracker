@@ -135,6 +135,8 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
     val streakState by streak.state.collectAsState()
     val recoveryOffer by streak.showOffer.collectAsState()
     var showStreakSheet by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { streak.refresh() }
+    LaunchedEffect(streakState) { if (streakState !is StreakUiState.Loaded) showStreakSheet = false }
     (streakState as? StreakUiState.Loaded)?.takeIf { showStreakSheet }?.let {
         StreakSheet(it.data, onDismiss = { showStreakSheet = false })
     }

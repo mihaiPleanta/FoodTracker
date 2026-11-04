@@ -12,6 +12,7 @@ import com.example.foodtracker.model.StreakTodayDto
 import com.example.foodtracker.streak.crossedMilestone
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -56,14 +57,18 @@ class StreakViewModel(
     private var lastCurrent: Int? = null
     private var job: Job? = null
 
+    /** True while recover/decline is in flight; a refresh must not cancel it (it returns fresh state itself). */
+    private var mutating = false
+
     fun refresh() {
+        if (mutating) return
         offerDismissed.value = false
         launchCall { api.getStreak(today().toString()) }
     }
 
-    fun recover() = launchCall { api.recover(StreakTodayDto(today().toString())) }
+    fun recover() = launchCall(mutation = true) { api.recover(StreakTodayDto(today().toString())) }
 
-    fun decline() = launchCall { api.decline(StreakTodayDto(today().toString())) }
+    fun decline() = launchCall(mutation = true) { api.decline(StreakTodayDto(today().toString())) }
 
     /** Hides the offer until the next refresh (e.g. from onResume). */
     fun dismissOffer() {
@@ -73,14 +78,16 @@ class StreakViewModel(
     /** Logout / account deletion. */
     fun resetUserState() {
         job?.cancel()
+        mutating = false
         lastCurrent = null
         offerDismissed.value = false
         _state.value = StreakUiState.Loading
         viewModelScope.launch { snapshots.clear() }
     }
 
-    private fun launchCall(call: suspend () -> StreakResponseDto) {
+    private fun launchCall(mutation: Boolean = false, call: suspend () -> StreakResponseDto) {
         job?.cancel()
+        mutating = mutation
         job = viewModelScope.launch {
             try {
                 apply(call())
@@ -103,6 +110,8 @@ class StreakViewModel(
                 fallBackToSnapshot()
             } catch (_: Exception) {
                 fallBackToSnapshot()
+            } finally {
+                if (mutation && job === currentCoroutineContext()[Job]) mutating = false
             }
         }
     }
