@@ -49,6 +49,7 @@ class DataStoreSettingsRepository(
     private val snacksKeys    = ReminderKeys("snacks")
     private val dinnerKeys    = ReminderKeys("dinner")
     private val dayCompleteKeys = ReminderKeys("day_complete")
+    private val streakKeys = ReminderKeys("streak")
 
     private val defaults = AppSettings()
 
@@ -79,6 +80,7 @@ class DataStoreSettingsRepository(
                 snacksReminder    = prefs.reminder(snacksKeys, defaults.snacksReminder),
                 dinnerReminder    = prefs.reminder(dinnerKeys, defaults.dinnerReminder),
                 dayCompleteReminder = prefs.reminder(dayCompleteKeys, defaults.dayCompleteReminder),
+                streakReminder = prefs.reminder(streakKeys, defaults.streakReminder),
                 inTargetTolerancePct = prefs[Keys.IN_TARGET_TOLERANCE]
                     ?.takeIf { it in TOLERANCE_OPTIONS } ?: defaults.inTargetTolerancePct
             )
@@ -94,6 +96,7 @@ class DataStoreSettingsRepository(
             prefs.setReminder(snacksKeys, settings.snacksReminder)
             prefs.setReminder(dinnerKeys, settings.dinnerReminder)
             prefs.setReminder(dayCompleteKeys, settings.dayCompleteReminder)
+            prefs.setReminder(streakKeys, settings.streakReminder)
             prefs[Keys.IN_TARGET_TOLERANCE] = settings.inTargetTolerancePct
         }
     }

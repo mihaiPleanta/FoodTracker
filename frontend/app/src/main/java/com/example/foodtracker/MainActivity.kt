@@ -43,7 +43,9 @@ import com.example.foodtracker.util.notifications.desiredSchedule
 import com.example.foodtracker.util.notifications.MealReminderWorker
 import com.example.foodtracker.util.notifications.DayCompleteReminderScheduler
 import com.example.foodtracker.util.notifications.DayCompleteReminderWorker
+import com.example.foodtracker.util.notifications.StreakReminderScheduler
 import com.example.foodtracker.util.notifications.desiredDayCompleteMinute
+import com.example.foodtracker.util.notifications.desiredStreakMinute
 import com.example.foodtracker.util.notifications.NotificationChannels
 import com.example.foodtracker.util.AppLocale
 import com.example.foodtracker.viewmodel.AuthViewModel
@@ -166,6 +168,15 @@ class MainActivity : ComponentActivity() {
                         .distinctUntilChanged { a, b -> desiredDayCompleteMinute(a) == desiredDayCompleteMinute(b) }
                         .collect { settings ->
                             DayCompleteReminderScheduler.sync(applicationContext, settings)
+                        }
+                }
+
+                // Evening streak reminder — its own effect, scheduler and store key.
+                LaunchedEffect(Unit) {
+                    viewModel.persistedSettings
+                        .distinctUntilChanged { a, b -> desiredStreakMinute(a) == desiredStreakMinute(b) }
+                        .collect { settings ->
+                            StreakReminderScheduler.sync(applicationContext, settings)
                         }
                 }
 

@@ -17,6 +17,7 @@ data class AppSettings(
     val snacksReminder: MealReminder = MealReminder(minuteOfDay = 16 * 60),
     val dinnerReminder: MealReminder = MealReminder(minuteOfDay = 19 * 60),
     val dayCompleteReminder: MealReminder = MealReminder(enabled = false, minuteOfDay = 21 * 60 + 30),
+    val streakReminder: MealReminder = MealReminder(enabled = true, minuteOfDay = 20 * 60),
     /** A day counts as "on target" within +/- this percent of the kcal goal. One of 5/10/15. */
     val inTargetTolerancePct: Int = 10
 )

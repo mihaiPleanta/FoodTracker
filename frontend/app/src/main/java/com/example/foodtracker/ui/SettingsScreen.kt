@@ -73,6 +73,7 @@ fun SettingsScreen(
     var showLogoutDialog by remember { mutableStateOf(false) }
     var editingMeal by remember { mutableStateOf<MealReminderScheduler.Meal?>(null) }
     var editingDayComplete by remember { mutableStateOf(false) }
+    var editingStreak by remember { mutableStateOf(false) }
     val is24Hour = DateFormat.is24HourFormat(context)
     var showDeleteDialog by remember { mutableStateOf(false) }
     val deleteAccountState by authViewModel.deleteAccountState.collectAsState()
@@ -171,6 +172,19 @@ fun SettingsScreen(
                     onCheckedChange = {
                         viewModel.updateAppSettings(
                             settings.copy(dayCompleteReminder = settings.dayCompleteReminder.copy(enabled = it))
+                        )
+                    }
+                )
+                MealReminderRow(
+                    emoji = "🔥",
+                    label = stringResource(R.string.settings_streak_reminder),
+                    time = formatMinuteOfDay(settings.streakReminder.minuteOfDay, is24Hour),
+                    checked = settings.streakReminder.enabled,
+                    enabled = settings.notificationsEnabled,
+                    onTimeClick = { editingStreak = true },
+                    onCheckedChange = {
+                        viewModel.updateAppSettings(
+                            settings.copy(streakReminder = settings.streakReminder.copy(enabled = it))
                         )
                     }
                 )
@@ -436,6 +450,21 @@ fun SettingsScreen(
                 editingDayComplete = false
                 viewModel.updateAppSettings(
                     settings.copy(dayCompleteReminder = reminder.copy(minuteOfDay = minuteOfDay))
+                )
+            }
+        )
+    }
+
+    if (editingStreak) {
+        val reminder = settings.streakReminder
+        ReminderTimeDialog(
+            initialMinuteOfDay = reminder.minuteOfDay,
+            is24Hour = is24Hour,
+            onDismiss = { editingStreak = false },
+            onConfirm = { minuteOfDay ->
+                editingStreak = false
+                viewModel.updateAppSettings(
+                    settings.copy(streakReminder = reminder.copy(minuteOfDay = minuteOfDay))
                 )
             }
         )

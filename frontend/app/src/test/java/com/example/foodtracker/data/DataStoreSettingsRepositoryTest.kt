@@ -126,6 +126,18 @@ class DataStoreSettingsRepositoryTest {
     }
 
     @Test
+    fun streakReminder_defaultsToEnabled2000() = runTest {
+        assertEquals(MealReminder(enabled = true, minuteOfDay = 20 * 60), repo.settings.first().streakReminder)
+    }
+
+    @Test
+    fun streakReminder_roundTrips() = runTest {
+        val custom = AppSettings(streakReminder = MealReminder(enabled = false, minuteOfDay = 18 * 60))
+        repo.update(custom)
+        assertEquals(custom.streakReminder, repo.settings.first().streakReminder)
+    }
+
+    @Test
     fun tolerance_defaultsTo10() = runTest {
         assertEquals(10, repo.settings.first().inTargetTolerancePct)
     }

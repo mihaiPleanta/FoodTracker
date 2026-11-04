@@ -40,6 +40,17 @@ class ScheduledReminderStore(
         }
     }
 
+    private val streakKey = intPreferencesKey("scheduled_streak_minutes")
+
+    /** `null` = streak reminder not scheduled. */
+    suspend fun readStreak(): Int? = dataStore.data.first()[streakKey]
+
+    suspend fun writeStreak(minute: Int?) {
+        dataStore.edit { prefs ->
+            if (minute == null) prefs.remove(streakKey) else prefs[streakKey] = minute
+        }
+    }
+
     suspend fun write(schedule: ReminderSchedule) {
         dataStore.edit { prefs ->
             prefs[initialized] = true

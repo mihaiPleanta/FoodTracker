@@ -48,4 +48,13 @@ class ScheduledReminderStoreTest {
         store.write(Meal.values().associateWith { 780 } + (Meal.LUNCH to null))
         assertNull(store.read()!![Meal.LUNCH])
     }
+
+    @Test
+    fun streak_roundTripsAndClears() = runTest {
+        assertNull(store.readStreak())
+        store.writeStreak(1200)
+        assertEquals(1200, store.readStreak())
+        store.writeStreak(null)
+        assertNull(store.readStreak())
+    }
 }
