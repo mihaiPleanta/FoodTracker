@@ -107,6 +107,7 @@ class FoodLogCreate(BaseModel):
     ingredients: Optional[List[FoodLogIngredient]] = None
     unit: Optional[str] = None
     unit_qty: Optional[float] = None
+    client_id: Optional[str] = Field(default=None, min_length=1, max_length=36)
 
     @model_validator(mode="after")
     def _unit_pair(self):
@@ -155,6 +156,7 @@ class FoodLogDeleteBatchResponse(BaseModel):
 class FoodLogDto(FoodLogCreate):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    client_id: str
     created_at: _datetime
 
 

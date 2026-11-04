@@ -1,3 +1,4 @@
+import uuid
 from datetime import date, datetime
 from typing import Optional
 
@@ -62,12 +63,16 @@ class FoodLog(Base):
     ingredients: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     unit: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     unit_qty: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    client_id: Mapped[str] = mapped_column(
+        String(36), nullable=False, default=lambda: str(uuid.uuid4())
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
     __table_args__ = (
+        UniqueConstraint("uid", "client_id", name="uq_food_logs_uid_client_id"),
         CheckConstraint("grams > 0", name="ck_food_logs_grams_positive"),
         CheckConstraint("kcal_100g >= 0", name="ck_food_logs_kcal_nonneg"),
         CheckConstraint("protein_100g >= 0", name="ck_food_logs_protein_nonneg"),
