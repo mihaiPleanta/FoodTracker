@@ -238,6 +238,7 @@ class GoalsResponse(BaseModel):
     carbs_goal_g: int
     fat_goal_g: int
     mode: Literal["DEFICIT", "MAINTENANCE", "SURPLUS"]
+    tdee: int
     hydration: HydrationGoalDto
 
 
@@ -447,6 +448,15 @@ class StatsGoalsDto(BaseModel):
     carbs_goal_g: int
     fat_goal_g: int
     tdee: int
+
+
+class DayRangeItem(DayResponse):
+    date: _date
+    goals: Optional[StatsGoalsDto] = None
+
+
+class DaysRangeResponse(BaseModel):
+    days: List[DayRangeItem]
 
 
 class StatsDayDto(BaseModel):

@@ -29,6 +29,7 @@ async def get_goals(
         carbs_goal_g=goals.carbs_goal_g,
         fat_goal_g=goals.fat_goal_g,
         mode=goals.mode,
+        tdee=goals.tdee,
         hydration=HydrationGoalDto(
             goal_l=hydration.goal_l,
             auto_l=hydration.auto_l,

@@ -90,3 +90,17 @@ def test_goals_hydration_manual(client):
     _create_profile(client, takes_creatine=True, hydration_goal_override_l=2.8)
     h = client.get("/goals", headers=AUTH_HEADER).json()["hydration"]
     assert h["goal_l"] == 2.8 and h["is_manual"] and h["auto_l"] == 3.6
+
+
+def test_goals_include_tdee(client):
+    from services.nutrition import calculate_goals
+    from models import Profile
+    from sqlalchemy.orm import Session
+    from tests.conftest import _sync_engine
+
+    _create_profile(client)
+    data = client.get("/goals", headers=AUTH_HEADER).json()
+    with Session(_sync_engine) as s:
+        profile = s.query(Profile).filter_by(uid="test-uid-123").one()
+        expected = calculate_goals(profile).tdee
+    assert data["tdee"] == round(expected)
