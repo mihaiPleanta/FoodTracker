@@ -62,13 +62,9 @@ private class FakeCopyLogsApi : LogsApi {
     var summary = FoodLogSummaryDto(emptyList())
     val days = mutableMapOf<String, DayResponseDto>()
     val dayGates = mutableMapOf<String, CompletableDeferred<Unit>>()
-    var failCopy: Throwable? = null
     var summaryGate: CompletableDeferred<Unit>? = null
     var failSummary = false
-    var copyGate: CompletableDeferred<Unit>? = null
-    var copyResult: List<FoodLogDto> = emptyList()
     val summaryRequests = mutableListOf<Pair<String, String>>()
-    val copyRequests = mutableListOf<FoodLogCopyRequestDto>()
 
     override suspend fun updateFoodLogByClient(cid: String, body: FoodLogUpdateDto): FoodLogDto = TODO()
     override suspend fun deleteFoodLogByClient(cid: String): retrofit2.Response<Unit> = TODO()
@@ -84,10 +80,7 @@ private class FakeCopyLogsApi : LogsApi {
         return summary
     }
     override suspend fun copyFoodLogs(body: FoodLogCopyRequestDto): List<FoodLogDto> {
-        copyRequests += body
-        copyGate?.await()
-        failCopy?.let { throw it }
-        return copyResult
+        error("unused")
     }
     override suspend fun createFoodLog(body: FoodLogCreateDto): FoodLogDto = error("unused")
     override suspend fun updateFoodLog(id: Long, body: FoodLogUpdateDto): FoodLogDto = error("unused")
@@ -287,7 +280,6 @@ class CopyViewModelTest {
     private fun apiWithOne() = FakeCopyLogsApi().apply {
         summary = summaryOf("2026-10-30" to mapOf("lunch" to ms))
         days["2026-10-30"] = dayOf("lunch" to listOf(log(1, "LUNCH")))
-        copyResult = listOf(log(99, "LUNCH"))
     }
 
     @Test
@@ -395,5 +387,68 @@ class CopyViewModelTest {
         vm.copy()
         advanceUntilIdle()
         assertEquals(1, tj.repo.observeDay(target).first().meals["Lunch"].orEmpty().size)
+    }
+
+    private fun recipeLog(id: Long) = serverLog(id, "2026-10-30", "LUNCH", grams = 300).copy(
+        ingredients = listOf(FoodLogIngredientDto("Orez", 200f, 130f, 2.7f, 28f, 0.3f)),
+    )
+
+    private suspend fun copiedBodies(tj: TestJournal) = tj.ops().map { (it as com.example.foodtracker.sync.SyncOp.CreateLog).body }
+
+    @Test
+    fun copyUneditedRecipeKeepsSourceGramsAndMacros() = runTest(testDispatcher) {
+        val tj = mirrorOf("2026-10-30" to dayOf("lunch" to listOf(recipeLog(1))))
+        val vm = CopyViewModel(tj.repo, FakeCopyLogsApi())
+        vm.open(CopyMode.Day, target); advanceUntilIdle()
+        vm.updatePortion("srv-cid-1", 999, "bol", 1f)
+        vm.copy(); advanceUntilIdle()
+        val b = copiedBodies(tj).single()
+        assertEquals(300, b.grams)
+        assertEquals(100f, b.kcal100g, 0.01f)
+        assertEquals(1, b.ingredients!!.size)
+        assertNull(b.unit)
+        assertNull(b.unitQty)
+    }
+
+    @Test
+    fun copyEditedRecipeRecomputesFromIngredients() = runTest(testDispatcher) {
+        val tj = mirrorOf("2026-10-30" to dayOf("lunch" to listOf(recipeLog(1))))
+        val vm = CopyViewModel(tj.repo, FakeCopyLogsApi())
+        vm.open(CopyMode.Day, target); advanceUntilIdle()
+        vm.updateIngredients("srv-cid-1", listOf(FoodIngredient("Orez", 200f, 130f, 2.7f, 28f, 0.3f)))
+        vm.copy(); advanceUntilIdle()
+        val b = copiedBodies(tj).single()
+        assertEquals(200, b.grams)
+        assertEquals(130f, b.kcal100g, 0.01f)
+        assertNull(b.unit)
+    }
+
+    @Test
+    fun copyPlainFoodUsesEditedPortionAndUnit() = runTest(testDispatcher) {
+        val tj = mirrorOf("2026-10-30" to dayOf("lunch" to listOf(serverLog(1, "2026-10-30", "LUNCH"))))
+        val vm = CopyViewModel(tj.repo, FakeCopyLogsApi())
+        vm.open(CopyMode.Day, target); advanceUntilIdle()
+        vm.updatePortion("srv-cid-1", 250, "lingura", 2f)
+        vm.copy(); advanceUntilIdle()
+        val b = copiedBodies(tj).single()
+        assertEquals(250, b.grams)
+        assertEquals("lingura", b.unit)
+        assertEquals(2f, b.unitQty)
+        assertEquals(100f, b.kcal100g, 0.01f)
+        assertNull(b.ingredients)
+    }
+
+    @Test
+    fun copyFailureReenablesAndEmitsErrorSave() = runTest(testDispatcher) {
+        val tj = mirrorOf("2026-10-30" to dayOf("lunch" to listOf(serverLog(1, "2026-10-30", "LUNCH"))))
+        val vm = CopyViewModel(tj.repo, FakeCopyLogsApi())
+        val errs = mutableListOf<FoodViewModel.ToastEvent>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.errors.collect { errs += it } }
+        vm.open(CopyMode.Day, target); advanceUntilIdle()
+        tj.failWrites = true
+        vm.copy(); advanceUntilIdle()
+        assertEquals(listOf(R.string.error_save), errs.map { it.messageRes })
+        assertEquals(false, vm.state.value.copying)
+        assertEquals(1, vm.state.value.checkedCount)
     }
 }

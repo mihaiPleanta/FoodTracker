@@ -725,8 +725,8 @@ class FoodViewModelTest {
         advanceUntilIdle()
 
         val source = listOf(
-            "Breakfast" to serverLog(100, key, "BREAKFAST", "Eggs").toLogged(),
-            "Dinner" to serverLog(101, key, "DINNER", "Rice").toLogged(),
+            com.example.foodtracker.data.journal.CopyLogItem("Breakfast", serverLog(100, key, "BREAKFAST", "Eggs").toLogged()),
+            com.example.foodtracker.data.journal.CopyLogItem("Dinner", serverLog(101, key, "DINNER", "Rice").toLogged()),
         )
         val ids = journal.repo.copyLogs(java.time.LocalDate.parse(key), source)
         vm.onCopied(key, setOf("Breakfast", "Dinner"))
@@ -749,7 +749,7 @@ class FoodViewModelTest {
         val vm = newVm(journal)
         val dinner = collectFoods(vm, "Dinner")
         advanceUntilIdle()
-        val ids = journal.repo.copyLogs(java.time.LocalDate.now(), listOf("Dinner" to LoggedFood(bread, 60)))
+        val ids = journal.repo.copyLogs(java.time.LocalDate.now(), listOf(com.example.foodtracker.data.journal.CopyLogItem("Dinner", LoggedFood(bread, 60))))
         advanceUntilIdle()
         assertEquals(1, dinner().size)
 

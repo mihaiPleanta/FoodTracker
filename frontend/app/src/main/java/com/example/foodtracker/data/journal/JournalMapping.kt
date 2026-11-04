@@ -59,11 +59,13 @@ internal fun LoggedFood.toUpdateBody() = FoodLogUpdateDto(
     unitQty = unitQty,
 )
 
-/** Same rules as `POST /food-logs/copy`: a recipe takes grams + per-100g from its ingredients
- *  and drops the unit; anything else keeps the item's grams/unit and has `ingredients = null`. */
-internal fun LoggedFood.toCopyBody(date: String, meal: String, clientId: String): FoodLogCreateDto {
+/** Same rules as `POST /food-logs/copy`: a recipe with edited ingredients takes grams + per-100g from them,
+ *  an unedited recipe keeps its source values; both drop the unit; anything else keeps the item's grams/unit and has `ingredients = null`. */
+internal fun LoggedFood.toCopyBody(date: String, meal: String, clientId: String, ingredientsEdited: Boolean = false): FoodLogCreateDto {
     val base = toCreateBody(date, meal, clientId)
     val ing = food.ingredients ?: return base.copy(ingredients = null)
+    // Unedited recipe: source grams, per-100g and ingredients as they are.
+    if (!ingredientsEdited) return base.copy(unit = null, unitQty = null)
     if (ing.isEmpty()) return base.copy(unit = null, unitQty = null)
     val totalG = ing.sumOf { it.grams.toDouble() }
     fun per(x: Double) = if (totalG > 0) (x / totalG * 100).toFloat() else 0f

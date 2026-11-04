@@ -38,6 +38,8 @@ const val MIRROR_DAYS = 62
 const val WEIGHT_MIRROR_DAYS = 122
 private const val REFRESH_RETRIES = 2
 
+data class CopyLogItem(val mealName: String, val logged: LoggedFood, val ingredientsEdited: Boolean = false)
+
 data class LocalDay(
     val date: LocalDate,
     /** key = "Breakfast"/"Lunch"/"Dinner"/"Snacks" (all four, in [MEAL_ORDER]); lists ordered by sortKey. */
@@ -173,12 +175,12 @@ class JournalRepository(
         if (changed) scheduler.requestSync()
     }
 
-    /** [items] = (mealName, source log as edited in the copy sheet). Returns the new clientIds, in order. */
-    suspend fun copyLogs(toDate: LocalDate, items: List<Pair<String, LoggedFood>>): List<String> {
+    /** [items] = source logs as edited in the copy sheet. Returns the new clientIds, in order. */
+    suspend fun copyLogs(toDate: LocalDate, items: List<CopyLogItem>): List<String> {
         if (items.isEmpty()) return emptyList()
         val key = toDate.toString()
-        val bodies = items.map { (mealName, logged) ->
-            logged.toCopyBody(key, mealKeyToBackend(mealName), UUID.randomUUID().toString())
+        val bodies = items.map { (mealName, logged, edited) ->
+            logged.toCopyBody(key, mealKeyToBackend(mealName), UUID.randomUUID().toString(), edited)
         }
         val base = now()
         write {

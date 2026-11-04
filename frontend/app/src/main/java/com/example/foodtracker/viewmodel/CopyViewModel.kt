@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.foodtracker.R
 import com.example.foodtracker.api.LogsApi
 import com.example.foodtracker.api.RetrofitInstance
+import com.example.foodtracker.data.journal.CopyLogItem
 import com.example.foodtracker.data.journal.JournalRepository
 import com.example.foodtracker.data.journal.LocalDay
 import com.example.foodtracker.model.DayResponseDto
@@ -42,6 +43,8 @@ data class CopyCandidate(
     val logged: LoggedFood,
     val checked: Boolean = true,
     val ingredientsEdited: Boolean = false,
+    /** The log as read from the source day; a recipe copied without edits keeps these values. */
+    val original: LoggedFood = logged,
 )
 
 sealed interface SourceDayState {
@@ -67,7 +70,7 @@ data class CopyUiState(
         get() = (source as? SourceDayState.Loaded)?.candidates?.count { it.checked } ?: 0
 }
 
-data class CopyResult(val targetDateKey: String, val clientIds: List<String>, val meals: Set<String> = emptySet())
+data class CopyResult(val targetDateKey: String, val clientIds: List<String>, val meals: Set<String>)
 
 const val COPY_STRIP_DAYS = 7
 const val COPY_PRESELECT_WINDOW_DAYS = 30L
@@ -284,7 +287,7 @@ class CopyViewModel(
         _state.update { it.copy(copying = true) }
         copyJob = viewModelScope.launch {
             try {
-                val ids = journal.copyLogs(target, checked.map { it.mealName to it.logged })
+                val ids = journal.copyLogs(target, checked.map { CopyLogItem(it.mealName, if (it.logged.food.ingredients != null && !it.ingredientsEdited) it.original else it.logged, it.ingredientsEdited) })
                 _state.update { it.copy(copying = false) }
                 _copied.tryEmit(CopyResult(target.toString(), ids, checked.map { it.mealName }.toSet()))
             } catch (e: CancellationException) {

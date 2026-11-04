@@ -195,7 +195,7 @@ class JournalRepositoryTest {
         val simple = LoggedFood(oats.copy(barcode = "999"), 120, clientId = "src-s")
         val target = today.plusDays(1)
 
-        val ids = repo.copyLogs(target, listOf("Dinner" to recipe, "Breakfast" to withUnit, "Snacks" to simple))
+        val ids = repo.copyLogs(target, listOf(CopyLogItem("Dinner", recipe, true), CopyLogItem("Breakfast", withUnit), CopyLogItem("Snacks", simple)))
 
         assertEquals(3, ids.toSet().size)
         assertTrue(ids.none { it.startsWith("src") })
