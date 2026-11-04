@@ -129,7 +129,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
     }
     LaunchedEffect(resources) {
         streak.milestones.collect { days ->
-            snackbarHostState.showSnackbar(resources.getString(R.string.streak_milestone_reached, days))
+            snackbarHostState.showSnackbar(resources.getQuantityString(R.plurals.streak_milestone_reached, days, days))
         }
     }
     val streakState by streak.state.collectAsState()

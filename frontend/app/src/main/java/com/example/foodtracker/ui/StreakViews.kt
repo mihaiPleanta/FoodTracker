@@ -6,9 +6,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -38,6 +40,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -58,8 +61,6 @@ import com.example.foodtracker.util.toLocale
 import com.example.foodtracker.viewmodel.StreakUiState
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
-import java.time.format.TextStyle
 import java.util.Locale
 
 private val CircleSize = 42.dp
@@ -161,7 +162,7 @@ private fun StreakSheetContent(data: StreakResponseDto) {
         }
 
         StreakCard {
-            CardLabel(stringResource(R.string.streak_last_14))
+            CardLabel(stringResource(R.string.streak_last_14) + " · " + monthSpan(data.last14Days, locale))
             Spacer(Modifier.height(8.dp))
             data.last14Days.chunked(7).forEachIndexed { i, week ->
                 if (i > 0) Spacer(Modifier.height(10.dp))
@@ -172,12 +173,9 @@ private fun StreakSheetContent(data: StreakResponseDto) {
         }
 
         StreakCard {
+            val remaining = (data.nextMilestone - data.current).coerceAtLeast(0)
             Text(
-                stringResource(
-                    R.string.streak_next_milestone,
-                    (data.nextMilestone - data.current).coerceAtLeast(0),
-                    data.nextMilestone,
-                ),
+                pluralStringResource(R.plurals.streak_next_milestone, remaining, remaining, data.nextMilestone),
                 fontSize = 16.sp, fontWeight = FontWeight.Bold, color = GlassColors.textPrimary,
             )
             Spacer(Modifier.height(8.dp))
@@ -198,19 +196,19 @@ private fun StreakSheetContent(data: StreakResponseDto) {
         }
 
         Spacer(Modifier.height(2.dp))
-        Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), Arrangement.spacedBy(10.dp)) {
             StatCard(
                 stringResource(R.string.streak_best),
-                stringResource(R.string.streak_days_count, data.best),
+                pluralStringResource(R.plurals.streak_days_count, data.best, data.best),
                 GlassColors.textPrimary, Modifier.weight(1f),
             )
             StatCard(
                 stringResource(R.string.streak_total),
-                stringResource(R.string.streak_days_count, data.totalLoggedDays),
+                pluralStringResource(R.plurals.streak_days_count, data.totalLoggedDays, data.totalLoggedDays),
                 GlassColors.textPrimary, Modifier.weight(1f),
             )
         }
-        Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), Arrangement.spacedBy(10.dp)) {
             val pauseUsed = data.pauseUsedThisWeek
             StatCard(
                 stringResource(R.string.streak_pause_week),
@@ -239,7 +237,17 @@ private fun StreakSheetContent(data: StreakResponseDto) {
 
 private fun shortDate(iso: String?, locale: Locale): String {
     val date = iso?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return "—"
-    return DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT).withLocale(locale).format(date)
+    return DateTimeFormatter.ofPattern("d MMM", locale).format(date)
+}
+
+/** "nov." or "oct. – nov." for the span of the 14-day strip. */
+private fun monthSpan(days: List<StreakDayDto>, locale: Locale): String {
+    val dates = days.mapNotNull { runCatching { LocalDate.parse(it.date) }.getOrNull() }
+    if (dates.isEmpty()) return ""
+    val fmt = DateTimeFormatter.ofPattern("MMM", locale)
+    val first = fmt.format(dates.first())
+    val last = fmt.format(dates.last())
+    return if (first == last) last else "$first – $last"
 }
 
 @Composable
@@ -262,7 +270,7 @@ private fun CardLabel(text: String) {
 
 @Composable
 private fun StatCard(label: String, value: String, valueColor: Color, modifier: Modifier) {
-    StreakCard(modifier) {
+    StreakCard(modifier.fillMaxHeight()) {
         CardLabel(label)
         Text(value, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = valueColor, modifier = Modifier.padding(top = 2.dp))
     }
@@ -274,7 +282,7 @@ private fun DayCell(day: StreakDayDto, locale: Locale) {
     val blue = GlassColors.accentBlue
     val grey = GlassColors.textTertiary
     val date = runCatching { LocalDate.parse(day.date) }.getOrNull()
-    val letter = date?.dayOfWeek?.getDisplayName(TextStyle.NARROW, locale) ?: ""
+    val dayNumber = date?.dayOfMonth?.toString() ?: ""
     val size = 28.dp
     val base = Modifier.size(size).clip(CircleShape)
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -300,7 +308,7 @@ private fun DayCell(day: StreakDayDto, locale: Locale) {
             "today_pending" -> Box(Modifier.size(size).dashedCircle(orange), Alignment.Center) {}
             else -> Box(Modifier.size(size).dashedCircle(grey, 1.5.dp), Alignment.Center) {} // missed
         }
-        Text(letter, fontSize = 11.sp, color = GlassColors.textSecondary)
+        Text(dayNumber, fontSize = 11.sp, color = GlassColors.textSecondary)
     }
 }
 
@@ -319,7 +327,7 @@ fun StreakRecoveryDialog(
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("🔥", fontSize = 42.sp)
                 Text(
-                    stringResource(R.string.streak_broken_title, offer.previousStreak),
+                    pluralStringResource(R.plurals.streak_broken_title, offer.previousStreak, offer.previousStreak),
                     fontSize = 20.sp, fontWeight = FontWeight.ExtraBold,
                     color = GlassColors.textPrimary, textAlign = TextAlign.Center,
                 )
