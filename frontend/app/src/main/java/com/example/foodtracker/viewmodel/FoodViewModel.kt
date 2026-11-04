@@ -25,6 +25,7 @@ import com.example.foodtracker.model.toProfileDto
 import com.example.foodtracker.model.totalGrams
 import com.example.foodtracker.model.withIngredients
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -338,7 +339,7 @@ class FoodViewModel(
 
     fun incrementHydration(amountLiters: Float = 0.25f) {
         val date = localDate(_selectedHomeDate.value)
-        viewModelScope.launch {
+        launchWrite {
             hydrationMutex.withLock {
                 val current = journal.observeDay(date).first().hydrationL
                 journal.setHydration(date, (current + amountLiters).coerceAtMost(8f))
@@ -347,6 +348,17 @@ class FoodViewModel(
     }
 
     private fun sameDay(a: Date, b: Date): Boolean = dateKey(a) == dateKey(b)
+
+    /** Runs a local journal write; a storage failure becomes a snackbar instead of a crash. */
+    private fun launchWrite(block: suspend () -> Unit) = viewModelScope.launch {
+        try {
+            block()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            _toastEvents.tryEmit(ToastEvent(R.string.error_save))
+        }
+    }
 
     /** Best-effort server refresh; only a day the mirror has never seen reports a failure. */
     private suspend fun refreshDay(date: LocalDate) {
@@ -446,7 +458,7 @@ class FoodViewModel(
 
     private fun writeStatus(date: Date, complete: Boolean?) {
         val day = localDate(date)
-        viewModelScope.launch {
+        launchWrite {
             journal.setDayStatus(day, complete)
             _dayStatusChanged.tryEmit(Unit)
         }
@@ -467,7 +479,7 @@ class FoodViewModel(
         }
         val day = localDate(date)
         weightDatesAwaitingSync += day.toString()
-        viewModelScope.launch { journal.setWeight(day, weightKg) }
+        launchWrite { journal.setWeight(day, weightKg) }
     }
 
     fun setSelectedHomeDate(date: Date) {
@@ -497,25 +509,45 @@ class FoodViewModel(
     private fun currentMeal(mealName: String): List<LoggedFood> =
         selectedDay.value?.meals?.get(mealName).orEmpty()
 
-    // Adds launched but not yet visible in [selectedDay], per "date|meal": keeps returned indexes
-    // increasing when several adds happen before the mirror emits.
-    private val addsInFlight = mutableMapOf<String, Int>()
+    /**
+     * An add whose index was handed to the UI before the mirror shows the row. The MealDetail
+     * undo removes by that index, so it is resolved through [clientId] until the row is visible.
+     */
+    private class PendingAdd(val date: LocalDate, val meal: String, val index: Int) {
+        /** Completes with the new clientId, or null if the write failed. */
+        val clientId = CompletableDeferred<String?>()
+    }
+
+    private val pendingAdds = mutableListOf<PendingAdd>()
+
+    /** Forgets adds the mirror now shows, adds that failed, and adds of another date. */
+    private fun prunePendingAdds() {
+        val selected = localDate(_selectedHomeDate.value)
+        val day = selectedDay.value
+        pendingAdds.removeAll { p ->
+            if (p.date != selected) return@removeAll true
+            if (!p.clientId.isCompleted) return@removeAll false
+            @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+            val cid = p.clientId.getCompleted() ?: return@removeAll true
+            day != null && day.meals[p.meal].orEmpty().any { it.clientId == cid }
+        }
+    }
 
     fun addFoodToMeal(mealName: String, food: LoggedFood) {
         addFoodToMealReturningIndex(mealName, food)
     }
 
     fun addFoodToMealReturningIndex(mealName: String, food: LoggedFood): Int {
+        prunePendingAdds()
         val date = localDate(_selectedHomeDate.value)
-        val slot = "$date|$mealName"
-        val index = currentMeal(mealName).size + (addsInFlight[slot] ?: 0)
-        addsInFlight[slot] = (addsInFlight[slot] ?: 0) + 1
-        viewModelScope.launch {
+        val index = currentMeal(mealName).size + pendingAdds.count { it.date == date && it.meal == mealName }
+        val pending = PendingAdd(date, mealName, index)
+        pendingAdds += pending
+        launchWrite {
             try {
-                addLog(date, mealName, food, sortKey = null)
+                pending.clientId.complete(addLog(date, mealName, food, sortKey = null))
             } finally {
-                addsInFlight[slot] = (addsInFlight[slot] ?: 1) - 1
-                if (addsInFlight[slot] == 0) addsInFlight.remove(slot)
+                pending.clientId.complete(null)   // no-op after success
             }
         }
         return index
@@ -525,15 +557,16 @@ class FoodViewModel(
     fun restoreRemovedFood(mealName: String, index: Int, food: LoggedFood) {
         if (food.clientId != null && currentMeal(mealName).any { it.clientId == food.clientId }) return
         val date = localDate(_selectedHomeDate.value)
-        viewModelScope.launch { addLog(date, mealName, food, sortKey = food.sortKey) }
+        launchWrite { addLog(date, mealName, food, sortKey = food.sortKey) }
     }
 
-    private suspend fun addLog(date: LocalDate, mealName: String, food: LoggedFood, sortKey: Long?) {
+    private suspend fun addLog(date: LocalDate, mealName: String, food: LoggedFood, sortKey: Long?): String {
         val clean = food.copy(id = null, clientId = null, pending = false, sortKey = null)
-        journal.addLog(date, mealName, clean, sortKey)
+        val clientId = journal.addLog(date, mealName, clean, sortKey)
         _foodLogsChanged.tryEmit(Unit)
         // Hint local pentru worker-ul de remindere — sursa de adevăr rămâne backend-ul.
         runCatching { mealLogTracker.markLogged(date, mealName) }
+        return clientId
     }
 
     /**
@@ -560,19 +593,30 @@ class FoodViewModel(
     /** Undoes a copy: deletes the copied rows locally; the queue removes them on the server. */
     fun undoCopy(dateKey: String, clientIds: List<String>) {
         if (clientIds.isEmpty()) return
-        viewModelScope.launch {
+        launchWrite {
             journal.deleteLogs(clientIds)
             _foodLogsChanged.tryEmit(Unit)
         }
     }
 
     fun removeFoodFromMeal(mealName: String, index: Int) {
-        val target = currentMeal(mealName).getOrNull(index) ?: return
-        val clientId = target.clientId ?: return
-        viewModelScope.launch {
-            journal.deleteLogs(listOf(clientId))
-            _foodLogsChanged.tryEmit(Unit)
+        prunePendingAdds()
+        val date = localDate(_selectedHomeDate.value)
+        val pending = pendingAdds.firstOrNull { it.date == date && it.meal == mealName && it.index == index }
+        if (pending != null) {
+            // Undo of an add the mirror doesn't show yet: delete it by its clientId once written.
+            pendingAdds -= pending
+            deleteLog { pending.clientId.await() }
+            return
         }
+        val clientId = currentMeal(mealName).getOrNull(index)?.clientId ?: return
+        deleteLog { clientId }
+    }
+
+    private fun deleteLog(clientId: suspend () -> String?) = launchWrite {
+        val cid = clientId() ?: return@launchWrite
+        journal.deleteLogs(listOf(cid))
+        _foodLogsChanged.tryEmit(Unit)
     }
 
     fun updateFoodPortion(mealName: String, index: Int, grams: Int, unit: String?, unitQty: Float?) {
@@ -591,7 +635,7 @@ class FoodViewModel(
 
     private fun updateLog(target: LoggedFood, updated: LoggedFood) {
         val clientId = target.clientId ?: return
-        viewModelScope.launch {
+        launchWrite {
             journal.updateLog(clientId, updated)
             _foodLogsChanged.tryEmit(Unit)
         }
@@ -602,9 +646,16 @@ class FoodViewModel(
             is SyncEvent.Synced -> {
                 _foodLogsChanged.tryEmit(Unit)
                 _dayStatusChanged.tryEmit(Unit)
-                // Goals depend on the server's latest weight; per-date ops sync in order, so reloading on
-                // every sync of such a date also covers ops queued before the weight.
-                if (event.dates.any { it in weightDatesAwaitingSync }) loadGoals()
+                // Goals depend on the server's latest weight: reload once the weight itself is synced
+                // (another op of the same date may sync before it).
+                val dates = event.dates.filter { it in weightDatesAwaitingSync }
+                if (dates.isNotEmpty()) viewModelScope.launch {
+                    val settled = dates.filterNot { journal.isWeightPending(LocalDate.parse(it)) }
+                    if (settled.isNotEmpty()) {
+                        weightDatesAwaitingSync.removeAll(settled.toSet())
+                        loadGoals()
+                    }
+                }
             }
             SyncEvent.Rejected -> _toastEvents.tryEmit(ToastEvent(R.string.sync_rejected))
         }
@@ -647,7 +698,7 @@ class FoodViewModel(
         _yesterdayAnsweredFor.value = null
         _loadingDay.value = false
         _selectedHomeDate.value = clock()
-        addsInFlight.clear()
+        pendingAdds.clear()
         weightDatesAwaitingSync.clear()
     }
 

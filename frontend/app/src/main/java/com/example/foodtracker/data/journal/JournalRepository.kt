@@ -220,6 +220,9 @@ class JournalRepository(
 
     suspend fun hasLocalLog(date: LocalDate): Boolean = dao.countLogs(date.toString()) > 0
 
+    /** True while a locally written weight for [date] hasn't been accepted by the server. */
+    suspend fun isWeightPending(date: LocalDate): Boolean = dao.getWeight(date.toString())?.pending == true
+
     suspend fun clearAll() {
         tx.run {
             clears.incrementAndGet()

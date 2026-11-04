@@ -559,6 +559,87 @@ class FoodViewModelTest {
         assertEquals(emptyList<SyncOp>(), journal.ops())
     }
 
+    @Test
+    fun twoQuickAddsThenUndoOfTheSecond_removesTheSecond() = runTest(testDispatcher) {
+        val journal = TestJournal()
+        val vm = newVm(journal)
+        val foods = collectFoods(vm, "Lunch")
+        advanceUntilIdle()
+
+        vm.addFoodToMealReturningIndex("Lunch", LoggedFood(sampleFood("Rice"), 200))
+        val second = vm.addFoodToMealReturningIndex("Lunch", LoggedFood(sampleFood("Chicken"), 150))
+        vm.removeFoodFromMeal("Lunch", second)   // undo before anything reached the mirror
+        advanceUntilIdle()
+
+        assertEquals(listOf("Rice"), foods().map { it.food.name })
+        // The cancelled create never leaves the device.
+        assertEquals(listOf("Rice"), journal.ops().map { (it as SyncOp.CreateLog).body.name })
+    }
+
+    @Test
+    fun undoOfAddRightAfterAnotherLanded_removesTheNewOne() = runTest(testDispatcher) {
+        val vm = newVm()
+        val foods = collectFoods(vm, "Lunch")
+        advanceUntilIdle()
+        vm.addFoodToMealReturningIndex("Lunch", LoggedFood(sampleFood("Rice"), 200))
+        advanceUntilIdle()
+
+        val second = vm.addFoodToMealReturningIndex("Lunch", LoggedFood(sampleFood("Chicken"), 150))
+        assertEquals(1, second)
+        vm.removeFoodFromMeal("Lunch", second)
+        advanceUntilIdle()
+
+        assertEquals(listOf("Rice"), foods().map { it.food.name })
+        // Index-based removal still works once the add is visible.
+        vm.removeFoodFromMeal("Lunch", 0)
+        advanceUntilIdle()
+        assertEquals(emptyList<String>(), foods().map { it.food.name })
+    }
+
+    @Test
+    fun localWriteFailureToastsErrorSave() = runTest(testDispatcher) {
+        val journal = TestJournal()
+        val vm = newVm(journal)
+        val toasts = collectToasts(vm)
+        advanceUntilIdle()
+        journal.failWrites = true
+
+        vm.addFoodToMeal("Lunch", LoggedFood(bread, 60))
+        vm.incrementHydration()
+        vm.setDayComplete(java.util.Date(), true)
+        advanceUntilIdle()
+
+        assertEquals(List(3) { R.string.error_save }, toasts.map { it.messageRes })
+    }
+
+    @Test
+    fun goalsReloadOnlyOnceTheWeightItselfIsSynced() = runTest(testDispatcher) {
+        val api = RecordingProfileApi()
+        val journal = TestJournal()
+        val vm = newVm(journal, profileApi = api)
+        advanceUntilIdle()
+        val before = api.getGoalsCalls
+
+        vm.incrementHydration()
+        advanceUntilIdle()
+        vm.addWeightCheckIn(80f)
+        advanceUntilIdle()
+
+        journal.repo.completeOp(journal.repo.nextOp()!!, null)   // hydration of the same date
+        advanceUntilIdle()
+        assertEquals(before, api.getGoalsCalls)
+
+        journal.repo.completeOp(journal.repo.nextOp()!!, null)   // the weight
+        advanceUntilIdle()
+        assertEquals(before + 1, api.getGoalsCalls)
+
+        vm.incrementHydration()
+        advanceUntilIdle()
+        journal.repo.completeOp(journal.repo.nextOp()!!, null)   // date already settled: no reload
+        advanceUntilIdle()
+        assertEquals(before + 1, api.getGoalsCalls)
+    }
+
     // ── Journal: events ──────────────────────────────────────────────────────
 
     @Test

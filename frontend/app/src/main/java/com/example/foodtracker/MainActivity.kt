@@ -24,6 +24,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.lifecycleScope
 import com.example.foodtracker.data.journal.JournalProvider
 import com.example.foodtracker.sync.WorkManagerSyncScheduler
+import androidx.work.WorkManager
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -83,6 +84,21 @@ class MainActivity : ComponentActivity() {
         val mealIcon: String,
         val accentHex: String,
     )
+
+    /** The journal mirror and its unsent queue belong to the account that is leaving. */
+    private fun clearJournal() {
+        runCatching {
+            WorkManager.getInstance(applicationContext).cancelUniqueWork(WorkManagerSyncScheduler.UNIQUE_NAME)
+        }
+        lifecycleScope.launch {
+            try {
+                JournalProvider.repository(applicationContext).clearAll()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+            }
+        }
+    }
 
     /** Private custom foods must not survive in the Room cache for the next account on this device. */
     private fun clearFoodCache(repository: FoodRepository) {
@@ -401,6 +417,7 @@ class MainActivity : ComponentActivity() {
                                             streakViewModel.resetUserState()
                                             customFoodViewModel.resetUserState()
                                             clearFoodCache(foodRepository)
+                                            clearJournal()
                                             navController.navigate("login") {
                                                 popUpTo(0) { inclusive = true }
                                             }
@@ -415,6 +432,7 @@ class MainActivity : ComponentActivity() {
                                             streakViewModel.resetUserState()
                                             customFoodViewModel.resetUserState()
                                             clearFoodCache(foodRepository)
+                                            clearJournal()
                                             navController.navigate("login") {
                                                 popUpTo(0) { inclusive = true }
                                             }

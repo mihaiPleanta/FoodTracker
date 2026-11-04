@@ -25,7 +25,8 @@ class WorkManagerSyncScheduler(private val context: Context) : SyncScheduler {
             .enqueueUniqueWork(UNIQUE_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
     }
 
-    private companion object {
+    companion object {
+        /** Unique work name of the sync chain (cancelled on logout). */
         const val UNIQUE_NAME = "journal-sync"
     }
 }

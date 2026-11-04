@@ -72,10 +72,15 @@ internal class TestJournal(
     val dao = FakeUserDataDao()
     val scheduler = FakeSyncScheduler()
     private var clock = 1_000_000L
+    /** When true every transaction throws, as a failing Room database would. */
+    var failWrites = false
     val repo = JournalRepository(
         dao = dao,
         tx = object : TxRunner {
-            override suspend fun <R> run(block: suspend () -> R): R = block()
+            override suspend fun <R> run(block: suspend () -> R): R {
+                if (failWrites) throw IllegalStateException("disk full")
+                return block()
+            }
         },
         logsApi = logsApi,
         daysApi = JournalFakeDaysApi,
