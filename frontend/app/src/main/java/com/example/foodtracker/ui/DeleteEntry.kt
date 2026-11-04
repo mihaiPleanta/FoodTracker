@@ -45,19 +45,18 @@ fun DeleteEntryButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 /**
- * Swipe right-to-left to delete. [enabled] = false (entry still being saved) disables the swipe.
+ * Swipe right-to-left to delete.
  * The row is removed by the caller's state update; returning true lets the box settle dismissed.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SwipeToDeleteRow(
-    enabled: Boolean,
     onDelete: () -> Unit,
     content: @Composable () -> Unit,
 ) {
     val state = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
-            if (value == SwipeToDismissBoxValue.EndToStart && enabled) {
+            if (value == SwipeToDismissBoxValue.EndToStart) {
                 onDelete(); true
             } else false
         },
@@ -65,7 +64,7 @@ fun SwipeToDeleteRow(
     SwipeToDismissBox(
         state = state,
         enableDismissFromStartToEnd = false,
-        enableDismissFromEndToStart = enabled,
+        enableDismissFromEndToStart = true,
         backgroundContent = {
             // Rows are translucent: draw the red band only while actually swiping, or it shows through.
             if (state.dismissDirection != SwipeToDismissBoxValue.EndToStart) return@SwipeToDismissBox

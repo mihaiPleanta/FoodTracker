@@ -23,6 +23,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.rounded.MoreVert
 import com.example.foodtracker.viewmodel.CopyMode
 import com.example.foodtracker.viewmodel.CopyViewModel
@@ -645,12 +646,24 @@ fun LoggedFoodRow(
 
         // Name + macros
         Column(Modifier.weight(1f)) {
-            Text(
-                text = logged.food.name,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = GlassColors.textPrimary
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = logged.food.name,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = GlassColors.textPrimary,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (logged.pending) {
+                    Spacer(Modifier.width(6.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.Schedule,
+                        contentDescription = stringResource(R.string.pending_sync_cd),
+                        tint = GlassColors.textSecondary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
             Spacer(Modifier.height(3.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 MiniMacroTag("P ${logged.protein.toInt()}g", GlassColors.proteinColor)

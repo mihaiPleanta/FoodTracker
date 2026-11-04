@@ -458,9 +458,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
                         editTarget = null
                         viewModel.clearSearch()
                     },
-                    onDelete = if (logged.id != null) {
-                        { editTarget = null; viewModel.clearSearch(); deleteEntry(mealName, index, logged) }
-                    } else null,
+                    onDelete = { editTarget = null; viewModel.clearSearch(); deleteEntry(mealName, index, logged) },
                 )
             } else {
                 AddFoodSheet(
@@ -474,9 +472,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
                         viewModel.updateFoodPortion(mealName, index, choice.grams, choice.unit, choice.unitQty)
                         editTarget = null
                     },
-                    onDelete = if (logged.id != null) {
-                        { editTarget = null; deleteEntry(mealName, index, logged) }
-                    } else null,
+                    onDelete = { editTarget = null; deleteEntry(mealName, index, logged) },
                 )
             }
         }
@@ -829,7 +825,7 @@ fun MealCard(
                     Spacer(Modifier.height(10.dp))
                     meal.entries.forEachIndexed { i, entry ->
                         key(entry.id ?: "pending-$i-${entry.name}") {
-                            SwipeToDeleteRow(enabled = entry.id != null, onDelete = { onDeleteEntry(i) }) {
+                            SwipeToDeleteRow(onDelete = { onDeleteEntry(i) }) {
                                 MealEntryRow(entry, meal.accentColor, onEdit = { onEditEntry(i) })
                             }
                         }
