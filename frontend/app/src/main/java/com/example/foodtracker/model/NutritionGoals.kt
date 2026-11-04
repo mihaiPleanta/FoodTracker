@@ -9,6 +9,7 @@ data class NutritionGoals(
     val fatGoal: Int = 65,
     val mode: GoalsMode = GoalsMode.MAINTENANCE,
     val hydration: HydrationGoal? = null,
+    val tdee: Int? = null,
 )
 
 data class HydrationGoal(

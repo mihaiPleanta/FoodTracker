@@ -37,10 +37,13 @@ data class FoodLogCreateDto(
     val ingredients: List<FoodLogIngredientDto>? = null,
     val unit: String? = null,
     @SerializedName("unit_qty") val unitQty: Float? = null,
+    @SerializedName("client_id") val clientId: String? = null,
 )
 
 data class FoodLogDto(
     val id: Long,
+    @SerializedName("client_id") val clientId: String = "",
+    @SerializedName("created_at") val createdAt: String? = null,
     @SerializedName("log_date") val logDate: String,
     val meal: String,
     val grams: Int,
@@ -72,7 +75,7 @@ data class FoodLogDto(
         ),
         grams = grams,
         id = id,
-        clientTempId = null,
+        clientId = clientId,
         unit = unit,
         unitQty = unitQty,
     )
@@ -119,3 +122,14 @@ data class FoodLogCopyRequestDto(
 
 data class FoodLogDeleteBatchDto(val ids: List<Long>)
 data class FoodLogDeleteBatchResultDto(val deleted: Int)
+
+data class DayRangeItemDto(
+    val date: String,
+    @SerializedName("foods_by_meal") val foodsByMeal: Map<String, List<FoodLogDto>>,
+    @SerializedName("hydration_liters") val hydrationLiters: Float,
+    @SerializedName("weight_check_in") val weightCheckIn: WeightCheckInDto?,
+    val status: String? = null,
+    val goals: StatsGoalsDto? = null,
+)
+
+data class DaysRangeResponseDto(val days: List<DayRangeItemDto>)

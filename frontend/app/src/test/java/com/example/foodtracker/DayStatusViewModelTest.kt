@@ -98,6 +98,9 @@ private class DsLogsApi : LogsApi {
     val days = mutableMapOf<String, DayResponseDto>()
     val requested = mutableListOf<String>()
 
+    override suspend fun updateFoodLogByClient(cid: String, body: FoodLogUpdateDto): FoodLogDto = TODO()
+    override suspend fun deleteFoodLogByClient(cid: String): retrofit2.Response<Unit> = TODO()
+    override suspend fun getDays(from: String, to: String): com.example.foodtracker.model.DaysRangeResponseDto = TODO()
     override suspend fun getDay(date: String): DayResponseDto {
         requested += date
         return days[date] ?: DayResponseDto(emptyMap(), 0f, null)

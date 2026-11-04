@@ -69,6 +69,9 @@ private class FakeCopyLogsApi : LogsApi {
     val summaryRequests = mutableListOf<Pair<String, String>>()
     val copyRequests = mutableListOf<FoodLogCopyRequestDto>()
 
+    override suspend fun updateFoodLogByClient(cid: String, body: FoodLogUpdateDto): FoodLogDto = TODO()
+    override suspend fun deleteFoodLogByClient(cid: String): retrofit2.Response<Unit> = TODO()
+    override suspend fun getDays(from: String, to: String): com.example.foodtracker.model.DaysRangeResponseDto = TODO()
     override suspend fun getDay(date: String): DayResponseDto {
         dayGates[date]?.await()
         return days[date] ?: dayOf()

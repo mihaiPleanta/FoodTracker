@@ -9,6 +9,7 @@ data class GoalsDto(
     @SerializedName("fat_goal_g")     val fatGoal: Int,
     val mode: String,
     val hydration: HydrationGoalDto? = null,
+    val tdee: Int? = null,
 ) {
     fun toDomain(): NutritionGoals = NutritionGoals(
         calorieGoal = calorieGoal,
@@ -17,6 +18,7 @@ data class GoalsDto(
         fatGoal = fatGoal,
         mode = runCatching { GoalsMode.valueOf(mode) }.getOrDefault(GoalsMode.MAINTENANCE),
         hydration = hydration?.toDomain(),
+        tdee = tdee,
     )
 }
 

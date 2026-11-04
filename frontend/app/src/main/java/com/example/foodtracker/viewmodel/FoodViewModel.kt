@@ -591,7 +591,7 @@ class FoodViewModel(
 
     private fun addFoodAt(mealName: String, food: LoggedFood, insertAt: Int?): Int {
         val tempId = UUID.randomUUID().toString()
-        val optimistic = food.copy(id = null, clientTempId = tempId)
+        val optimistic = food.copy(id = null, clientId = tempId)
         val key = dateKey(_selectedHomeDate.value)
         val day = _foodsByDate.value[key] ?: DayMeals()
         val currentList = mealList(day, mealName)
@@ -620,7 +620,7 @@ class FoodViewModel(
                         unitQty = optimistic.unitQty,
                     )
                 )
-                replaceByTempId(key, mealName, tempId) { it.copy(id = response.id, clientTempId = null) }
+                replaceByTempId(key, mealName, tempId) { it.copy(id = response.id, clientId = null) }
                 _foodLogsChanged.tryEmit(Unit)
                 // Hint local pentru worker-ul de remindere — sursa de adevăr rămâne backend-ul.
                 launch {
@@ -732,14 +732,14 @@ class FoodViewModel(
     ) {
         val day = _foodsByDate.value[key] ?: return
         val list = mealList(day, mealName)
-        val newList = list.map { if (it.clientTempId == tempId) transform(it) else it }
+        val newList = list.map { if (it.clientId == tempId) transform(it) else it }
         _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
     }
 
     private fun removeByTempId(key: String, mealName: String, tempId: String) {
         val day = _foodsByDate.value[key] ?: return
         val list = mealList(day, mealName)
-        val newList = list.filterNot { it.clientTempId == tempId }
+        val newList = list.filterNot { it.clientId == tempId }
         _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
     }
 
