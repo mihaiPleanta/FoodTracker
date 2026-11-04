@@ -127,6 +127,17 @@ class StreakViewModelTest {
         assertEquals(listOf(7), got)
     }
 
+    @Test fun milestoneEmittedBeforeCollectingIsStillReceived() = runTest(dispatcher) {
+        val api = FakeStreakApi().apply { getResponses += resp(current = 6); getResponses += resp(current = 7) }
+        val vm = vm(api)
+        vm.refresh(); advanceUntilIdle()
+        vm.refresh(); advanceUntilIdle()
+        val got = mutableListOf<Int>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.milestones.collect { got += it } }
+        advanceUntilIdle()
+        assertEquals(listOf(7), got)
+    }
+
     @Test fun recoverUpdatesState() {
         val api = FakeStreakApi().apply {
             getResponses += resp(current = 3, offer = offer)

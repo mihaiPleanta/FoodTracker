@@ -12,11 +12,11 @@ import com.example.foodtracker.model.StreakTodayDto
 import com.example.foodtracker.streak.crossedMilestone
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.SharingStarted
@@ -48,8 +48,10 @@ class StreakViewModel(
         if (dismissed) null else (s as? StreakUiState.Loaded)?.data?.recoveryOffer
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    private val _milestones = MutableSharedFlow<Int>(extraBufferCapacity = 1)
-    val milestones: SharedFlow<Int> = _milestones.asSharedFlow()
+    // Buffered channel (not a SharedFlow): food is usually logged from MealDetail while Home is
+    // not composed, and the event must survive until the user returns to Home.
+    private val _milestones = Channel<Int>(Channel.BUFFERED)
+    val milestones: Flow<Int> = _milestones.receiveAsFlow()
 
     private var lastCurrent: Int? = null
     private var job: Job? = null
@@ -110,7 +112,7 @@ class StreakViewModel(
         val lastLogged = if (data.todayLogged) now
         else data.last14Days.filter { it.state == "logged" }.maxOfOrNull { LocalDate.parse(it.date) }
         snapshots.write(StreakSnapshot(data.current, now, lastLogged))
-        crossedMilestone(lastCurrent, data.current)?.let { _milestones.tryEmit(it) }
+        crossedMilestone(lastCurrent, data.current)?.let { _milestones.trySend(it) }
         lastCurrent = data.current
         _state.value = StreakUiState.Loaded(data)
     }

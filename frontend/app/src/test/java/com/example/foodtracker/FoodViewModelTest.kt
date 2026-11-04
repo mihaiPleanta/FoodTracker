@@ -82,6 +82,7 @@ private class FakeLogsApi : LogsApi {
     var lastUpdateBody: FoodLogUpdateDto? = null
     var lastCreate: FoodLogCreateDto? = null
     var failUpdateWith: Throwable? = null
+    var failCreateWith: Throwable? = null
     var seedUnit: String? = null
     var seedUnitQty: Float? = null
 
@@ -101,6 +102,7 @@ private class FakeLogsApi : LogsApi {
     )
 
     override suspend fun createFoodLog(body: FoodLogCreateDto): FoodLogDto {
+        failCreateWith?.let { throw it }
         lastCreate = body
         return FoodLogDto(
             id = 7L, logDate = body.logDate, meal = body.meal, grams = body.grams,
@@ -414,6 +416,52 @@ class FoodViewModelTest {
         logsApi = fake,
         profileApi = NoOpProfileApi,
     )
+
+    private val oats = FoodItem(
+        barcode = "999", name = "Bread", brand = null, imageUrl = null,
+        categories = emptyList(), per100g = 250, protein100g = 8f, carbs100g = 45f, fat100g = 3f,
+    )
+
+    @Test
+    fun addFoodEmitsFoodLogsChanged() = runTest(testDispatcher) {
+        val vm = newVm(FakeLogsApi(), "emitAdd")
+        advanceUntilIdle()
+        var count = 0
+        val job = launch { vm.foodLogsChanged.collect { count++ } }
+        advanceUntilIdle()
+        vm.addFoodToMeal("Lunch", LoggedFood(oats, 60))
+        advanceUntilIdle()
+        assertEquals(1, count)
+        job.cancel()
+    }
+
+    @Test
+    fun removeFoodEmitsFoodLogsChanged() = runTest(testDispatcher) {
+        val vm = newVm(FakeLogsApi(), "emitRemove")
+        val foodsJob = launch { vm.getFoodsFlow("Breakfast").collect { } }
+        advanceUntilIdle()
+        var count = 0
+        val job = launch { vm.foodLogsChanged.collect { count++ } }
+        advanceUntilIdle()
+        vm.removeFoodFromMeal("Breakfast", 0)
+        advanceUntilIdle()
+        assertEquals(1, count)
+        job.cancel(); foodsJob.cancel()
+    }
+
+    @Test
+    fun failedAddDoesNotEmit() = runTest(testDispatcher) {
+        val fake = FakeLogsApi().apply { failCreateWith = java.io.IOException("offline") }
+        val vm = newVm(fake, "emitFail")
+        advanceUntilIdle()
+        var count = 0
+        val job = launch { vm.foodLogsChanged.collect { count++ } }
+        advanceUntilIdle()
+        vm.addFoodToMeal("Lunch", LoggedFood(oats, 60))
+        advanceUntilIdle()
+        assertEquals(0, count)
+        job.cancel()
+    }
 
     @Test
     fun addFood_sendsUnitAndQty() = runTest(testDispatcher) {

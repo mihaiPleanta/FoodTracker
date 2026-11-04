@@ -19,7 +19,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
@@ -34,6 +39,8 @@ import com.example.foodtracker.api.RetrofitInstance
 import com.example.foodtracker.data.DataStoreSettingsRepository
 import com.example.foodtracker.data.FoodRepository
 import com.example.foodtracker.data.MealLogTracker
+import com.example.foodtracker.data.StreakSnapshotStore
+import com.example.foodtracker.data.streakSnapshotDataStore
 import com.example.foodtracker.data.cache.FoodCacheDb
 import com.example.foodtracker.data.cache.RoomFoodCache
 import com.example.foodtracker.data.mealLogTrackerDataStore
@@ -58,6 +65,7 @@ import com.example.foodtracker.viewmodel.PortionsViewModel
 import com.example.foodtracker.viewmodel.QuickPicksViewModel
 import com.example.foodtracker.viewmodel.RecipeViewModel
 import com.example.foodtracker.viewmodel.StatsViewModel
+import com.example.foodtracker.viewmodel.StreakViewModel
 import java.net.URLDecoder
 import java.net.URLEncoder
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -116,6 +124,15 @@ class MainActivity : ComponentActivity() {
             val portionsViewModel: PortionsViewModel = viewModel()
             val copyViewModel: CopyViewModel = viewModel()
             val statsViewModel: StatsViewModel = viewModel()
+            val streakViewModel: StreakViewModel = viewModel(
+                factory = remember {
+                    viewModelFactory {
+                        initializer {
+                            StreakViewModel(snapshots = StreakSnapshotStore(applicationContext.streakSnapshotDataStore))
+                        }
+                    }
+                }
+            )
             val customFoodViewModel: CustomFoodViewModel = viewModel(
                 factory = remember {
                     CustomFoodViewModelFactory(
@@ -179,6 +196,17 @@ class MainActivity : ComponentActivity() {
                             StreakReminderScheduler.sync(applicationContext, settings)
                         }
                 }
+
+                // Streak: refresh on resume and after every food log change.
+                val lifecycleOwner = LocalLifecycleOwner.current
+                DisposableEffect(lifecycleOwner) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_RESUME) streakViewModel.refresh()
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                }
+                LaunchedEffect(Unit) { viewModel.foodLogsChanged.collect { streakViewModel.refresh() } }
 
                 // Keep period stats in sync with day status changes, tolerance and hydration goal.
                 LaunchedEffect(Unit) { viewModel.dayStatusChanged.collect { statsViewModel.invalidate() } }
@@ -333,7 +361,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                                 composable("home") {
-                                    HomeScreen(navController, viewModel, portionsViewModel, copyViewModel)
+                                    HomeScreen(navController, viewModel, portionsViewModel, copyViewModel, streakViewModel)
                                 }
                                 composable("stats") {
                                     StatsScreen(viewModel, statsViewModel)
@@ -360,6 +388,7 @@ class MainActivity : ComponentActivity() {
                                             portionsViewModel.resetUserState()
                                             copyViewModel.resetUserState()
                                             statsViewModel.resetUserState()
+                                            streakViewModel.resetUserState()
                                             customFoodViewModel.resetUserState()
                                             clearFoodCache(foodRepository)
                                             navController.navigate("login") {
@@ -373,6 +402,7 @@ class MainActivity : ComponentActivity() {
                                             portionsViewModel.resetUserState()
                                             copyViewModel.resetUserState()
                                             statsViewModel.resetUserState()
+                                            streakViewModel.resetUserState()
                                             customFoodViewModel.resetUserState()
                                             clearFoodCache(foodRepository)
                                             navController.navigate("login") {

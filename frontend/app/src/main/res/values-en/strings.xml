@@ -489,4 +489,22 @@
     <string name="stats_hydration_avg">%1$s L/day on average</string>
     <string name="stats_hydration_goal_days">%1$d/%2$d days at goal</string>
     <string name="stats_calendar_title">Calendar</string>
+    <string name="streak_days_in_row">days in a row</string>
+    <string name="streak_not_logged_today">not logged today yet</string>
+    <string name="streak_last_14">Last 14 days</string>
+    <string name="streak_next_milestone">%1$d more days to %2$d 🔥</string>
+    <string name="streak_best">Best</string>
+    <string name="streak_total">Total logged</string>
+    <string name="streak_days_count">%1$d days</string>
+    <string name="streak_pause_week">Weekly pause</string>
+    <string name="streak_recovery_month">Monthly recovery</string>
+    <string name="streak_available">Available</string>
+    <string name="streak_used_on">Used (%1$s)</string>
+    <string name="streak_rules">Any logged food counts for the day. You get one pause day per week (Mon–Sun) and one recovery per month if you come back within 3 days of a broken streak.</string>
+    <string name="streak_broken_title">Your %1$d-day streak broke</string>
+    <string name="streak_broken_body">You can recover it once a month. Missed days don\'t count, but your streak continues from %1$d.</string>
+    <string name="streak_recover">Recover streak</string>
+    <string name="streak_start_over">Start over</string>
+    <string name="streak_milestone_reached">🔥 %1$d days in a row!</string>
+    <string name="streak_cd">Streak: %1$d days</string>
 </resources>

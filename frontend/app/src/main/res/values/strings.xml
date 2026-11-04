@@ -510,4 +510,22 @@
     <string name="stats_hydration_avg">%1$s L/zi în medie</string>
     <string name="stats_hydration_goal_days">%1$d/%2$d zile cu ținta atinsă</string>
     <string name="stats_calendar_title">Calendar</string>
+    <string name="streak_days_in_row">zile la rând</string>
+    <string name="streak_not_logged_today">azi încă n-ai logat</string>
+    <string name="streak_last_14">Ultimele 14 zile</string>
+    <string name="streak_next_milestone">Încă %1$d zile până la %2$d 🔥</string>
+    <string name="streak_best">Record</string>
+    <string name="streak_total">Total logat</string>
+    <string name="streak_days_count">%1$d zile</string>
+    <string name="streak_pause_week">Pauza săptămânii</string>
+    <string name="streak_recovery_month">Recuperare lunară</string>
+    <string name="streak_available">Disponibilă</string>
+    <string name="streak_used_on">Folosită (%1$s)</string>
+    <string name="streak_rules">Orice aliment logat bifează ziua. Ai o zi de pauză pe săptămână (luni–duminică) și o recuperare pe lună, dacă revii în cel mult 3 zile după ce seria s-a rupt.</string>
+    <string name="streak_broken_title">Seria ta de %1$d zile s-a rupt</string>
+    <string name="streak_broken_body">Poți s-o recuperezi o dată pe lună. Zilele lipsă nu se adaugă, dar seria continuă de la %1$d.</string>
+    <string name="streak_recover">Recuperează seria</string>
+    <string name="streak_start_over">Încep de la zero</string>
+    <string name="streak_milestone_reached">🔥 %1$d zile la rând!</string>
+    <string name="streak_cd">Serie: %1$d zile</string>
 </resources>

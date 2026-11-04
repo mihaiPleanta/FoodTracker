@@ -399,6 +399,10 @@ class FoodViewModel(
     /** Emits after every successful status write (set, answer, clear). */
     val dayStatusChanged: SharedFlow<Unit> = _dayStatusChanged.asSharedFlow()
 
+    private val _foodLogsChanged = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
+    /** Emits after a food log was successfully created or deleted on the backend (streak refresh). */
+    val foodLogsChanged: SharedFlow<Unit> = _foodLogsChanged.asSharedFlow()
+
     val selectedDayStatus: StateFlow<DayStatus?> = combine(_selectedHomeDate, _dayStatusByDate) { date, all ->
         all[dateKey(date)]
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -605,6 +609,7 @@ class FoodViewModel(
                     )
                 )
                 replaceByTempId(key, mealName, tempId) { it.copy(id = response.id, clientTempId = null) }
+                _foodLogsChanged.tryEmit(Unit)
                 // Hint local pentru worker-ul de remindere — sursa de adevăr rămâne backend-ul.
                 launch {
                     runCatching {
@@ -636,6 +641,7 @@ class FoodViewModel(
             day = updateMealList(day, mealName, mealList(day, mealName) + log.toLogged())
         }
         _foodsByDate.value = _foodsByDate.value + (dateKey to day)
+        _foodLogsChanged.tryEmit(Unit)
         viewModelScope.launch {
             val date = LocalDate.parse(dateKey)
             meals.forEach { meal -> runCatching { mealLogTracker.markLogged(date, meal) } }
@@ -661,6 +667,7 @@ class FoodViewModel(
         viewModelScope.launch {
             try {
                 logsApi.deleteFoodLogs(FoodLogDeleteBatchDto(ids))
+                _foodLogsChanged.tryEmit(Unit)
             } catch (e: java.io.IOException) {
                 restoreRemoved(dateKey, removed)
                 _toastEvents.tryEmit(ToastEvent(R.string.error_no_internet))
@@ -755,6 +762,8 @@ class FoodViewModel(
             if (!response.isSuccessful) {
                 restoreFood(key, mealName, index, target)
                 _toastEvents.tryEmit(ToastEvent(R.string.error_delete, response.code()))
+            } else {
+                _foodLogsChanged.tryEmit(Unit)
             }
         }
     }

@@ -48,6 +48,8 @@ import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.ui.theme.accentCard
 import com.example.foodtracker.ui.theme.glassCard
 import com.example.foodtracker.util.LocalAppLanguage
+import com.example.foodtracker.viewmodel.StreakUiState
+import com.example.foodtracker.viewmodel.StreakViewModel
 import com.example.foodtracker.util.toLocale
 import com.example.foodtracker.viewmodel.CopyMode
 import com.example.foodtracker.viewmodel.CopyViewModel
@@ -100,7 +102,7 @@ private fun goalsModeRes(mode: GoalsMode): Int = when (mode) {
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 @Composable
-fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions: PortionsViewModel, copy: CopyViewModel) {
+fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions: PortionsViewModel, copy: CopyViewModel, streak: StreakViewModel) {
     val appLocale = LocalAppLanguage.current.toLocale()
     val calendarDays = remember(appLocale) { generateCalendarDays(appLocale) }
     val todayIndex = calendarDays.indexOfFirst { it.isToday }
@@ -124,6 +126,25 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
             val msg = if (event.code != null) "$base (${event.code})" else base
             snackbarHostState.showSnackbar(msg)
         }
+    }
+    LaunchedEffect(resources) {
+        streak.milestones.collect { days ->
+            snackbarHostState.showSnackbar(resources.getString(R.string.streak_milestone_reached, days))
+        }
+    }
+    val streakState by streak.state.collectAsState()
+    val recoveryOffer by streak.showOffer.collectAsState()
+    var showStreakSheet by remember { mutableStateOf(false) }
+    (streakState as? StreakUiState.Loaded)?.takeIf { showStreakSheet }?.let {
+        StreakSheet(it.data, onDismiss = { showStreakSheet = false })
+    }
+    recoveryOffer?.let { offer ->
+        StreakRecoveryDialog(
+            offer = offer,
+            onRecover = { streak.recover() },
+            onDecline = { streak.decline() },
+            onDismiss = { streak.dismissOffer() },
+        )
     }
     LaunchedEffect(resources) {
         portions.toastEvents.collect { res -> snackbarHostState.showSnackbar(resources.getString(res)) }
@@ -261,6 +282,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
                 initial = initial,
                 onSettingsClick = { navController.navigate("settings") },
                 onCopyFromDay = openCopy,
+                streakBadge = { StreakBadge(streakState, onClick = { showStreakSheet = true }) },
                 modifier = Modifier.padding(horizontal = 20.dp)
             )
 
@@ -434,7 +456,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
 // ── Header ────────────────────────────────────────────────────────────────────
 
 @Composable
-fun HomeHeader(title: String, subtitle: String, initial: String, onSettingsClick: () -> Unit, modifier: Modifier = Modifier, onCopyFromDay: () -> Unit = {}) {
+fun HomeHeader(title: String, subtitle: String, initial: String, onSettingsClick: () -> Unit, modifier: Modifier = Modifier, onCopyFromDay: () -> Unit = {}, streakBadge: @Composable () -> Unit = {}) {
     Row(modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
         Column {
             Text(subtitle, fontSize = 13.sp, color = GlassColors.textSecondary)
@@ -443,7 +465,8 @@ fun HomeHeader(title: String, subtitle: String, initial: String, onSettingsClick
                 color = GlassColors.textPrimary)
         }
         Row(verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            streakBadge()
             var menuOpen by remember { mutableStateOf(false) }
             Box {
                 Box(
