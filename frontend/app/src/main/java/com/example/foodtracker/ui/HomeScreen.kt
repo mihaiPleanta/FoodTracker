@@ -82,8 +82,8 @@ data class MealEntry(
     val isRecipe: Boolean = false,
     val unit: String? = null,
     val unitQty: Float? = null,
-    /** null while the POST is pending — such rows can't be deleted yet. */
     val id: Long? = null,
+    val pending: Boolean = false,
 )
 
 data class MealSection(
@@ -281,7 +281,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
                 protein          = foods.sumOf { it.protein.toDouble() }.toInt(),
                 carbs            = foods.sumOf { it.carbs.toDouble() }.toInt(),
                 fat              = foods.sumOf { it.fat.toDouble() }.toInt(),
-                entries          = foods.map { MealEntry(it.food.name, it.grams, it.calories, it.food.ingredients != null, it.unit, it.unitQty, it.id) },
+                entries          = foods.map { MealEntry(it.food.name, it.grams, it.calories, it.food.ingredients != null, it.unit, it.unitQty, it.id, it.pending) },
                 accentColor      = color
             )
         }
@@ -886,7 +886,12 @@ fun MealEntryRow(entry: MealEntry, accentColor: Color, onEdit: () -> Unit) {
             Spacer(Modifier.width(10.dp))
             Text(entry.name, fontSize = 14.sp, fontWeight = FontWeight.Medium,
                 color = GlassColors.textPrimary,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false))
+            if (entry.pending) {
+                Spacer(Modifier.width(6.dp))
+                PendingSyncMarker()
+            }
         }
         Text(
             if (entry.isRecipe) "${stringResource(R.string.recipe_portion_one)}  ·  ${entry.calories} kcal"

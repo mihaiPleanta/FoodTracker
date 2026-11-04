@@ -625,6 +625,16 @@ fun LoggedFoodsList(
 }
 
 @Composable
+fun PendingSyncMarker() {
+    Icon(
+        imageVector = Icons.Outlined.Schedule,
+        contentDescription = stringResource(R.string.pending_sync_cd),
+        tint = GlassColors.textSecondary,
+        modifier = Modifier.size(14.dp)
+    )
+}
+
+@Composable
 fun LoggedFoodRow(
     logged: LoggedFood,
     accentColor: Color,
@@ -656,12 +666,7 @@ fun LoggedFoodRow(
                 )
                 if (logged.pending) {
                     Spacer(Modifier.width(6.dp))
-                    Icon(
-                        imageVector = Icons.Outlined.Schedule,
-                        contentDescription = stringResource(R.string.pending_sync_cd),
-                        tint = GlassColors.textSecondary,
-                        modifier = Modifier.size(14.dp)
-                    )
+                    PendingSyncMarker()
                 }
             }
             Spacer(Modifier.height(3.dp))
