@@ -22,6 +22,8 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.lifecycleScope
+import com.example.foodtracker.data.journal.JournalProvider
+import com.example.foodtracker.sync.WorkManagerSyncScheduler
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -201,7 +203,14 @@ class MainActivity : ComponentActivity() {
                 val lifecycleOwner = LocalLifecycleOwner.current
                 DisposableEffect(lifecycleOwner) {
                     val observer = LifecycleEventObserver { _, event ->
-                        if (event == Lifecycle.Event.ON_RESUME) streakViewModel.refresh()
+                        if (event == Lifecycle.Event.ON_RESUME) {
+                            streakViewModel.refresh()
+                            // Push the offline queue and refresh the local mirror (best-effort).
+                            runCatching { WorkManagerSyncScheduler(applicationContext).requestSync() }
+                            lifecycleOwner.lifecycleScope.launch {
+                                runCatching { JournalProvider.repository(applicationContext).refreshWindow() }
+                            }
+                        }
                     }
                     lifecycleOwner.lifecycle.addObserver(observer)
                     onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
