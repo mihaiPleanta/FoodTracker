@@ -450,6 +450,31 @@ class FoodViewModelTest {
     }
 
     @Test
+    fun restoreRemovedFood_reCreatesAtOriginalIndex() = runTest(testDispatcher) {
+        val fake = FakeLogsApi()
+        val vm = newVm(fake, "restoreRemoved")
+        var foods: List<LoggedFood> = emptyList()
+        val job = launch { vm.getFoodsFlow("Breakfast").collect { foods = it } }
+        advanceUntilIdle()
+        vm.addFoodToMeal("Breakfast", LoggedFood(oats, 60))
+        advanceUntilIdle()
+        val removed = foods[0]
+        vm.removeFoodFromMeal("Breakfast", 0)
+        advanceUntilIdle()
+        assertEquals(1, foods.size)
+
+        vm.restoreRemovedFood("Breakfast", 0, removed)
+        advanceUntilIdle()
+
+        assertEquals(2, foods.size)
+        assertEquals("Oats", foods[0].food.name)
+        assertEquals(7L, foods[0].id)          // new id from the re-POST, not the deleted 42
+        assertEquals(100, fake.lastCreate?.grams)
+        assertEquals("111", fake.lastCreate?.barcode)
+        job.cancel()
+    }
+
+    @Test
     fun failedAddDoesNotEmit() = runTest(testDispatcher) {
         val fake = FakeLogsApi().apply { failCreateWith = java.io.IOException("offline") }
         val vm = newVm(fake, "emitFail")

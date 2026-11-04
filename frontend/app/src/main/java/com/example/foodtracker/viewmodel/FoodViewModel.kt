@@ -578,14 +578,26 @@ class FoodViewModel(
         addFoodToMealReturningIndex(mealName, food)
     }
 
-    fun addFoodToMealReturningIndex(mealName: String, food: LoggedFood): Int {
+    fun addFoodToMealReturningIndex(mealName: String, food: LoggedFood): Int =
+        addFoodAt(mealName, food, insertAt = null)
+
+    /** Undo of [removeFoodFromMeal]: logs the same food again (new id) back at its old position. */
+    fun restoreRemovedFood(mealName: String, index: Int, food: LoggedFood) {
+        // The DELETE may have failed and already put the entry back — don't log it twice.
+        val current = mealList(_foodsByDate.value[dateKey(_selectedHomeDate.value)] ?: DayMeals(), mealName)
+        if (food.id != null && current.any { it.id == food.id }) return
+        addFoodAt(mealName, food, insertAt = index)
+    }
+
+    private fun addFoodAt(mealName: String, food: LoggedFood, insertAt: Int?): Int {
         val tempId = UUID.randomUUID().toString()
         val optimistic = food.copy(id = null, clientTempId = tempId)
         val key = dateKey(_selectedHomeDate.value)
         val day = _foodsByDate.value[key] ?: DayMeals()
         val currentList = mealList(day, mealName)
-        val insertedIndex = currentList.size
-        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, currentList + optimistic))
+        val insertedIndex = (insertAt ?: currentList.size).coerceIn(0, currentList.size)
+        val newList = currentList.toMutableList().also { it.add(insertedIndex, optimistic) }
+        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
 
         viewModelScope.launch {
             try {

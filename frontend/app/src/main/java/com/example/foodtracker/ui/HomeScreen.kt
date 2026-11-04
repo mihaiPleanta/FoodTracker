@@ -32,6 +32,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.key
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -78,6 +82,8 @@ data class MealEntry(
     val isRecipe: Boolean = false,
     val unit: String? = null,
     val unitQty: Float? = null,
+    /** null while the POST is pending — such rows can't be deleted yet. */
+    val id: Long? = null,
 )
 
 data class MealSection(
@@ -120,6 +126,19 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
     val showYesterdayPrompt by viewModel.showYesterdayPrompt.collectAsState()
 
     val resources = LocalContext.current.resources
+    val deleteScope = rememberCoroutineScope()
+    // Delete from Home (sheet button or swipe) with an undo snackbar; undo re-logs the same food.
+    val deleteEntry: (String, Int, LoggedFood) -> Unit = { mealName, index, logged ->
+        viewModel.removeFoodFromMeal(mealName, index)
+        deleteScope.launch {
+            val result = snackbarHostState.showSnackbar(
+                message = resources.getString(R.string.home_food_deleted, logged.food.name),
+                actionLabel = resources.getString(R.string.action_cancel),
+                duration = SnackbarDuration.Short,
+            )
+            if (result == SnackbarResult.ActionPerformed) viewModel.restoreRemovedFood(mealName, index, logged)
+        }
+    }
     LaunchedEffect(resources) {
         viewModel.toastEvents.collect { event ->
             val base = resources.getString(event.messageRes)
@@ -208,6 +227,13 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
     val lunchFoods     by viewModel.lunchFoods.collectAsState()
     val dinnerFoods    by viewModel.dinnerFoods.collectAsState()
     val snacksFoods    by viewModel.snacksFoods.collectAsState()
+    fun foodsFor(mealName: String): List<LoggedFood> = when (mealName) {
+        "Breakfast" -> breakfastFoods
+        "Lunch"     -> lunchFoods
+        "Dinner"    -> dinnerFoods
+        "Snacks"    -> snacksFoods
+        else        -> emptyList()
+    }
     val hydrationLiters by viewModel.hydrationTodayLiters.collectAsState()
     val weightHistory   by viewModel.weightHistory.collectAsState()
 
@@ -255,7 +281,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
                 protein          = foods.sumOf { it.protein.toDouble() }.toInt(),
                 carbs            = foods.sumOf { it.carbs.toDouble() }.toInt(),
                 fat              = foods.sumOf { it.fat.toDouble() }.toInt(),
-                entries          = foods.map { MealEntry(it.food.name, it.grams, it.calories, it.food.ingredients != null, it.unit, it.unitQty) },
+                entries          = foods.map { MealEntry(it.food.name, it.grams, it.calories, it.food.ingredients != null, it.unit, it.unitQty, it.id) },
                 accentColor      = color
             )
         }
@@ -364,14 +390,10 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
                         navController.navigate("meal/${meal.name}/$encodedIcon/$colorHex")
                     },
                     onEditEntry = { index ->
-                        val foods = when (meal.name) {
-                            "Breakfast" -> breakfastFoods
-                            "Lunch"     -> lunchFoods
-                            "Dinner"    -> dinnerFoods
-                            "Snacks"    -> snacksFoods
-                            else        -> emptyList()
-                        }
-                        foods.getOrNull(index)?.let { editTarget = Triple(meal.name, index, it) }
+                        foodsFor(meal.name).getOrNull(index)?.let { editTarget = Triple(meal.name, index, it) }
+                    },
+                    onDeleteEntry = { index ->
+                        foodsFor(meal.name).getOrNull(index)?.let { deleteEntry(meal.name, index, it) }
                     },
                     modifier = Modifier.padding(horizontal = 20.dp)
                 )
@@ -436,6 +458,9 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
                         editTarget = null
                         viewModel.clearSearch()
                     },
+                    onDelete = if (logged.id != null) {
+                        { editTarget = null; viewModel.clearSearch(); deleteEntry(mealName, index, logged) }
+                    } else null,
                 )
             } else {
                 AddFoodSheet(
@@ -449,6 +474,9 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
                         viewModel.updateFoodPortion(mealName, index, choice.grams, choice.unit, choice.unitQty)
                         editTarget = null
                     },
+                    onDelete = if (logged.id != null) {
+                        { editTarget = null; deleteEntry(mealName, index, logged) }
+                    } else null,
                 )
             }
         }
@@ -722,7 +750,8 @@ fun MealCard(
     meal: MealSection,
     onQuickAdd: () -> Unit,
     onEditEntry: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onDeleteEntry: (Int) -> Unit = {},
 ) {
     var expanded by remember { mutableStateOf(false) }
     val arrowAngle by animateFloatAsState(
@@ -799,7 +828,11 @@ fun MealCard(
                         .background(meal.accentColor.copy(.12f)))
                     Spacer(Modifier.height(10.dp))
                     meal.entries.forEachIndexed { i, entry ->
-                        MealEntryRow(entry, meal.accentColor, onEdit = { onEditEntry(i) })
+                        key(entry.id ?: "pending-$i-${entry.name}") {
+                            SwipeToDeleteRow(enabled = entry.id != null, onDelete = { onDeleteEntry(i) }) {
+                                MealEntryRow(entry, meal.accentColor, onEdit = { onEditEntry(i) })
+                            }
+                        }
                         if (i < meal.entries.lastIndex) Spacer(Modifier.height(8.dp))
                     }
                 }

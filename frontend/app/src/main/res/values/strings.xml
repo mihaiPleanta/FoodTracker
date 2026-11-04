@@ -510,6 +510,7 @@
     <string name="stats_hydration_avg">%1$s L/zi în medie</string>
     <string name="stats_hydration_goal_days">%1$d/%2$d zile cu ținta atinsă</string>
     <string name="stats_calendar_title">Calendar</string>
+    <string name="home_food_deleted">„%1$s” a fost șters</string>
     <string name="streak_days_in_row">zile la rând</string>
     <string name="streak_not_logged_today">azi încă n-ai logat</string>
     <string name="streak_last_14">Ultimele 14 zile</string>

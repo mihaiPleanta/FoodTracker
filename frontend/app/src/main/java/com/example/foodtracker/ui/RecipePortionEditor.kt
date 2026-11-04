@@ -68,6 +68,7 @@ fun RecipePortionEditor(
     onClearSearch: () -> Unit,
     onDismiss: () -> Unit,
     onSave: (List<FoodIngredient>) -> Unit,
+    onDelete: (() -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -201,6 +202,7 @@ fun RecipePortionEditor(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { saving = true },
             )
+            onDelete?.let { DeleteEntryButton(onClick = it) }
         }
       }
     }

@@ -489,6 +489,7 @@
     <string name="stats_hydration_avg">%1$s L/day on average</string>
     <string name="stats_hydration_goal_days">%1$d/%2$d days at goal</string>
     <string name="stats_calendar_title">Calendar</string>
+    <string name="home_food_deleted">“%1$s” deleted</string>
     <string name="streak_days_in_row">days in a row</string>
     <string name="streak_not_logged_today">not logged today yet</string>
     <string name="streak_last_14">Last 14 days</string>

@@ -83,6 +83,7 @@ fun AddFoodSheet(
     fallbackGrams: Int = 100,            // Recents: lastGrams; search: 100
     isFavorite: Boolean? = null,          // null => no star (edit flows)
     onToggleFavorite: () -> Unit = {},
+    onDelete: (() -> Unit)? = null,       // edit flows on Home: delete the logged entry
 ) {
     val barcode = target.barcode
     val decimalSep = DecimalFormatSymbols.getInstance(LocalConfiguration.current.locales[0]).decimalSeparator
@@ -259,6 +260,7 @@ fun AddFoodSheet(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { if (saving == null) choice?.let { saving = it } },
             )
+            onDelete?.let { DeleteEntryButton(onClick = it) }
         }
 
         editingUnit?.let { u ->
