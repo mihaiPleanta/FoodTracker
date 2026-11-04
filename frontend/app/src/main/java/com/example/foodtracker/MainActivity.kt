@@ -23,6 +23,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.lifecycleScope
 import com.example.foodtracker.data.journal.JournalProvider
+import com.example.foodtracker.model.NutritionGoals
+import com.example.foodtracker.model.StatsGoalsDto
 import com.example.foodtracker.sync.WorkManagerSyncScheduler
 import androidx.work.WorkManager
 import androidx.lifecycle.viewmodel.initializer
@@ -38,6 +40,7 @@ import com.example.foodtracker.ui.customfood.MyFoodsScreen
 import com.example.foodtracker.ui.*
 import com.example.foodtracker.ui.theme.FoodTrackerTheme
 import com.example.foodtracker.ui.theme.GlassColors
+import com.example.foodtracker.api.DaysApi
 import com.example.foodtracker.api.RetrofitInstance
 import com.example.foodtracker.data.DataStoreSettingsRepository
 import com.example.foodtracker.data.FoodRepository
@@ -67,6 +70,7 @@ import com.example.foodtracker.viewmodel.FoodViewModelFactory
 import com.example.foodtracker.viewmodel.PortionsViewModel
 import com.example.foodtracker.viewmodel.QuickPicksViewModel
 import com.example.foodtracker.viewmodel.RecipeViewModel
+import com.example.foodtracker.viewmodel.StatsSource
 import com.example.foodtracker.viewmodel.StatsViewModel
 import com.example.foodtracker.viewmodel.StreakViewModel
 import java.net.URLDecoder
@@ -148,7 +152,21 @@ class MainActivity : ComponentActivity() {
                     }
                 },
             )
-            val statsViewModel: StatsViewModel = viewModel()
+            val statsDaysApi = remember { RetrofitInstance.retrofit.create(DaysApi::class.java) }
+            val statsViewModel: StatsViewModel = viewModel(
+                factory = remember {
+                    viewModelFactory {
+                        initializer {
+                            val journal = JournalProvider.repository(applicationContext)
+                            StatsViewModel(source = StatsSource { from, to ->
+                                // Local mirror first (offline); the server covers ranges the mirror doesn't hold.
+                                journal.statsDays(from, to, viewModel.nutritionGoals.value?.toProvisionalStatsGoals())
+                                    ?: statsDaysApi.getStatsDays(from.toString(), to.toString())
+                            })
+                        }
+                    }
+                }
+            )
             val streakViewModel: StreakViewModel = viewModel(
                 factory = remember {
                     viewModelFactory {
@@ -238,7 +256,7 @@ class MainActivity : ComponentActivity() {
                     lifecycleOwner.lifecycle.addObserver(observer)
                     onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
                 }
-                LaunchedEffect(Unit) { viewModel.foodLogsChanged.collect { streakViewModel.refresh() } }
+                LaunchedEffect(Unit) { viewModel.foodLogsChanged.collect { streakViewModel.refresh(); statsViewModel.invalidate() } }
 
                 // Keep period stats in sync with day status changes, tolerance and hydration goal.
                 LaunchedEffect(Unit) { viewModel.dayStatusChanged.collect { statsViewModel.invalidate() } }
@@ -549,3 +567,7 @@ class MainActivity : ComponentActivity() {
         return DeepLink(name, icon, accent)
     }
 }
+
+/** Current goals as a stats snapshot for complete days that have none yet; null while the TDEE is unknown. */
+private fun NutritionGoals.toProvisionalStatsGoals(): StatsGoalsDto? =
+    tdee?.let { StatsGoalsDto(calorieGoal, proteinGoal, carbsGoal, fatGoal, it) }

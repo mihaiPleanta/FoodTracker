@@ -54,7 +54,21 @@ class StatsViewModelTest {
         override suspend fun deleteStatus(date: String): Response<Unit> = error("unused")
     }
 
-    private fun vm(api: FakeDaysApi) = StatsViewModel(api, { today })
+    private fun vm(api: FakeDaysApi) = StatsViewModel({ from, to -> api.getStatsDays(from.toString(), to.toString()) }, { today })
+
+    @Test fun usesSourceResult() {
+        val seen = mutableListOf<Pair<LocalDate, LocalDate>>()
+        val vm = StatsViewModel({ from, to ->
+            seen += from to to
+            StatsDaysResponseDto(days = listOf(StatsDayDto(
+                date = from.toString(), kcal = 1234, proteinG = 0f, carbsG = 0f, fatG = 0f, hasFood = true,
+                status = "complete", goals = StatsGoalsDto(2000, 0, 0, 0, 2000),
+            )))
+        }, { today })
+        vm.setMode(StatsMode.WEEK, today); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(setOf(LocalDate.of(2026, 11, 2) to LocalDate.of(2026, 11, 8), LocalDate.of(2026, 10, 26) to LocalDate.of(2026, 11, 1)), seen.toSet())
+        assertEquals(1234, (vm.state.value as PeriodUiState.Loaded).raw.days.single().kcal)
+    }
 
     @Test fun setMode_week_fetchesCurrentAndPrevious() {
         val api = FakeDaysApi(); val vm = vm(api)

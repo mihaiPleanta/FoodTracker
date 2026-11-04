@@ -25,6 +25,8 @@ class FakeUserDataDao : UserDataDao {
     override suspend fun getLogs(date: String): List<LogEntity> =
         logs.value.values.filter { it.date == date }.sortedWith(logOrder)
     override suspend fun getLog(clientId: String): LogEntity? = logs.value[clientId]
+    override suspend fun getLogsBetween(from: String, to: String): List<LogEntity> =
+        logs.value.values.filter { it.date in from..to }.sortedWith(compareBy<LogEntity>({ it.date }, { it.sortKey }, { it.serverId }))
     override suspend fun countLogs(date: String): Int = logs.value.values.count { it.date == date }
     override suspend fun upsertLogs(logs: List<LogEntity>) {
         this.logs.value = this.logs.value + logs.associateBy { it.clientId }
@@ -41,6 +43,8 @@ class FakeUserDataDao : UserDataDao {
     }
 
     override suspend fun getWeight(date: String): WeightEntity? = weights.value[date]
+    override suspend fun getWeightsBetween(from: String, to: String): List<WeightEntity> =
+        weights.value.values.filter { it.date in from..to }.sortedBy { it.date }
     override suspend fun upsertWeights(weights: List<WeightEntity>) {
         this.weights.value = this.weights.value + weights.associateBy { it.date }
     }

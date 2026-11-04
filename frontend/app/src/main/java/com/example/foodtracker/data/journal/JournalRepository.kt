@@ -6,9 +6,12 @@ import com.example.foodtracker.model.DayStatus
 import com.example.foodtracker.model.FoodLogDto
 import com.example.foodtracker.model.LoggedFood
 import com.example.foodtracker.model.MEAL_ORDER
+import com.example.foodtracker.model.StatsDaysResponseDto
+import com.example.foodtracker.model.StatsGoalsDto
 import com.example.foodtracker.model.mealKeyToBackend
 import com.example.foodtracker.model.mealNameFromBackend
 import com.example.foodtracker.model.toDayStatus
+import com.example.foodtracker.stats.LocalStatsBuilder
 import com.example.foodtracker.sync.LocalDayValues
 import com.example.foodtracker.sync.LocalLog
 import com.example.foodtracker.sync.QueuedOp
@@ -140,6 +143,37 @@ class JournalRepository(
         if (from.isAfter(to) || from.isBefore(t.minusDays(MIRROR_DAYS - 1L)) || to.isAfter(t)) return false
         val fetched = dao.getDays(from.toString(), to.toString()).count { it.fetchedAt != null }
         return fetched.toLong() == ChronoUnit.DAYS.between(from, to) + 1
+    }
+
+    /**
+     * Period statistics from the mirror (same shape as `GET /stats/days`), or null when the range
+     * isn't fully downloaded. Days after today hold no data, so coverage is checked up to today only
+     * (otherwise the current week/month would never be served locally). Weights span `from - 60 .. to`,
+     * inside the [WEIGHT_MIRROR_DAYS] window for any covered range.
+     */
+    suspend fun statsDays(from: LocalDate, to: LocalDate, provisionalGoals: StatsGoalsDto?): StatsDaysResponseDto? {
+        val covered = minOf(to, today())
+        if (!isCovered(from, covered)) return null
+        val f = from.toString()
+        val t = to.toString()
+        val dayRows = dao.getDays(f, t)
+        val logsByDate = dao.getLogsBetween(f, t).groupBy { it.date }
+        val days = dayRows.map { it.date }.toSet().plus(logsByDate.keys).sorted().map { key ->
+            val row = dayRows.firstOrNull { it.date == key }
+            val byMeal = logsByDate[key].orEmpty().map { it.toLocal().logged to mealNameFromBackend(it.meal) }
+                .groupBy({ it.second }, { it.first })
+            LocalDay(
+                date = LocalDate.parse(key),
+                meals = MEAL_ORDER.associateWith { byMeal[it].orEmpty() },
+                hydrationL = row?.hydrationL ?: 0f,
+                status = row?.status.toDayStatus(),
+                weightKg = null,
+                fetched = row?.fetchedAt != null,
+            )
+        }
+        val goals = dayRows.associate { LocalDate.parse(it.date) to JournalJson.decodeGoals(it.goalsJson) }
+        val weights = dao.getWeightsBetween(from.minusDays(60).toString(), t).map { LocalDate.parse(it.date) to it.weightKg }
+        return LocalStatsBuilder.build(days, goals, weights, from, to, provisionalGoals)
     }
 
     // ── Local writes ──

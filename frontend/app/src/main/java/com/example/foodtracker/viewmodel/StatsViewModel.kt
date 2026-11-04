@@ -4,8 +4,6 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.foodtracker.R
-import com.example.foodtracker.api.DaysApi
-import com.example.foodtracker.api.RetrofitInstance
 import com.example.foodtracker.model.StatsDaysResponseDto
 import com.example.foodtracker.stats.PeriodDeltas
 import com.example.foodtracker.stats.PeriodKind
@@ -38,8 +36,13 @@ sealed interface PeriodUiState {
     data class Error(@StringRes val message: Int) : PeriodUiState
 }
 
+/** Where period stats come from (local mirror first, server as fallback). */
+fun interface StatsSource {
+    suspend fun days(from: LocalDate, to: LocalDate): StatsDaysResponseDto
+}
+
 class StatsViewModel(
-    private val daysApi: DaysApi = RetrofitInstance.retrofit.create(DaysApi::class.java),
+    private val source: StatsSource,
     private val today: () -> LocalDate = { LocalDate.now() },
 ) : ViewModel() {
 
@@ -137,7 +140,7 @@ class StatsViewModel(
 
     private suspend fun fetch(period: StatsPeriod): StatsDaysResponseDto {
         cache[period]?.let { return it }
-        return daysApi.getStatsDays(period.start.toString(), period.end.toString())
+        return source.days(period.start, period.end)
             .also { cache[period] = it }
     }
 

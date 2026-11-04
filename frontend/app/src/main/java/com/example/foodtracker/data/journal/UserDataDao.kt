@@ -38,6 +38,9 @@ interface UserDataDao {
     @Query("SELECT * FROM logs WHERE clientId = :clientId")
     suspend fun getLog(clientId: String): LogEntity?
 
+    @Query("SELECT * FROM logs WHERE date BETWEEN :from AND :to ORDER BY date, sortKey, serverId")
+    suspend fun getLogsBetween(from: String, to: String): List<LogEntity>
+
     @Query("SELECT COUNT(*) FROM logs WHERE date = :date")
     suspend fun countLogs(date: String): Int
 
@@ -60,6 +63,9 @@ interface UserDataDao {
     // ── Weights ──
     @Query("SELECT * FROM weights WHERE date = :date")
     suspend fun getWeight(date: String): WeightEntity?
+
+    @Query("SELECT * FROM weights WHERE date BETWEEN :from AND :to ORDER BY date")
+    suspend fun getWeightsBetween(from: String, to: String): List<WeightEntity>
 
     @Upsert
     suspend fun upsertWeights(weights: List<WeightEntity>)
