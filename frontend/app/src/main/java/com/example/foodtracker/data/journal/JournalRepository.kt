@@ -30,11 +30,13 @@ import kotlinx.coroutines.flow.map
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicLong
 
 /** Local window: today and the 61 days before it. */
 const val MIRROR_DAYS = 62
 /** Weights: the window + 60 days of EMA warm-up. */
 const val WEIGHT_MIRROR_DAYS = 122
+private const val REFRESH_RETRIES = 2
 
 data class LocalDay(
     val date: LocalDate,
@@ -64,6 +66,10 @@ class JournalRepository(
     private val now: () -> Long,
     private val today: () -> LocalDate,
 ) {
+    /** Bumped (inside the tx) by completeOp / rejectOp / clearAll; guards refreshes fetched outside the tx. */
+    private val epoch = AtomicLong()
+    /** Bumped by clearAll only: a refresh started before it never writes. */
+    private val clears = AtomicLong()
     private val _events = MutableSharedFlow<SyncEvent>(extraBufferCapacity = 16)
     val events: SharedFlow<SyncEvent> = _events.asSharedFlow()
     val pendingCount: Flow<Int> = dao.observeOpCount()
@@ -94,8 +100,7 @@ class JournalRepository(
     /** GET /days/{d}; throws IOException / HttpException. */
     suspend fun refreshDay(date: LocalDate) {
         val key = date.toString()
-        val resp = logsApi.getDay(key)
-        tx.run {
+        guardedRefresh(fetch = { logsApi.getDay(key) }) { resp ->
             val pending = pendingOps()
             // GET /days/{d} carries no goals snapshot: keep the local one while the day stays marked.
             val goals = if (resp.status == null) null else JournalJson.decodeGoals(dao.getDay(key)?.goalsJson)
@@ -110,10 +115,12 @@ class JournalRepository(
         val t = today()
         val from = t.minusDays(MIRROR_DAYS - 1L)
         val weightFrom = t.minusDays(WEIGHT_MIRROR_DAYS - 1L)
-        val days = logsApi.getDays(from.toString(), t.toString()).days.associateBy { it.date }
-        val weights = logsApi.getWeightCheckIns(weightFrom.toString(), t.toString()).items
-            .associate { it.date to it.weightKg }
-        tx.run {
+        guardedRefresh(fetch = {
+            val days = logsApi.getDays(from.toString(), t.toString()).days.associateBy { it.date }
+            val weights = logsApi.getWeightCheckIns(weightFrom.toString(), t.toString()).items
+                .associate { it.date to it.weightKg }
+            days to weights
+        }) { (days, weights) ->
             val pending = pendingOps()
             for (d in datesBetween(from, t)) {
                 val key = d.toString()
@@ -215,6 +222,8 @@ class JournalRepository(
 
     suspend fun clearAll() {
         tx.run {
+            clears.incrementAndGet()
+            epoch.incrementAndGet()
             dao.clearLogs()
             dao.clearDays()
             dao.clearWeights()
@@ -234,6 +243,7 @@ class JournalRepository(
 
     suspend fun completeOp(op: QueuedOp, response: FoodLogDto?) {
         val date = tx.run {
+            epoch.incrementAndGet()
             val entity = dao.getOp(op.seq) ?: return@run null
             dao.deleteOps(listOf(op.seq))
             val remaining = pendingOps()
@@ -252,10 +262,13 @@ class JournalRepository(
 
     suspend fun rejectOp(op: QueuedOp, outcome: SyncOutcome) {
         val date = tx.run {
+            epoch.incrementAndGet()
             val rows = dao.getOps()
             val date = rows.firstOrNull { it.seq == op.seq }?.date ?: op.op.date
             val kept = dropDependents(rows.map(JournalJson::toQueued), op).mapTo(HashSet()) { it.seq }
             dao.deleteOps(rows.map { it.seq }.filter { it !in kept })
+            // The server never accepted the create: drop its mirror row now, even if the refresh below fails.
+            (op.op as? SyncOp.CreateLog)?.let { dao.deleteLogs(listOf(it.clientId)) }
             date
         }
         if (date != null) {
@@ -271,6 +284,29 @@ class JournalRepository(
     }
 
     // ── Internals ──
+
+    private enum class RefreshResult { APPLIED, RETRY, DROPPED }
+
+    /**
+     * Fetches outside the transaction and applies inside it only if no op completed/was rejected
+     * meanwhile ([epoch]); otherwise re-fetches (max [REFRESH_RETRIES] times) then skips silently.
+     * After a [clearAll] ([clears]) the snapshot belongs to the previous session and is dropped.
+     */
+    private suspend fun <T> guardedRefresh(fetch: suspend () -> T, apply: suspend (T) -> Unit) {
+        repeat(REFRESH_RETRIES + 1) {
+            val seenEpoch = epoch.get()
+            val seenClears = clears.get()
+            val data = fetch()
+            val result = tx.run {
+                when {
+                    clears.get() != seenClears -> RefreshResult.DROPPED
+                    epoch.get() != seenEpoch -> RefreshResult.RETRY
+                    else -> { apply(data); RefreshResult.APPLIED }
+                }
+            }
+            if (result != RefreshResult.RETRY) return
+        }
+    }
 
     private suspend fun write(block: suspend () -> Unit) {
         tx.run { block() }

@@ -27,10 +27,12 @@ import com.example.foodtracker.sync.QueuedOp
 import com.example.foodtracker.sync.SyncOp
 import com.example.foodtracker.sync.SyncOutcome
 import com.example.foodtracker.sync.SyncScheduler
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -57,10 +59,15 @@ private class JLogsApi : LogsApi {
     val rangeRequests = mutableListOf<Pair<String, String>>()
     val weightRequests = mutableListOf<Pair<String, String>>()
 
+    /** When set, the first getDay snapshots the answer, then suspends until completed (one-shot). */
+    var gate: CompletableDeferred<Unit>? = null
+
     override suspend fun getDay(date: String): DayResponseDto {
         dayRequests += date
         dayFailure?.let { throw it }
-        return days[date] ?: DayResponseDto(emptyMap(), 0f, null)
+        val snapshot = days[date] ?: DayResponseDto(emptyMap(), 0f, null)
+        gate?.let { gate = null; it.await() }
+        return snapshot
     }
     override suspend fun getDays(from: String, to: String): DaysRangeResponseDto {
         rangeRequests += from to to
@@ -411,5 +418,72 @@ class JournalRepositoryTest {
         assertTrue(again.attempted)
         assertEquals(cid, (again.op as SyncOp.CreateLog).body.clientId)
         assertNotEquals(0L, again.seq)
+    }
+
+    @Test fun refreshSkipsStaleSnapshotAfterCompleteOp() = runTest {
+        val cid = repo.addLog(today, "Lunch", LoggedFood(oats, 50))
+        val create = repo.nextOp()!!
+        repo.markInFlight(create.seq)
+        val gate = CompletableDeferred<Unit>()
+        logsApi.gate = gate
+        val refresh = launch { repo.refreshDay(today) }   // snapshot taken now: the day is still empty
+        runCurrent()
+
+        val synced = serverLog(42, cid, "2026-11-04", grams = 50).copy(meal = "LUNCH")
+        repo.completeOp(create, synced)
+        logsApi.days["2026-11-04"] = DayResponseDto(mapOf("lunch" to listOf(synced)), 0f, null)
+        gate.complete(Unit)
+        refresh.join()
+
+        val item = repo.observeDay(today).first().meals.getValue("Lunch").single()
+        assertEquals(cid, item.clientId)
+        assertEquals(42L, item.id)
+        assertFalse(item.pending)
+        assertEquals(2, logsApi.dayRequests.size)
+    }
+
+    @Test fun refreshAfterClearAllDoesNotWrite() = runTest {
+        logsApi.days["2026-11-04"] = DayResponseDto(
+            mapOf("dinner" to listOf(serverLog(9, "srv-9", "2026-11-04"))), 1f, WeightCheckInDto("2026-11-04", 80f), "complete",
+        )
+        val gate = CompletableDeferred<Unit>()
+        logsApi.gate = gate
+        val refresh = launch { repo.refreshDay(today) }
+        runCurrent()
+
+        repo.clearAll()
+        gate.complete(Unit)
+        refresh.join()
+
+        assertTrue(dao.logs.value.isEmpty())
+        assertTrue(dao.days.value.isEmpty())
+        assertTrue(dao.weights.value.isEmpty())
+        assertEquals(1, logsApi.dayRequests.size)
+    }
+
+    @Test fun rejectedCreateRemovesMirrorRowEvenOffline() = runTest {
+        repo.addLog(today, "Lunch", LoggedFood(oats, 50))
+        val create = repo.nextOp()!!
+        repo.markInFlight(create.seq)
+        logsApi.dayFailure = IOException("offline")
+
+        repo.rejectOp(create, SyncOutcome.DROP_NOTIFY)
+
+        assertTrue(dao.logs.value.isEmpty())
+        assertFalse(repo.hasLocalLog(today))
+        assertEquals(0, repo.pendingCount.first())
+    }
+
+    @Test fun refreshWindowKeepsLocalLogWithQueuedOp() = runTest {
+        val cid = repo.addLog(today.minusDays(2), "Dinner", LoggedFood(oats, 50))
+
+        repo.refreshWindow()
+
+        val day = repo.observeDay(today.minusDays(2)).first()
+        val item = day.meals.getValue("Dinner").single()
+        assertEquals(cid, item.clientId)
+        assertTrue(item.pending)
+        assertTrue(day.fetched)
+        assertEquals(1, repo.pendingCount.first())
     }
 }
