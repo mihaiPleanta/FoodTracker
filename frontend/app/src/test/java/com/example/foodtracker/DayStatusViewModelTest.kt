@@ -34,6 +34,7 @@ import com.example.foodtracker.model.WeightCheckInCreateDto
 import com.example.foodtracker.model.WeightCheckInDto
 import com.example.foodtracker.model.WeightCheckInListDto
 import com.example.foodtracker.model.toDayStatus
+import com.example.foodtracker.sync.SyncOp
 import com.example.foodtracker.viewmodel.FoodViewModel
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -94,56 +95,13 @@ private object DsNoOpProfileApi : ProfileApi {
     override suspend fun deleteAccount(): Response<Unit> = throw UnsupportedOperationException()
 }
 
-private class DsLogsApi : LogsApi {
-    val days = mutableMapOf<String, DayResponseDto>()
-    val requested = mutableListOf<String>()
-
-    override suspend fun updateFoodLogByClient(cid: String, body: FoodLogUpdateDto): FoodLogDto = TODO()
-    override suspend fun deleteFoodLogByClient(cid: String): retrofit2.Response<Unit> = TODO()
-    override suspend fun getDays(from: String, to: String): com.example.foodtracker.model.DaysRangeResponseDto = TODO()
-    override suspend fun getDay(date: String): DayResponseDto {
-        requested += date
-        return days[date] ?: DayResponseDto(emptyMap(), 0f, null)
-    }
-    override suspend fun createFoodLog(body: FoodLogCreateDto): FoodLogDto = error("unused")
-    override suspend fun updateFoodLog(id: Long, body: FoodLogUpdateDto): FoodLogDto = error("unused")
-    override suspend fun getFoodLogSummary(from: String, to: String): FoodLogSummaryDto = error("unused")
-    override suspend fun copyFoodLogs(body: FoodLogCopyRequestDto): List<FoodLogDto> = error("unused")
-    override suspend fun deleteFoodLogs(body: FoodLogDeleteBatchDto): FoodLogDeleteBatchResultDto = error("unused")
-    override suspend fun deleteFoodLog(id: Long): Response<Unit> = error("unused")
-    override suspend fun putHydration(date: String, body: HydrationUpdateDto): HydrationDto = error("unused")
-    override suspend fun postWeightCheckIn(body: WeightCheckInCreateDto): WeightCheckInDto = error("unused")
-    override suspend fun getWeightCheckIns(from: String, to: String): WeightCheckInListDto = error("unused")
-}
-
-private class DsDaysApi : DaysApi {
-    val puts = mutableListOf<Pair<String, Boolean>>()
-    val deletes = mutableListOf<String>()
-    var failure: Throwable? = null
-    var gate: CompletableDeferred<Unit>? = null
-
-    override suspend fun getStatsDays(from: String, to: String): com.example.foodtracker.model.StatsDaysResponseDto = error("unused")
-    override suspend fun putStatus(date: String, body: DayStatusUpdateDto): DayStatusResponseDto {
-        puts += date to body.complete
-        gate?.await()
-        failure?.let { throw it }
-        return DayStatusResponseDto(date, if (body.complete) "complete" else "incomplete")
-    }
-    override suspend fun deleteStatus(date: String): Response<Unit> {
-        deletes += date
-        gate?.await()
-        failure?.let { throw it }
-        return Response.success(null)
-    }
-}
-
-private fun dsLog(id: Long) = FoodLogDto(
-    id = id, logDate = "2026-11-03", meal = "BREAKFAST", grams = 100, barcode = "b$id", name = "Food $id",
+private fun dsLog(id: Long, date: String) = FoodLogDto(
+    id = id, logDate = date, meal = "BREAKFAST", grams = 100, barcode = "b$id", name = "Food $id",
     kcal100g = 100f, protein100g = 1f, carbs100g = 1f, fat100g = 1f,
 )
 
-private fun dsDay(withFood: Boolean, status: String? = null) = DayResponseDto(
-    foodsByMeal = if (withFood) mapOf("breakfast" to listOf(dsLog(1))) else emptyMap(),
+private fun dsDay(date: String, withFood: Boolean, status: String? = null) = DayResponseDto(
+    foodsByMeal = if (withFood) mapOf("breakfast" to listOf(dsLog(date.replace("-", "").toLong(), date))) else emptyMap(),
     hydrationLiters = 0f,
     weightCheckIn = null,
     status = status,
@@ -156,8 +114,10 @@ class DayStatusViewModelTest {
     private val today = "2026-11-03"
     private val yesterday = "2026-11-02"
     private var now: Date = Calendar.getInstance().apply { clear(); set(2026, Calendar.NOVEMBER, 3, 12, 0) }.time
-    private val logs = DsLogsApi()
-    private val days = DsDaysApi()
+    private val journal = TestJournal(today = {
+        java.time.LocalDate.parse(java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(now))
+    })
+    private val logs = journal.logsApi
 
     @get:Rule val tempFolder = TemporaryFolder()
 
@@ -170,6 +130,8 @@ class DayStatusViewModelTest {
     private fun date(y: Int, m: Int, d: Int): Date =
         Calendar.getInstance().apply { clear(); set(y, m - 1, d, 12, 0) }.time
 
+    private fun statusOps() = journal.ops().filterIsInstance<SyncOp.PutDayStatus>()
+
     private fun TestScope.newVm(): FoodViewModel {
         val vm = FoodViewModel(
             settingsRepository = FakeSettingsRepository(),
@@ -180,9 +142,8 @@ class DayStatusViewModelTest {
                 )
             ),
             foodRepository = FoodRepository(DsNoOpFoodApi, DsNoOpCache),
-            logsApi = logs,
+            journal = journal.repo,
             profileApi = DsNoOpProfileApi,
-            daysApi = days,
             clock = { now },
         )
         // WhileSubscribed flows only update while collected.
@@ -204,7 +165,7 @@ class DayStatusViewModelTest {
 
     @Test
     fun selectedDayStatus_reflectsGetDay() = runTest(testDispatcher) {
-        logs.days[today] = dsDay(withFood = true, status = "complete")
+        logs.days[today] = dsDay(today, withFood = true, status = "complete")
         val vm = newVm()
         assertEquals(DayStatus.COMPLETE, vm.selectedDayStatus.value)
         assertTrue(vm.selectedDayHasFood.value)
@@ -212,8 +173,8 @@ class DayStatusViewModelTest {
 
     @Test
     fun selectedDayStatus_followsSelectedDate() = runTest(testDispatcher) {
-        logs.days[today] = dsDay(withFood = true, status = "complete")
-        logs.days["2026-10-20"] = dsDay(withFood = false)
+        logs.days[today] = dsDay(today, withFood = true, status = "complete")
+        logs.days["2026-10-20"] = dsDay("2026-10-20", withFood = false)
         val vm = newVm()
         vm.setSelectedHomeDate(date(2026, 10, 20))
         advanceUntilIdle()
@@ -222,98 +183,91 @@ class DayStatusViewModelTest {
     }
 
     @Test
-    fun setDayComplete_isOptimistic_andCallsApi() = runTest(testDispatcher) {
-        logs.days[today] = dsDay(withFood = true)
+    fun setDayComplete_writesMirrorAndQueuesStatus() = runTest(testDispatcher) {
+        logs.days[today] = dsDay(today, withFood = true)
         val vm = newVm()
-        days.gate = CompletableDeferred()
 
         vm.setDayComplete(now, true)
-        runCurrent()
+        advanceUntilIdle()
 
         assertEquals(DayStatus.COMPLETE, vm.selectedDayStatus.value)
-        assertEquals(listOf(today to true), days.puts)
-        days.gate!!.complete(Unit)
-        advanceUntilIdle()
-        assertEquals(DayStatus.COMPLETE, vm.selectedDayStatus.value)
+        assertEquals(listOf(SyncOp.PutDayStatus(today, true)), statusOps())
+        assertTrue(journal.scheduler.calls > 0)
     }
 
     @Test
-    fun setDayComplete_failure_reverts_andToasts() = runTest(testDispatcher) {
-        logs.days[today] = dsDay(withFood = true, status = "incomplete")
+    fun dayCompleteOfflineKeepsStatus() = runTest(testDispatcher) {
+        logs.days[today] = dsDay(today, withFood = true, status = "incomplete")
         val vm = newVm()
         val toasts = mutableListOf<FoodViewModel.ToastEvent>()
         vm.toastEvents.onEach { toasts += it }.launchIn(backgroundScope)
-        days.failure = IOException("offline")
+        logs.dayFailure = IOException("offline")
 
         vm.setDayComplete(now, true)
+        vm.setSelectedHomeDate(now)   // a refresh attempt while offline changes nothing
         advanceUntilIdle()
 
-        assertEquals(DayStatus.INCOMPLETE, vm.selectedDayStatus.value)
-        assertEquals(listOf(R.string.error_no_internet), toasts.map { it.messageRes })
+        assertEquals(DayStatus.COMPLETE, vm.selectedDayStatus.value)
+        assertEquals(listOf(SyncOp.PutDayStatus(today, true)), statusOps())
+        assertEquals(emptyList<Int>(), toasts.map { it.messageRes })
     }
 
     @Test
-    fun setDayComplete_otherFailure_toastsDayStatusError() = runTest(testDispatcher) {
-        logs.days[today] = dsDay(withFood = true)
-        val vm = newVm()
-        val toasts = mutableListOf<FoodViewModel.ToastEvent>()
-        vm.toastEvents.onEach { toasts += it }.launchIn(backgroundScope)
-        days.failure = IllegalStateException("boom")
-
-        vm.setDayComplete(now, true)
-        advanceUntilIdle()
-
-        assertNull(vm.selectedDayStatus.value)
-        assertEquals(listOf(R.string.error_day_status), toasts.map { it.messageRes })
-    }
-
-    @Test
-    fun clearDayStatus_callsDelete_andNullsStatus() = runTest(testDispatcher) {
-        logs.days[today] = dsDay(withFood = true, status = "complete")
+    fun clearDayStatus_nullsStatusAndQueuesClear() = runTest(testDispatcher) {
+        logs.days[today] = dsDay(today, withFood = true, status = "complete")
         val vm = newVm()
 
         vm.clearDayStatus(now)
         advanceUntilIdle()
 
-        assertEquals(listOf(today), days.deletes)
+        assertEquals(listOf(SyncOp.PutDayStatus(today, null)), statusOps())
         assertNull(vm.selectedDayStatus.value)
     }
 
     @Test
-    fun clearDayStatus_failure_reverts() = runTest(testDispatcher) {
-        logs.days[today] = dsDay(withFood = true, status = "complete")
+    fun clearDayStatusOffline_staysCleared() = runTest(testDispatcher) {
+        logs.days[today] = dsDay(today, withFood = true, status = "complete")
         val vm = newVm()
-        days.failure = IOException("offline")
+        logs.dayFailure = IOException("offline")
 
         vm.clearDayStatus(now)
         advanceUntilIdle()
 
-        assertEquals(DayStatus.COMPLETE, vm.selectedDayStatus.value)
+        assertNull(vm.selectedDayStatus.value)
     }
 
     @Test
     fun yesterdayPrompt_shownWhenYesterdayHasFoodAndNoStatus() = runTest(testDispatcher) {
-        logs.days[yesterday] = dsDay(withFood = true)
+        logs.days[yesterday] = dsDay(yesterday, withFood = true)
         val vm = newVm()
         assertTrue(vm.showYesterdayPrompt.value)
-        assertTrue(yesterday in logs.requested)
+        assertTrue(yesterday in logs.dayRequests)
     }
 
     @Test
     fun yesterdayPrompt_hiddenWhenYesterdayEmpty() = runTest(testDispatcher) {
-        logs.days[yesterday] = dsDay(withFood = false)
+        logs.days[yesterday] = dsDay(yesterday, withFood = false)
         assertFalse(newVm().showYesterdayPrompt.value)
     }
 
     @Test
     fun yesterdayPrompt_hiddenWhenYesterdayHasStatus() = runTest(testDispatcher) {
-        logs.days[yesterday] = dsDay(withFood = true, status = "incomplete")
+        logs.days[yesterday] = dsDay(yesterday, withFood = true, status = "incomplete")
         assertFalse(newVm().showYesterdayPrompt.value)
     }
 
     @Test
+    fun yesterdayPrompt_shownFromMirrorWhenOffline() = runTest(testDispatcher) {
+        // Yesterday was downloaded earlier (e.g. by the window refresh); now we're offline.
+        logs.days[yesterday] = dsDay(yesterday, withFood = true)
+        journal.repo.refreshDay(java.time.LocalDate.parse(yesterday))
+        logs.dayFailure = IOException("offline")
+        assertTrue(newVm().showYesterdayPrompt.value)
+    }
+
+    @Test
     fun yesterdayPrompt_hiddenWhenSelectedDateIsNotToday() = runTest(testDispatcher) {
-        logs.days[yesterday] = dsDay(withFood = true)
+        logs.days[yesterday] = dsDay(yesterday, withFood = true)
         val vm = newVm()
         assertTrue(vm.showYesterdayPrompt.value)
         vm.setSelectedHomeDate(date(2026, 10, 20))
@@ -326,12 +280,12 @@ class DayStatusViewModelTest {
 
     @Test
     fun yesterday_isFetchedOnlyOncePerSession() = runTest(testDispatcher) {
-        logs.days[yesterday] = dsDay(withFood = true)
+        logs.days[yesterday] = dsDay(yesterday, withFood = true)
         val vm = newVm()
         vm.setSelectedHomeDate(date(2026, 10, 20))
         vm.setSelectedHomeDate(now)
         advanceUntilIdle()
-        assertEquals(1, logs.requested.count { it == yesterday })
+        assertEquals(1, logs.dayRequests.count { it == yesterday })
     }
 
     @Test
@@ -356,14 +310,14 @@ class DayStatusViewModelTest {
         vm.setDayComplete(tomorrow, true)
         advanceUntilIdle()
 
-        assertTrue(days.puts.isEmpty())
+        assertTrue(statusOps().isEmpty())
         assertNull(vm.selectedDayStatus.value)
     }
 
     @Test
     fun yesterdayPrompt_afterMidnight_asksAboutNewYesterday() = runTest(testDispatcher) {
-        logs.days[yesterday] = dsDay(withFood = true)
-        logs.days[today] = dsDay(withFood = true)
+        logs.days[yesterday] = dsDay(yesterday, withFood = true)
+        logs.days[today] = dsDay(today, withFood = true)
         val vm = newVm()
         assertTrue(vm.showYesterdayPrompt.value)
 
@@ -371,16 +325,15 @@ class DayStatusViewModelTest {
         vm.setSelectedHomeDate(now)
         advanceUntilIdle()
 
-        assertTrue(today in logs.requested.drop(1))
         assertTrue(vm.showYesterdayPrompt.value)
         vm.answerYesterdayPrompt(true)
         advanceUntilIdle()
-        assertEquals(listOf(today to true), days.puts)
+        assertEquals(listOf(SyncOp.PutDayStatus(today, true)), statusOps())
     }
 
     @Test
     fun yesterdayPrompt_afterMidnight_staleHasFoodDoesNotLeak() = runTest(testDispatcher) {
-        logs.days[yesterday] = dsDay(withFood = true)
+        logs.days[yesterday] = dsDay(yesterday, withFood = true)
         val vm = newVm()
         assertTrue(vm.showYesterdayPrompt.value)
 
@@ -393,8 +346,8 @@ class DayStatusViewModelTest {
 
     @Test
     fun yesterdayPrompt_answerForDayD_doesNotSuppressDayDPlus1() = runTest(testDispatcher) {
-        logs.days[yesterday] = dsDay(withFood = true)
-        logs.days[today] = dsDay(withFood = true)
+        logs.days[yesterday] = dsDay(yesterday, withFood = true)
+        logs.days[today] = dsDay(today, withFood = true)
         val vm = newVm()
         vm.answerYesterdayPrompt(false)
         advanceUntilIdle()
@@ -408,47 +361,49 @@ class DayStatusViewModelTest {
     }
 
     @Test
-    fun answerYesterdayPrompt_false_putsIncomplete_andHidesPrompt() = runTest(testDispatcher) {
-        logs.days[yesterday] = dsDay(withFood = true)
+    fun answerYesterdayPrompt_false_queuesIncomplete_andHidesPrompt() = runTest(testDispatcher) {
+        logs.days[yesterday] = dsDay(yesterday, withFood = true)
         val vm = newVm()
 
         vm.answerYesterdayPrompt(false)
         advanceUntilIdle()
 
-        assertEquals(listOf(yesterday to false), days.puts)
+        assertEquals(listOf(SyncOp.PutDayStatus(yesterday, false)), statusOps())
         assertFalse(vm.showYesterdayPrompt.value)
     }
 
     @Test
-    fun answerYesterdayPrompt_true_putsComplete() = runTest(testDispatcher) {
-        logs.days[yesterday] = dsDay(withFood = true)
+    fun answerYesterdayPrompt_true_queuesComplete() = runTest(testDispatcher) {
+        logs.days[yesterday] = dsDay(yesterday, withFood = true)
         val vm = newVm()
         vm.answerYesterdayPrompt(true)
         advanceUntilIdle()
-        assertEquals(listOf(yesterday to true), days.puts)
+        assertEquals(listOf(SyncOp.PutDayStatus(yesterday, true)), statusOps())
         assertFalse(vm.showYesterdayPrompt.value)
     }
 
     @Test
-    fun answerYesterdayPrompt_failure_staysHidden() = runTest(testDispatcher) {
-        logs.days[yesterday] = dsDay(withFood = true)
+    fun answerYesterdayPrompt_offline_staysHidden() = runTest(testDispatcher) {
+        logs.days[yesterday] = dsDay(yesterday, withFood = true)
         val vm = newVm()
-        days.failure = IOException("offline")
+        logs.dayFailure = IOException("offline")
         vm.answerYesterdayPrompt(true)
         advanceUntilIdle()
         assertFalse(vm.showYesterdayPrompt.value)
     }
 
     @Test
-    fun resetUserState_clearsStatusesAndAnsweredFlag() = runTest(testDispatcher) {
-        logs.days[today] = dsDay(withFood = true, status = "complete")
-        logs.days[yesterday] = dsDay(withFood = true)
+    fun resetUserState_clearsAnsweredFlag_andClearedMirrorHidesStatus() = runTest(testDispatcher) {
+        logs.days[today] = dsDay(today, withFood = true, status = "complete")
+        logs.days[yesterday] = dsDay(yesterday, withFood = true)
         val vm = newVm()
         vm.answerYesterdayPrompt(true)
         advanceUntilIdle()
 
+        // Logout: the mirror is wiped, then UI state.
+        journal.repo.clearAll()
         vm.resetUserState()
-        runCurrent()
+        advanceUntilIdle()
         assertNull(vm.selectedDayStatus.value)
         // Next account: yesterday is fetched again and the prompt can show again.
         vm.setSelectedHomeDate(now)
@@ -458,8 +413,8 @@ class DayStatusViewModelTest {
     }
 
     @Test
-    fun dayStatusChanged_emitsAfterSuccess_notOnFailure() = runTest(testDispatcher) {
-        logs.days[today] = dsDay(withFood = true)
+    fun dayStatusChanged_emitsOnEveryLocalWrite_evenOffline() = runTest(testDispatcher) {
+        logs.days[today] = dsDay(today, withFood = true)
         val vm = newVm()
         var emissions = 0
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
@@ -474,9 +429,9 @@ class DayStatusViewModelTest {
         advanceUntilIdle()
         assertEquals(2, emissions)
 
-        days.failure = IOException("offline")
+        logs.dayFailure = IOException("offline")
         vm.setDayComplete(now, true)
         advanceUntilIdle()
-        assertEquals(2, emissions)
+        assertEquals(3, emissions)
     }
 }

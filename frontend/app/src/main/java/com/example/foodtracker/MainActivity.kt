@@ -114,6 +114,7 @@ class MainActivity : ComponentActivity() {
                     settingsRepository = DataStoreSettingsRepository(applicationContext.settingsDataStore),
                     mealLogTracker = MealLogTracker(applicationContext.mealLogTrackerDataStore),
                     foodRepository = foodRepository,
+                    journal = JournalProvider.repository(applicationContext),
                 )
             }
             val viewModel: FoodViewModel = viewModel(factory = foodViewModelFactory)

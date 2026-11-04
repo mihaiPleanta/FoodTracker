@@ -275,6 +275,7 @@
     <string name="error_save_hydration">Eroare la salvare hidratare</string>
     <string name="error_save_hydration_prefs">Nu am putut salva setările de hidratare</string>
     <string name="error_load_day">Eroare la încărcarea zilei</string>
+    <string name="sync_rejected">O modificare n-a putut fi salvată</string>
     <string name="error_day_status">Nu am putut salva starea zilei</string>
     <string name="error_weight_history">Eroare la istoricul greutății</string>
     <string name="error_weight_checkin">Eroare la check-in greutate</string>

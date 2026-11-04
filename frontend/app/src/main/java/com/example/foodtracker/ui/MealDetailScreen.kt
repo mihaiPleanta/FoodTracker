@@ -150,7 +150,7 @@ fun MealDetailScreen(
 
     LaunchedEffect(Unit) {
         copy.copied.collect { r ->
-            viewModel.appendCopiedLogs(r.targetDateKey, r.logs)
+            viewModel.refreshAfterServerCopy(r.targetDateKey, r.logs.map { it.meal })
             val n = r.logs.size
             val res = context.resources.getQuantityString(R.plurals.copy_done, n, n)
             launch {
@@ -160,7 +160,7 @@ fun MealDetailScreen(
                     duration = SnackbarDuration.Short,
                 )
                 if (result == SnackbarResult.ActionPerformed) {
-                    viewModel.undoCopy(r.targetDateKey, r.logs.map { it.id })
+                    viewModel.undoCopy(r.targetDateKey, r.logs.map { it.clientId })
                 }
             }
         }

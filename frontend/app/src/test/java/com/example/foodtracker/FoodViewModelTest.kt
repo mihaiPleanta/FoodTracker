@@ -28,13 +28,20 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import com.example.foodtracker.sync.SyncOp
+import com.example.foodtracker.sync.SyncOutcome
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -61,129 +68,6 @@ private object NoOpFoodApi : FoodApi {
         throw UnsupportedOperationException("NoOpFoodApi")
 }
 
-/**
- * Fake LogsApi for testing the PATCH-grams flow. getDay seeds one breakfast item with a real id
- * (so updateFoodPortion has something to edit without going through the add path / markLogged);
- * updateFoodLog echoes the new grams and records the call. The rest throw.
- */
-private class FakeLogsApi : LogsApi {
-    override suspend fun getFoodLogSummary(from: String, to: String): com.example.foodtracker.model.FoodLogSummaryDto =
-        throw UnsupportedOperationException()
-    override suspend fun copyFoodLogs(body: com.example.foodtracker.model.FoodLogCopyRequestDto): List<FoodLogDto> =
-        throw UnsupportedOperationException()
-    var lastDeleteBatch: com.example.foodtracker.model.FoodLogDeleteBatchDto? = null
-    var failDeleteBatchWith: Throwable? = null
-    override suspend fun deleteFoodLogs(body: com.example.foodtracker.model.FoodLogDeleteBatchDto): com.example.foodtracker.model.FoodLogDeleteBatchResultDto {
-        failDeleteBatchWith?.let { throw it }
-        lastDeleteBatch = body
-        return com.example.foodtracker.model.FoodLogDeleteBatchResultDto(body.ids.size)
-    }
-    var lastUpdate: Pair<Long, Int>? = null
-    var lastUpdateBody: FoodLogUpdateDto? = null
-    var lastCreate: FoodLogCreateDto? = null
-    var failUpdateWith: Throwable? = null
-    var failCreateWith: Throwable? = null
-    var seedUnit: String? = null
-    var seedUnitQty: Float? = null
-
-    override suspend fun updateFoodLogByClient(cid: String, body: FoodLogUpdateDto): FoodLogDto = TODO()
-    override suspend fun deleteFoodLogByClient(cid: String): retrofit2.Response<Unit> = TODO()
-    override suspend fun getDays(from: String, to: String): com.example.foodtracker.model.DaysRangeResponseDto = TODO()
-    override suspend fun getDay(date: String): DayResponseDto = DayResponseDto(
-        foodsByMeal = mapOf(
-            "breakfast" to listOf(
-                FoodLogDto(
-                    id = 42L, logDate = date, meal = "BREAKFAST", grams = 100,
-                    barcode = "111", name = "Oats", brand = null, imageUrl = null,
-                    categories = emptyList(), kcal100g = 100f, protein100g = 5f,
-                    carbs100g = 10f, fat100g = 2f, unit = seedUnit, unitQty = seedUnitQty,
-                )
-            )
-        ),
-        hydrationLiters = 0f,
-        weightCheckIn = null,
-    )
-
-    override suspend fun createFoodLog(body: FoodLogCreateDto): FoodLogDto {
-        failCreateWith?.let { throw it }
-        lastCreate = body
-        return FoodLogDto(
-            id = 7L, logDate = body.logDate, meal = body.meal, grams = body.grams,
-            barcode = body.barcode, name = body.name, kcal100g = body.kcal100g,
-            protein100g = body.protein100g, carbs100g = body.carbs100g, fat100g = body.fat100g,
-            unit = body.unit, unitQty = body.unitQty,
-        )
-    }
-
-    override suspend fun updateFoodLog(id: Long, body: FoodLogUpdateDto): FoodLogDto {
-        failUpdateWith?.let { throw it }
-        lastUpdateBody = body
-        lastUpdate = id to body.grams
-        return FoodLogDto(
-            id = id, logDate = "2026-06-03", meal = "BREAKFAST", grams = body.grams,
-            barcode = "111", name = "Oats", brand = null, imageUrl = null, categories = emptyList(),
-            kcal100g = 100f, protein100g = 5f, carbs100g = 10f, fat100g = 2f,
-        )
-    }
-
-    override suspend fun deleteFoodLog(id: Long): retrofit2.Response<Unit> =
-        retrofit2.Response.success(null)
-
-    override suspend fun putHydration(date: String, body: HydrationUpdateDto): HydrationDto =
-        throw UnsupportedOperationException()
-    override suspend fun postWeightCheckIn(body: WeightCheckInCreateDto): WeightCheckInDto =
-        throw UnsupportedOperationException()
-    override suspend fun getWeightCheckIns(from: String, to: String): WeightCheckInListDto =
-        throw UnsupportedOperationException()
-}
-
-/**
- * A LogsApi whose getDay response can be swapped at runtime, to simulate switching
- * accounts (account A logs in, logs out, account B logs in on the same process).
- */
-private class SwitchableLogsApi(initial: DayResponseDto) : LogsApi {
-    override suspend fun getFoodLogSummary(from: String, to: String): com.example.foodtracker.model.FoodLogSummaryDto =
-        throw UnsupportedOperationException()
-    override suspend fun copyFoodLogs(body: com.example.foodtracker.model.FoodLogCopyRequestDto): List<FoodLogDto> =
-        throw UnsupportedOperationException()
-    override suspend fun deleteFoodLogs(body: com.example.foodtracker.model.FoodLogDeleteBatchDto): com.example.foodtracker.model.FoodLogDeleteBatchResultDto =
-        throw UnsupportedOperationException()
-    var day: DayResponseDto = initial
-
-    override suspend fun updateFoodLogByClient(cid: String, body: FoodLogUpdateDto): FoodLogDto = TODO()
-    override suspend fun deleteFoodLogByClient(cid: String): retrofit2.Response<Unit> = TODO()
-    override suspend fun getDays(from: String, to: String): com.example.foodtracker.model.DaysRangeResponseDto = TODO()
-    override suspend fun getDay(date: String): DayResponseDto = day
-    override suspend fun createFoodLog(body: FoodLogCreateDto): FoodLogDto =
-        throw UnsupportedOperationException()
-    override suspend fun updateFoodLog(id: Long, body: FoodLogUpdateDto): FoodLogDto =
-        throw UnsupportedOperationException()
-    override suspend fun deleteFoodLog(id: Long): retrofit2.Response<Unit> =
-        retrofit2.Response.success(null)
-    override suspend fun putHydration(date: String, body: HydrationUpdateDto): HydrationDto =
-        throw UnsupportedOperationException()
-    override suspend fun postWeightCheckIn(body: WeightCheckInCreateDto): WeightCheckInDto =
-        throw UnsupportedOperationException()
-    override suspend fun getWeightCheckIns(from: String, to: String): WeightCheckInListDto =
-        throw UnsupportedOperationException()
-}
-
-private fun dayWithOneBreakfast() = DayResponseDto(
-    foodsByMeal = mapOf(
-        "breakfast" to listOf(
-            FoodLogDto(
-                id = 1L, logDate = "2026-06-24", meal = "BREAKFAST", grams = 100,
-                barcode = "111", name = "Oats", brand = null, imageUrl = null,
-                categories = emptyList(), kcal100g = 100f, protein100g = 5f,
-                carbs100g = 10f, fat100g = 2f,
-            )
-        )
-    ),
-    hydrationLiters = 0f,
-    weightCheckIn = null,
-)
-
-private fun emptyDay() = DayResponseDto(emptyMap(), 0f, null)
 
 /**
  * Keeps FoodViewModel's init loadGoals() off the network: the real ProfileApi goes through
@@ -241,6 +125,7 @@ private object PagingFoodApi : FoodApi {
         throw UnsupportedOperationException("PagingFoodApi")
 }
 
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class FoodViewModelTest {
 
@@ -257,23 +142,59 @@ class FoodViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        val trackerStore = PreferenceDataStoreFactory.create(
-            scope = dataStoreScope,
-            produceFile = { File(tempFolder.newFolder("tracker"), "meal_log_tracker.preferences_pb") }
-        )
-        viewModel = FoodViewModel(
-            settingsRepository = FakeSettingsRepository(),
-            mealLogTracker = MealLogTracker(trackerStore),
-            foodRepository = FoodRepository(NoOpFoodApi, NoOpCache),
-            logsApi = SwitchableLogsApi(emptyDay()),
-            profileApi = NoOpProfileApi,
-        )
+        viewModel = newVm()
     }
 
     @After
     fun tearDown() {
         dataStoreScope.cancel()
         Dispatchers.resetMain()
+    }
+
+    private fun newTracker() = MealLogTracker(
+        PreferenceDataStoreFactory.create(
+            scope = dataStoreScope,
+            produceFile = { File(tempFolder.newFolder(), "meal_log_tracker.preferences_pb") }
+        )
+    )
+
+    private fun newVm(
+        journal: TestJournal = TestJournal(),
+        profileApi: ProfileApi = NoOpProfileApi,
+        foodApi: FoodApi = NoOpFoodApi,
+        settingsRepository: SettingsRepository = FakeSettingsRepository(),
+        tracker: MealLogTracker = newTracker(),
+    ) = FoodViewModel(
+        settingsRepository = settingsRepository,
+        mealLogTracker = tracker,
+        foodRepository = FoodRepository(foodApi, NoOpCache),
+        journal = journal.repo,
+        profileApi = profileApi,
+    )
+
+    private fun todayKey() = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+
+    /** A journal whose server has [logs] on today's breakfast. */
+    private fun journalWithBreakfast(vararg logs: FoodLogDto) = TestJournal().apply {
+        logsApi.days[todayKey()] = DayResponseDto(mapOf("breakfast" to logs.toList()), 0f, null)
+    }
+
+    private fun TestScope.collectToasts(vm: FoodViewModel): MutableList<FoodViewModel.ToastEvent> {
+        val toasts = mutableListOf<FoodViewModel.ToastEvent>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.toastEvents.collect { toasts += it } }
+        return toasts
+    }
+
+    private fun TestScope.collectFoods(vm: FoodViewModel, meal: String): () -> List<LoggedFood> {
+        var foods: List<LoggedFood> = emptyList()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.getFoodsFlow(meal).collect { foods = it } }
+        return { foods }
+    }
+
+    private fun TestScope.countEmissions(flow: kotlinx.coroutines.flow.Flow<Unit>): () -> Int {
+        var count = 0
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { flow.collect { count++ } }
+        return { count }
     }
 
     @Test
@@ -307,18 +228,7 @@ class FoodViewModelTest {
             override val settings = flow { delay(1_000); emit(stored) }
             override suspend fun update(settings: AppSettings) = Unit
         }
-        val vm = FoodViewModel(
-            settingsRepository = slowRepo,
-            mealLogTracker = MealLogTracker(
-                PreferenceDataStoreFactory.create(
-                    scope = dataStoreScope,
-                    produceFile = { File(tempFolder.newFolder("tracker2"), "meal_log_tracker.preferences_pb") }
-                )
-            ),
-            foodRepository = FoodRepository(NoOpFoodApi, NoOpCache),
-            logsApi = SwitchableLogsApi(emptyDay()),
-            profileApi = NoOpProfileApi,
-        )
+        val vm = newVm(settingsRepository = slowRepo)
         assertEquals(stored, vm.persistedSettings.first())
     }
 
@@ -342,6 +252,11 @@ class FoodViewModelTest {
         fat100g = 2f,
     )
 
+    private val bread = FoodItem(
+        barcode = "999", name = "Bread", brand = null, imageUrl = null,
+        categories = emptyList(), per100g = 250, protein100g = 8f, carbs100g = 45f, fat100g = 3f,
+    )
+
     @Test
     fun addFoodToMealReturningIndex_returnsZeroForFirstAdd() {
         val index = viewModel.addFoodToMealReturningIndex(
@@ -352,18 +267,27 @@ class FoodViewModelTest {
     }
 
     @Test
+    fun addFoodToMealReturningIndex_returnsIncrementingIndexes() {
+        val firstIndex = viewModel.addFoodToMealReturningIndex("Lunch", LoggedFood(sampleFood("Rice"), 200))
+        val secondIndex = viewModel.addFoodToMealReturningIndex("Lunch", LoggedFood(sampleFood("Chicken"), 150))
+        val thirdIndex = viewModel.addFoodToMealReturningIndex("Lunch", LoggedFood(sampleFood("Broccoli"), 80))
+        assertEquals(0, firstIndex)
+        assertEquals(1, secondIndex)
+        assertEquals(2, thirdIndex)
+    }
+
+    @Test
+    fun addFoodToMealReturningIndex_countsRowsAlreadyInTheMirror() = runTest(testDispatcher) {
+        val vm = newVm(journalWithBreakfast(serverLog(1, todayKey()), serverLog(2, todayKey())))
+        advanceUntilIdle()
+        assertEquals(2, vm.addFoodToMealReturningIndex("Breakfast", LoggedFood(bread, 30)))
+        advanceUntilIdle()
+        assertEquals(3, vm.addFoodToMealReturningIndex("Breakfast", LoggedFood(bread, 40)))
+    }
+
+    @Test
     fun loadMore_appendsNextPage_andUpdatesHasMore() = runTest(testDispatcher) {
-        val store = PreferenceDataStoreFactory.create(
-            scope = dataStoreScope,
-            produceFile = { File(tempFolder.newFolder("tracker2"), "meal_log_tracker.preferences_pb") }
-        )
-        val vm = FoodViewModel(
-            settingsRepository = FakeSettingsRepository(),
-            mealLogTracker = MealLogTracker(store),
-            foodRepository = FoodRepository(PagingFoodApi, NoOpCache),
-            logsApi = SwitchableLogsApi(emptyDay()),
-            profileApi = NoOpProfileApi,
-        )
+        val vm = newVm(foodApi = PagingFoodApi)
 
         vm.searchFoods("banana")
         advanceUntilIdle()   // drains the 350ms debounce + page-1 fetch
@@ -378,269 +302,408 @@ class FoodViewModelTest {
         assertEquals(false, after.hasMore)
     }
 
+    // ── Journal: reads ────────────────────────────────────────────────────────
+
     @Test
-    fun updateFoodPortion_updatesGramsInPlace() = runTest(testDispatcher) {
-        val fakeLogs = FakeLogsApi()
-        val store = PreferenceDataStoreFactory.create(
-            scope = dataStoreScope,
-            produceFile = { File(tempFolder.newFolder("tracker3"), "meal_log_tracker.preferences_pb") }
-        )
-        val vm = FoodViewModel(
-            settingsRepository = FakeSettingsRepository(),
-            mealLogTracker = MealLogTracker(store),
-            foodRepository = FoodRepository(NoOpFoodApi, NoOpCache),
-            logsApi = fakeLogs,
-            profileApi = NoOpProfileApi,
-        )
-        // Capture latest emission (WhileSubscribed needs an active collector).
-        var foods: List<LoggedFood> = emptyList()
-        val job = launch { vm.getFoodsFlow("Breakfast").collect { foods = it } }
-        advanceUntilIdle()  // drain init loadDay → seeds one breakfast item (id=42, 100g)
-
-        assertEquals(1, foods.size)
-        assertEquals(100, foods[0].grams)
-
-        vm.updateFoodPortion("Breakfast", 0, 175, unit = null, unitQty = null)
-        advanceUntilIdle()  // PATCH resolves
-
-        assertEquals(1, foods.size)                     // still one item, in place
-        assertEquals(175, foods[0].grams)               // grams updated
-        assertEquals(42L to 175, fakeLogs.lastUpdate)   // PATCH sent id + new grams
-        job.cancel()
+    fun homeShowsServerDayThroughTheMirror() = runTest(testDispatcher) {
+        val vm = newVm(journalWithBreakfast(serverLog(42, todayKey(), name = "Oats")))
+        val foods = collectFoods(vm, "Breakfast")
+        advanceUntilIdle()   // init refresh of today
+        assertEquals(listOf("Oats"), foods().map { it.food.name })
+        assertEquals(42L, foods()[0].id)
+        assertFalse(foods()[0].pending)
     }
 
+    @Test
+    fun setSelectedHomeDate_alwaysRefreshesFromServer() = runTest(testDispatcher) {
+        val journal = journalWithBreakfast(serverLog(1, todayKey()))
+        val vm = newVm(journal)
+        val foods = collectFoods(vm, "Breakfast")
+        advanceUntilIdle()
+        assertEquals(1, foods().size)
 
-    private fun TestScope.newVm(fake: FakeLogsApi, folder: String) = FoodViewModel(
-        settingsRepository = FakeSettingsRepository(),
-        mealLogTracker = MealLogTracker(
-            PreferenceDataStoreFactory.create(
-            scope = dataStoreScope,
-                produceFile = { File(tempFolder.newFolder(folder), "meal_log_tracker.preferences_pb") }
-            )
-        ),
-        foodRepository = FoodRepository(NoOpFoodApi, NoOpCache),
-        logsApi = fake,
-        profileApi = NoOpProfileApi,
-    )
+        // Another device deleted the log; coming back to Home re-fetches the day.
+        journal.logsApi.days[todayKey()] = DayResponseDto(emptyMap(), 0f, null)
+        vm.setSelectedHomeDate(java.util.Date())
+        advanceUntilIdle()
 
-    private val oats = FoodItem(
-        barcode = "999", name = "Bread", brand = null, imageUrl = null,
-        categories = emptyList(), per100g = 250, protein100g = 8f, carbs100g = 45f, fat100g = 3f,
-    )
+        assertEquals(0, foods().size)
+        assertEquals(2, journal.logsApi.dayRequests.count { it == todayKey() })
+    }
+
+    @Test
+    fun selectingNeverFetchedDayOffline_toastsNoInternet() = runTest(testDispatcher) {
+        val journal = TestJournal().apply { logsApi.dayFailure = java.io.IOException("offline") }
+        val vm = newVm(journal)
+        val toasts = collectToasts(vm)
+        advanceUntilIdle()
+        assertEquals(listOf(R.string.error_no_internet), toasts.map { it.messageRes })
+        assertFalse(vm.loadingDay.value)
+    }
+
+    @Test
+    fun selectingFetchedDayOffline_isSilentAndShowsTheMirror() = runTest(testDispatcher) {
+        val journal = journalWithBreakfast(serverLog(1, todayKey(), name = "Oats"))
+        val vm = newVm(journal)
+        val toasts = collectToasts(vm)
+        val foods = collectFoods(vm, "Breakfast")
+        advanceUntilIdle()
+
+        journal.logsApi.dayFailure = java.io.IOException("offline")
+        vm.setSelectedHomeDate(java.util.Date())
+        advanceUntilIdle()
+
+        assertEquals(emptyList<Int>(), toasts.map { it.messageRes })
+        assertEquals(listOf("Oats"), foods().map { it.food.name })
+    }
+
+    // ── Journal: writes are local + queued, never rolled back ───────────────────
+
+    @Test
+    fun addFoodOfflineStaysVisibleAsPending() = runTest(testDispatcher) {
+        val journal = TestJournal().apply { logsApi.dayFailure = java.io.IOException("offline") }
+        val vm = newVm(journal)
+        val toasts = collectToasts(vm)
+        val foods = collectFoods(vm, "Breakfast")
+        advanceUntilIdle()
+        toasts.clear()   // the never-fetched day's load error, not the add's
+
+        vm.addFoodToMeal("Breakfast", LoggedFood(bread, 60, unit = "slice", unitQty = 2f))
+        advanceUntilIdle()
+
+        assertEquals(1, foods().size)
+        assertTrue(foods()[0].pending)
+        assertNotNull(foods()[0].clientId)
+        assertEquals(emptyList<Int>(), toasts.map { it.messageRes })
+        val create = journal.ops().single() as SyncOp.CreateLog
+        assertEquals(foods()[0].clientId, create.clientId)
+        assertEquals(60, create.body.grams)
+        assertEquals("slice", create.body.unit)
+        assertEquals(2f, create.body.unitQty)
+        assertTrue(journal.scheduler.calls > 0)
+    }
+
+    @Test
+    fun deleteOfflineStaysDeleted() = runTest(testDispatcher) {
+        val journal = journalWithBreakfast(serverLog(42, todayKey()))
+        val vm = newVm(journal)
+        val toasts = collectToasts(vm)
+        val foods = collectFoods(vm, "Breakfast")
+        advanceUntilIdle()
+        val cid = foods()[0].clientId!!
+        journal.logsApi.dayFailure = java.io.IOException("offline")
+
+        vm.removeFoodFromMeal("Breakfast", 0)
+        advanceUntilIdle()
+
+        assertEquals(0, foods().size)
+        assertEquals(listOf<SyncOp>(SyncOp.DeleteLog(cid)), journal.ops())
+        assertEquals(emptyList<Int>(), toasts.map { it.messageRes })
+    }
+
+    @Test
+    fun editPendingFoodIsAllowed() = runTest(testDispatcher) {
+        val journal = TestJournal().apply { logsApi.dayFailure = java.io.IOException("offline") }
+        val vm = newVm(journal)
+        val foods = collectFoods(vm, "Breakfast")
+        advanceUntilIdle()
+        vm.addFoodToMeal("Breakfast", LoggedFood(bread, 60))
+        advanceUntilIdle()
+        assertTrue(foods()[0].pending)
+
+        vm.updateFoodPortion("Breakfast", 0, 175, unit = "slice", unitQty = 3f)
+        advanceUntilIdle()
+
+        assertEquals(175, foods()[0].grams)
+        assertEquals("slice", foods()[0].unit)
+        // Not sent yet: the edit is folded into the queued create.
+        val create = journal.ops().single() as SyncOp.CreateLog
+        assertEquals(175, create.body.grams)
+        assertEquals("slice", create.body.unit)
+        assertEquals(3f, create.body.unitQty)
+    }
+
+    @Test
+    fun updateFoodPortion_updatesSyncedLogInPlaceAndQueuesUpdate() = runTest(testDispatcher) {
+        val journal = journalWithBreakfast(serverLog(42, todayKey(), name = "Oats"), serverLog(43, todayKey()))
+        val vm = newVm(journal)
+        val foods = collectFoods(vm, "Breakfast")
+        advanceUntilIdle()
+        val cid = foods()[0].clientId!!
+
+        vm.updateFoodPortion("Breakfast", 0, 175, unit = "slice", unitQty = 2f)
+        advanceUntilIdle()
+
+        assertEquals(2, foods().size)
+        assertEquals("Oats", foods()[0].food.name)   // in place, no reordering
+        assertEquals(175, foods()[0].grams)
+        assertTrue(foods()[0].pending)
+        val update = journal.ops().single() as SyncOp.UpdateLog
+        assertEquals(cid, update.clientId)
+        assertEquals(175, update.body.grams)
+        assertEquals("slice", update.body.unit)
+        assertEquals(2f, update.body.unitQty)
+    }
+
+    @Test
+    fun updateRecipeLog_recomputesGramsFromIngredients() = runTest(testDispatcher) {
+        val journal = journalWithBreakfast(serverLog(42, todayKey()))
+        val vm = newVm(journal)
+        val foods = collectFoods(vm, "Breakfast")
+        advanceUntilIdle()
+        val ingredients = listOf(
+            FoodIngredient("Rice", 120f, 130f, 2.7f, 28f, 0.3f),
+            FoodIngredient("Egg", 60f, 155f, 13f, 1.1f, 11f),
+        )
+
+        vm.updateRecipeLog("Breakfast", 0, ingredients)
+        advanceUntilIdle()
+
+        assertEquals(180, foods()[0].grams)
+        val update = journal.ops().single() as SyncOp.UpdateLog
+        assertEquals(180, update.body.grams)
+        assertEquals(2, update.body.ingredients?.size)
+    }
+
+    @Test
+    fun hydrationOfflineKeepsValue() = runTest(testDispatcher) {
+        val journal = TestJournal().apply { logsApi.dayFailure = java.io.IOException("offline") }
+        val vm = newVm(journal)
+        val toasts = collectToasts(vm)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.hydrationTodayLiters.collect { } }
+        advanceUntilIdle()
+        toasts.clear()
+
+        vm.incrementHydration()
+        vm.incrementHydration()   // two quick taps: neither is lost
+        advanceUntilIdle()
+
+        assertEquals(0.5f, vm.hydrationTodayLiters.value)
+        assertEquals(SyncOp.PutHydration(todayKey(), 0.5f), journal.ops().last())
+        assertEquals(emptyList<Int>(), toasts.map { it.messageRes })
+    }
+
+    @Test
+    fun weightOfflineKeepsValue() = runTest(testDispatcher) {
+        val journal = TestJournal().apply { logsApi.dayFailure = java.io.IOException("offline") }
+        val vm = newVm(journal)
+        val toasts = collectToasts(vm)
+        advanceUntilIdle()
+        toasts.clear()
+
+        vm.addWeightCheckIn(80f)
+        advanceUntilIdle()
+
+        assertEquals(80f, vm.weightHistory.value.last().weightKg)
+        assertEquals(80f, vm.userProfile.value.currentWeightKg)
+        assertEquals(SyncOp.PutWeight(todayKey(), 80f), journal.ops().single())
+        assertEquals(emptyList<Int>(), toasts.map { it.messageRes })
+    }
+
+    @Test
+    fun addWeightCheckIn_reloadsGoalsAfterSync() = runTest(testDispatcher) {
+        val api = RecordingProfileApi()
+        val journal = TestJournal()
+        val vm = newVm(journal, profileApi = api)
+        advanceUntilIdle()
+        val before = api.getGoalsCalls
+
+        vm.addWeightCheckIn(80f)
+        advanceUntilIdle()
+        assertEquals(before, api.getGoalsCalls)   // the server doesn't know the weight yet
+
+        journal.repo.completeOp(journal.repo.nextOp()!!, null)
+        advanceUntilIdle()
+        assertEquals(before + 1, api.getGoalsCalls)
+    }
+
+    @Test
+    fun restoreRemovedFoodKeepsPosition() = runTest(testDispatcher) {
+        val key = todayKey()
+        val journal = journalWithBreakfast(
+            serverLog(1, key, name = "A"), serverLog(2, key, name = "B"), serverLog(3, key, name = "C"),
+        )
+        val vm = newVm(journal)
+        val foods = collectFoods(vm, "Breakfast")
+        advanceUntilIdle()
+        val removed = foods()[1]
+
+        vm.removeFoodFromMeal("Breakfast", 1)
+        advanceUntilIdle()
+        assertEquals(listOf("A", "C"), foods().map { it.food.name })
+
+        vm.restoreRemovedFood("Breakfast", 1, removed)
+        advanceUntilIdle()
+
+        assertEquals(listOf("A", "B", "C"), foods().map { it.food.name })
+        val restored = foods()[1]
+        assertTrue(restored.pending)
+        assertNotEquals(removed.clientId, restored.clientId)   // a new log, not the deleted one
+        val create = journal.ops().last() as SyncOp.CreateLog
+        assertEquals(restored.clientId, create.clientId)
+        assertEquals(100, create.body.grams)
+        assertEquals("b2", create.body.barcode)
+    }
+
+    @Test
+    fun restoreRemovedFood_ignoresFoodStillPresent() = runTest(testDispatcher) {
+        val journal = journalWithBreakfast(serverLog(1, todayKey()))
+        val vm = newVm(journal)
+        val foods = collectFoods(vm, "Breakfast")
+        advanceUntilIdle()
+
+        vm.restoreRemovedFood("Breakfast", 0, foods()[0])
+        advanceUntilIdle()
+
+        assertEquals(1, foods().size)
+        assertEquals(emptyList<SyncOp>(), journal.ops())
+    }
+
+    // ── Journal: events ──────────────────────────────────────────────────────
 
     @Test
     fun addFoodEmitsFoodLogsChanged() = runTest(testDispatcher) {
-        val vm = newVm(FakeLogsApi(), "emitAdd")
+        val vm = newVm()
+        val count = countEmissions(vm.foodLogsChanged)
         advanceUntilIdle()
-        var count = 0
-        val job = launch { vm.foodLogsChanged.collect { count++ } }
+        vm.addFoodToMeal("Lunch", LoggedFood(bread, 60))
         advanceUntilIdle()
-        vm.addFoodToMeal("Lunch", LoggedFood(oats, 60))
-        advanceUntilIdle()
-        assertEquals(1, count)
-        job.cancel()
+        assertEquals(1, count())
     }
 
     @Test
     fun removeFoodEmitsFoodLogsChanged() = runTest(testDispatcher) {
-        val vm = newVm(FakeLogsApi(), "emitRemove")
-        val foodsJob = launch { vm.getFoodsFlow("Breakfast").collect { } }
-        advanceUntilIdle()
-        var count = 0
-        val job = launch { vm.foodLogsChanged.collect { count++ } }
+        val vm = newVm(journalWithBreakfast(serverLog(42, todayKey())))
+        collectFoods(vm, "Breakfast")
+        val count = countEmissions(vm.foodLogsChanged)
         advanceUntilIdle()
         vm.removeFoodFromMeal("Breakfast", 0)
         advanceUntilIdle()
-        assertEquals(1, count)
-        job.cancel(); foodsJob.cancel()
+        assertEquals(1, count())
     }
 
     @Test
-    fun restoreRemovedFood_reCreatesAtOriginalIndex() = runTest(testDispatcher) {
-        val fake = FakeLogsApi()
-        val vm = newVm(fake, "restoreRemoved")
-        var foods: List<LoggedFood> = emptyList()
-        val job = launch { vm.getFoodsFlow("Breakfast").collect { foods = it } }
+    fun syncedEventEmitsFoodLogsChanged() = runTest(testDispatcher) {
+        val journal = TestJournal()
+        val vm = newVm(journal)
+        val logs = countEmissions(vm.foodLogsChanged)
+        val statuses = countEmissions(vm.dayStatusChanged)
         advanceUntilIdle()
-        vm.addFoodToMeal("Breakfast", LoggedFood(oats, 60))
+        vm.addFoodToMeal("Lunch", LoggedFood(bread, 60))
         advanceUntilIdle()
-        val removed = foods[0]
-        vm.removeFoodFromMeal("Breakfast", 0)
-        advanceUntilIdle()
-        assertEquals(1, foods.size)
+        assertEquals(1, logs())
 
-        vm.restoreRemovedFood("Breakfast", 0, removed)
+        journal.repo.completeOp(journal.repo.nextOp()!!, null)
         advanceUntilIdle()
 
-        assertEquals(2, foods.size)
-        assertEquals("Oats", foods[0].food.name)
-        assertEquals(7L, foods[0].id)          // new id from the re-POST, not the deleted 42
-        assertEquals(100, fake.lastCreate?.grams)
-        assertEquals("111", fake.lastCreate?.barcode)
-        job.cancel()
+        assertEquals(2, logs())
+        assertEquals(1, statuses())
     }
 
     @Test
-    fun failedAddDoesNotEmit() = runTest(testDispatcher) {
-        val fake = FakeLogsApi().apply { failCreateWith = java.io.IOException("offline") }
-        val vm = newVm(fake, "emitFail")
+    fun rejectedEventShowsSnackbar() = runTest(testDispatcher) {
+        val journal = TestJournal()
+        val vm = newVm(journal)
+        val toasts = collectToasts(vm)
+        val foods = collectFoods(vm, "Lunch")
         advanceUntilIdle()
-        var count = 0
-        val job = launch { vm.foodLogsChanged.collect { count++ } }
+        vm.addFoodToMeal("Lunch", LoggedFood(bread, 60))
         advanceUntilIdle()
-        vm.addFoodToMeal("Lunch", LoggedFood(oats, 60))
+
+        journal.repo.rejectOp(journal.repo.nextOp()!!, SyncOutcome.DROP_NOTIFY)
         advanceUntilIdle()
-        assertEquals(0, count)
-        job.cancel()
+
+        assertEquals(listOf(R.string.sync_rejected), toasts.map { it.messageRes })
+        assertEquals(0, foods().size)
     }
 
     @Test
-    fun addFood_sendsUnitAndQty() = runTest(testDispatcher) {
-        val fake = FakeLogsApi()
-        val vm = newVm(fake, "addUnit")
+    fun addFoodMarksMealLoggedImmediately() = runTest(testDispatcher) {
+        val journal = TestJournal().apply { logsApi.dayFailure = java.io.IOException("offline") }
+        val tracker = newTracker()
+        val vm = newVm(journal, tracker = tracker)
         advanceUntilIdle()
-        val food = FoodItem(
-            barcode = "999", name = "Bread", brand = null, imageUrl = null,
-            categories = emptyList(), per100g = 250, protein100g = 8f, carbs100g = 45f, fat100g = 3f,
+
+        vm.addFoodToMeal("Lunch", LoggedFood(bread, 60))
+        advanceUntilIdle()
+
+        assertTrue(tracker.wasLogged(java.time.LocalDate.now(), "Lunch"))
+        assertFalse(tracker.wasLogged(java.time.LocalDate.now(), "Dinner"))
+    }
+
+    // ── Copy (server copy until the copy sheet uses the mirror) ─────────────────
+
+    @Test
+    fun refreshAfterServerCopy_showsCopiedRows_andUndoQueuesDeletes() = runTest(testDispatcher) {
+        val key = todayKey()
+        val journal = journalWithBreakfast(serverLog(1, key, name = "Oats"))
+        val vm = newVm(journal)
+        val breakfast = collectFoods(vm, "Breakfast")
+        val dinner = collectFoods(vm, "Dinner")
+        val changes = countEmissions(vm.foodLogsChanged)
+        advanceUntilIdle()
+
+        // POST /food-logs/copy created two rows on the server.
+        val copied = listOf(serverLog(100, key, "BREAKFAST", "Eggs"), serverLog(101, key, "DINNER", "Rice"))
+        journal.logsApi.days[key] = DayResponseDto(
+            mapOf("breakfast" to listOf(serverLog(1, key, name = "Oats"), copied[0]), "dinner" to listOf(copied[1])),
+            0f, null,
         )
-        vm.addFoodToMeal("Lunch", LoggedFood(food, 60, unit = "slice", unitQty = 2f))
+        vm.refreshAfterServerCopy(key, copied.map { it.meal })
         advanceUntilIdle()
-        assertEquals("slice", fake.lastCreate?.unit)
-        assertEquals(2f, fake.lastCreate?.unitQty)
+        assertEquals(listOf("Oats", "Eggs"), breakfast().map { it.food.name })
+        assertEquals(listOf("Rice"), dinner().map { it.food.name })
+        assertEquals(1, changes())
+
+        vm.undoCopy(key, copied.map { it.clientId })
+        advanceUntilIdle()
+
+        assertEquals(listOf("Oats"), breakfast().map { it.food.name })
+        assertEquals(emptyList<String>(), dinner().map { it.food.name })
+        assertEquals(copied.map { SyncOp.DeleteLog(it.clientId) }, journal.ops())
+        assertEquals(2, changes())
     }
 
     @Test
-    fun updateFoodPortion_patchesUnit() = runTest(testDispatcher) {
-        val fake = FakeLogsApi()
-        val vm = newVm(fake, "patchUnit")
-        var foods: List<LoggedFood> = emptyList()
-        val job = launch { vm.getFoodsFlow("Breakfast").collect { foods = it } }
+    fun undoCopy_ofUnsyncedCopies_leavesNothingQueued() = runTest(testDispatcher) {
+        val journal = TestJournal().apply { logsApi.dayFailure = java.io.IOException("offline") }
+        val vm = newVm(journal)
+        val dinner = collectFoods(vm, "Dinner")
+        advanceUntilIdle()
+        val ids = journal.repo.copyLogs(java.time.LocalDate.now(), listOf("Dinner" to LoggedFood(bread, 60)))
+        advanceUntilIdle()
+        assertEquals(1, dinner().size)
+
+        vm.undoCopy(todayKey(), ids)
         advanceUntilIdle()
 
-        vm.updateFoodPortion("Breakfast", 0, 60, unit = "slice", unitQty = 2f)
-        advanceUntilIdle()
-
-        assertEquals(60, fake.lastUpdateBody?.grams)
-        assertEquals("slice", fake.lastUpdateBody?.unit)
-        assertEquals(2f, fake.lastUpdateBody?.unitQty)
-        assertEquals(60, foods[0].grams)
-        assertEquals("slice", foods[0].unit)
-        assertEquals(2f, foods[0].unitQty)
-        job.cancel()
+        assertEquals(0, dinner().size)
+        assertEquals(emptyList<SyncOp>(), journal.ops())
     }
 
-    @Test
-    fun updateFoodPortion_rollbackRestoresUnit() = runTest(testDispatcher) {
-        val fake = FakeLogsApi().apply {
-            seedUnit = "tsp"; seedUnitQty = 3f
-            failUpdateWith = java.io.IOException("offline")
-        }
-        val vm = newVm(fake, "rollbackUnit")
-        var foods: List<LoggedFood> = emptyList()
-        val job = launch { vm.getFoodsFlow("Breakfast").collect { foods = it } }
-        advanceUntilIdle()
-        assertEquals("tsp", foods[0].unit)
-
-        vm.updateFoodPortion("Breakfast", 0, 60, unit = "slice", unitQty = 2f)
-        advanceUntilIdle()
-
-        assertEquals(100, foods[0].grams)
-        assertEquals("tsp", foods[0].unit)
-        assertEquals(3f, foods[0].unitQty)
-        job.cancel()
-    }
+    // ── Reset ────────────────────────────────────────────────────────────────
 
     @Test
-    fun resetUserState_clearsProfileAndLoggedMeals() = runTest(testDispatcher) {
-        val store = PreferenceDataStoreFactory.create(
-            scope = dataStoreScope,
-            produceFile = { File(tempFolder.newFolder("trackerReset"), "meal_log_tracker.preferences_pb") }
-        )
-        val vm = FoodViewModel(
-            settingsRepository = FakeSettingsRepository(),
-            mealLogTracker = MealLogTracker(store),
-            foodRepository = FoodRepository(NoOpFoodApi, NoOpCache),
-            logsApi = SwitchableLogsApi(dayWithOneBreakfast()),
-            profileApi = NoOpProfileApi,
-        )
-        var foods: List<LoggedFood> = emptyList()
-        val job = launch { vm.getFoodsFlow("Breakfast").collect { foods = it } }
+    fun resetUserState_clearsProfile_andClearedMirrorShowsEmptyDay() = runTest(testDispatcher) {
+        val journal = journalWithBreakfast(serverLog(1, todayKey()))
+        val vm = newVm(journal)
+        val foods = collectFoods(vm, "Breakfast")
         vm.updateUserProfile(UserProfile(name = "Ana", age = 25))
-        advanceUntilIdle()   // init loadDay(today) → account A's one breakfast item
-        assertEquals(1, foods.size)
-        assertEquals("Ana", vm.userProfile.value.name)
+        advanceUntilIdle()
+        assertEquals(1, foods().size)
 
+        // Logout: the mirror is wiped, then UI state.
+        journal.repo.clearAll()
         vm.resetUserState()
+        journal.logsApi.days.clear()   // account B has nothing that day
+        vm.setSelectedHomeDate(java.util.Date())
         advanceUntilIdle()
 
-        assertEquals(0, foods.size)                 // logged meals cleared
-        assertEquals(UserProfile(), vm.userProfile.value)   // profile cleared
-        job.cancel()
+        assertEquals(0, foods().size)
+        assertEquals(UserProfile(), vm.userProfile.value)
     }
 
-    @Test
-    fun resetUserState_clearsLoadedDates_soNextLoadRefetches() = runTest(testDispatcher) {
-        // Regression: account A's logged day must not leak into account B after logout.
-        val logs = SwitchableLogsApi(dayWithOneBreakfast())
-        val store = PreferenceDataStoreFactory.create(
-            scope = dataStoreScope,
-            produceFile = { File(tempFolder.newFolder("trackerReset2"), "meal_log_tracker.preferences_pb") }
-        )
-        val vm = FoodViewModel(
-            settingsRepository = FakeSettingsRepository(),
-            mealLogTracker = MealLogTracker(store),
-            foodRepository = FoodRepository(NoOpFoodApi, NoOpCache),
-            logsApi = logs,
-            profileApi = NoOpProfileApi,
-        )
-        var foods: List<LoggedFood> = emptyList()
-        val job = launch { vm.getFoodsFlow("Breakfast").collect { foods = it } }
-        advanceUntilIdle()   // account A logged in → one breakfast item for today
-        assertEquals(1, foods.size)
-
-        // Logout + a different account whose same day is empty.
-        vm.resetUserState()
-        logs.day = emptyDay()
-        vm.setSelectedHomeDate(java.util.Date())   // what HomeScreen does on entry
-        advanceUntilIdle()
-
-        // Without clearing _loadedDates, loadDay() short-circuits and account A's
-        // stale item stays on screen. After reset it must re-fetch → empty.
-        assertEquals(0, foods.size)
-        job.cancel()
-    }
-
-    @Test
-    fun addFoodToMealReturningIndex_returnsIncrementingIndexes() {
-        val firstIndex = viewModel.addFoodToMealReturningIndex(
-            "Lunch",
-            LoggedFood(sampleFood("Rice"), 200)
-        )
-        val secondIndex = viewModel.addFoodToMealReturningIndex(
-            "Lunch",
-            LoggedFood(sampleFood("Chicken"), 150)
-        )
-        val thirdIndex = viewModel.addFoodToMealReturningIndex(
-            "Lunch",
-            LoggedFood(sampleFood("Broccoli"), 80)
-        )
-        assertEquals(0, firstIndex)
-        assertEquals(1, secondIndex)
-        assertEquals(2, thirdIndex)
-    }
-
-    private fun hydrationVm(profileApi: ProfileApi, logsApi: LogsApi = SwitchableLogsApi(emptyDay())) = FoodViewModel(
-        settingsRepository = FakeSettingsRepository(),
-        mealLogTracker = MealLogTracker(
-            PreferenceDataStoreFactory.create(
-                scope = dataStoreScope,
-                produceFile = { File(tempFolder.newFolder(), "meal_log_tracker.preferences_pb") }
-            )
-        ),
-        foodRepository = FoodRepository(NoOpFoodApi, NoOpCache),
-        logsApi = logsApi,
-        profileApi = profileApi,
-    )
+    // ── Hydration goal / prefs, profile ─────────────────────────────────────────
 
     @Test
     fun hydrationGoal_fallsBackTo2_5WhenGoalsMissing() = runTest(testDispatcher) {
@@ -652,7 +715,7 @@ class FoodViewModelTest {
     @Test
     fun hydrationGoal_comesFromGoals() = runTest(testDispatcher) {
         val api = RecordingProfileApi().apply { goals = goalsWithHydration(3.5f) }
-        val vm = hydrationVm(api)
+        val vm = newVm(profileApi = api)
         vm.loadGoals()
         advanceUntilIdle()
         assertEquals(3.5f, vm.hydrationGoalLiters.value)
@@ -661,7 +724,7 @@ class FoodViewModelTest {
     @Test
     fun updateHydrationPrefs_savesProfileAndReloadsGoals() = runTest(testDispatcher) {
         val api = RecordingProfileApi().apply { goals = goalsWithHydration(3.0f) }
-        val vm = hydrationVm(api)
+        val vm = newVm(profileApi = api)
         advanceUntilIdle()
         val before = api.getGoalsCalls
         vm.updateHydrationPrefs(takesCreatine = true, overrideL = null)
@@ -676,7 +739,7 @@ class FoodViewModelTest {
     @Test
     fun updateHydrationPrefs_debounced_coalescesToLastValue() = runTest(testDispatcher) {
         val api = RecordingProfileApi()
-        val vm = hydrationVm(api)
+        val vm = newVm(profileApi = api)
         advanceUntilIdle()
         vm.updateHydrationPrefs(false, 3.0f, debounce = true)
         vm.updateHydrationPrefs(false, 3.1f, debounce = true)
@@ -692,7 +755,7 @@ class FoodViewModelTest {
     @Test
     fun updateHydrationPrefs_immediateCancelsPendingDebounce() = runTest(testDispatcher) {
         val api = RecordingProfileApi()
-        val vm = hydrationVm(api)
+        val vm = newVm(profileApi = api)
         advanceUntilIdle()
         vm.updateHydrationPrefs(false, 3.1f, debounce = true)
         vm.updateHydrationPrefs(false, null)
@@ -705,10 +768,9 @@ class FoodViewModelTest {
     @Test
     fun updateHydrationPrefs_failureRevertsAndToasts() = runTest(testDispatcher) {
         val api = RecordingProfileApi().apply { saveFailure = java.io.IOException("boom") }
-        val vm = hydrationVm(api)
+        val vm = newVm(profileApi = api)
         advanceUntilIdle()
-        val toasts = mutableListOf<FoodViewModel.ToastEvent>()
-        val job = launch { vm.toastEvents.collect { toasts += it } }
+        val toasts = collectToasts(vm)
         advanceUntilIdle()
         val initial = vm.userProfile.value
         vm.updateHydrationPrefs(takesCreatine = true, overrideL = 4.0f)
@@ -717,28 +779,12 @@ class FoodViewModelTest {
         assertEquals(initial.takesCreatine, vm.userProfile.value.takesCreatine)
         assertEquals(initial.hydrationGoalOverrideL, vm.userProfile.value.hydrationGoalOverrideL)
         assertEquals(listOf(R.string.error_save_hydration_prefs), toasts.map { it.messageRes })
-        job.cancel()
-    }
-
-    @Test
-    fun addWeightCheckIn_success_reloadsGoals() = runTest(testDispatcher) {
-        val api = RecordingProfileApi()
-        val logs = object : LogsApi by SwitchableLogsApi(emptyDay()) {
-            override suspend fun postWeightCheckIn(body: WeightCheckInCreateDto) =
-                WeightCheckInDto(body.date, body.weightKg)
-        }
-        val vm = hydrationVm(api, logs)
-        advanceUntilIdle()
-        val before = api.getGoalsCalls
-        vm.addWeightCheckIn(80f)
-        advanceUntilIdle()
-        assertEquals(before + 1, api.getGoalsCalls)
     }
 
     @Test
     fun resetUserState_cancelsPendingHydrationSave() = runTest(testDispatcher) {
         val api = RecordingProfileApi()
-        val vm = hydrationVm(api)
+        val vm = newVm(profileApi = api)
         advanceUntilIdle()
         vm.updateHydrationPrefs(false, 3.1f, debounce = true)
         vm.resetUserState()
@@ -749,7 +795,7 @@ class FoodViewModelTest {
     @Test
     fun applyLoadedProfile_setsProfileAndLoadsGoals() = runTest(testDispatcher) {
         val api = RecordingProfileApi().apply { goals = goalsWithHydration(3.4f) }
-        val vm = hydrationVm(api)
+        val vm = newVm(profileApi = api)
         advanceUntilIdle()
         val before = api.getGoalsCalls
         val loaded = UserProfile(name = "Ana", takesCreatine = true)
@@ -763,7 +809,7 @@ class FoodViewModelTest {
     @Test
     fun applyLoadedProfile_sameProfileAgain_keepsLocalChangesAndDoesNotReload() = runTest(testDispatcher) {
         val api = RecordingProfileApi()
-        val vm = hydrationVm(api)
+        val vm = newVm(profileApi = api)
         advanceUntilIdle()
         val loaded = UserProfile(name = "Ana")
         vm.applyLoadedProfile(loaded)
@@ -783,7 +829,7 @@ class FoodViewModelTest {
     @Test
     fun applyLoadedProfile_afterReset_appliesSameProfileAgain() = runTest(testDispatcher) {
         val api = RecordingProfileApi()
-        val vm = hydrationVm(api)
+        val vm = newVm(profileApi = api)
         advanceUntilIdle()
         val loaded = UserProfile(name = "Ana")
         vm.applyLoadedProfile(loaded)
@@ -796,132 +842,5 @@ class FoodViewModelTest {
 
         assertEquals(loaded, vm.userProfile.value)
         assertEquals(before + 1, api.getGoalsCalls)
-    }
-
-    private fun copiedDto(id: Long, meal: String, name: String, date: String) = FoodLogDto(
-        id = id, logDate = date, meal = meal, grams = 50,
-        barcode = "b$id", name = name, brand = null, imageUrl = null,
-        categories = emptyList(), kcal100g = 100f, protein100g = 5f,
-        carbs100g = 10f, fat100g = 2f,
-    )
-
-    private fun todayKey() = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
-
-    @Test
-    fun appendCopiedLogs_addsToEndOfMealsOnGivenDate() = runTest(testDispatcher) {
-        val vm = newVm(FakeLogsApi(), "copyAppend")
-        val job = launch {
-            launch { vm.breakfastFoods.collect { } }
-            launch { vm.dinnerFoods.collect { } }
-        }
-        vm.setSelectedHomeDate(java.util.Date())
-        advanceUntilIdle()
-        val key = todayKey()
-        vm.appendCopiedLogs(key, listOf(copiedDto(100, "BREAKFAST", "Eggs", key), copiedDto(101, "DINNER", "Rice", key)))
-        advanceUntilIdle()
-        assertEquals(listOf("Oats", "Eggs"), vm.breakfastFoods.value.map { it.food.name })
-        assertEquals(listOf("Rice"), vm.dinnerFoods.value.map { it.food.name })
-        job.cancel()
-    }
-
-    @Test
-    fun appendCopiedLogs_onNonSelectedDate_doesNotChangeVisibleDay() = runTest(testDispatcher) {
-        val vm = newVm(FakeLogsApi(), "copyOther")
-        val job = launch { vm.breakfastFoods.collect { } }
-        vm.setSelectedHomeDate(java.util.Date())
-        advanceUntilIdle()
-        vm.appendCopiedLogs("2020-01-01", listOf(copiedDto(100, "BREAKFAST", "Eggs", "2020-01-01")))
-        advanceUntilIdle()
-        assertEquals(listOf("Oats"), vm.breakfastFoods.value.map { it.food.name })
-        job.cancel()
-    }
-
-    @Test
-    fun undoCopy_removesRowsAndCallsDeleteBatch() = runTest(testDispatcher) {
-        val fake = FakeLogsApi()
-        val vm = newVm(fake, "copyUndo")
-        val job = launch {
-            launch { vm.breakfastFoods.collect { } }
-            launch { vm.dinnerFoods.collect { } }
-        }
-        vm.setSelectedHomeDate(java.util.Date())
-        advanceUntilIdle()
-        val key = todayKey()
-        vm.appendCopiedLogs(key, listOf(copiedDto(100, "BREAKFAST", "Eggs", key), copiedDto(101, "DINNER", "Rice", key)))
-        vm.undoCopy(key, listOf(100L, 101L))
-        advanceUntilIdle()
-        assertEquals(listOf(100L, 101L), fake.lastDeleteBatch!!.ids)
-        assertEquals(listOf("Oats"), vm.breakfastFoods.value.map { it.food.name })
-        assertEquals(emptyList<String>(), vm.dinnerFoods.value.map { it.food.name })
-        job.cancel()
-    }
-
-    @Test
-    fun undoCopy_networkFailure_restoresRowsAndEmitsToast() = runTest(testDispatcher) {
-        val fake = FakeLogsApi().apply { failDeleteBatchWith = java.io.IOException() }
-        val vm = newVm(fake, "copyUndoFail")
-        val toasts = mutableListOf<FoodViewModel.ToastEvent>()
-        val job = launch {
-            launch { vm.breakfastFoods.collect { } }
-            launch { vm.toastEvents.collect { toasts += it } }
-        }
-        vm.setSelectedHomeDate(java.util.Date())
-        advanceUntilIdle()
-        val key = todayKey()
-        vm.appendCopiedLogs(key, listOf(copiedDto(100, "BREAKFAST", "Eggs", key)))
-        vm.undoCopy(key, listOf(100L))
-        advanceUntilIdle()
-        assertEquals(listOf("Oats", "Eggs"), vm.breakfastFoods.value.map { it.food.name })
-        assertEquals(listOf(R.string.error_no_internet), toasts.map { it.messageRes })
-        job.cancel()
-    }
-
-    @Test
-    fun undoCopy_withNoLocalDay_stillCallsDeleteBatch() = runTest(testDispatcher) {
-        val fake = FakeLogsApi()
-        val vm = newVm(fake, "copyUndoNoDay")
-        advanceUntilIdle()
-        vm.undoCopy("2020-01-01", listOf(5L, 6L))
-        advanceUntilIdle()
-        assertEquals(listOf(5L, 6L), fake.lastDeleteBatch!!.ids)
-    }
-
-    @Test
-    fun undoCopy_failure_doesNotClobberConcurrentChanges() = runTest(testDispatcher) {
-        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
-        val base = FakeLogsApi()
-        val logs = object : LogsApi by base {
-            override suspend fun deleteFoodLogs(body: FoodLogDeleteBatchDto): FoodLogDeleteBatchResultDto {
-                gate.await()
-                throw java.io.IOException()
-            }
-        }
-        val vm = FoodViewModel(
-            settingsRepository = FakeSettingsRepository(),
-            mealLogTracker = MealLogTracker(
-                PreferenceDataStoreFactory.create(
-                    scope = dataStoreScope,
-                    produceFile = { File(tempFolder.newFolder("copyUndoRace"), "meal_log_tracker.preferences_pb") }
-                )
-            ),
-            foodRepository = FoodRepository(NoOpFoodApi, NoOpCache),
-            logsApi = logs,
-            profileApi = NoOpProfileApi,
-        )
-        val job = launch { vm.breakfastFoods.collect { } }
-        vm.setSelectedHomeDate(java.util.Date())
-        advanceUntilIdle()
-        val key = todayKey()
-        vm.appendCopiedLogs(key, listOf(copiedDto(100, "BREAKFAST", "Eggs", key)))
-        vm.undoCopy(key, listOf(100L))
-        advanceUntilIdle()
-        assertEquals(listOf("Oats"), vm.breakfastFoods.value.map { it.food.name })
-        vm.addFoodToMeal("Breakfast", LoggedFood(
-            food = sampleFood("Toast"), 30))
-        advanceUntilIdle()
-        gate.complete(Unit)
-        advanceUntilIdle()
-        assertEquals(listOf("Oats", "Toast", "Eggs"), vm.breakfastFoods.value.map { it.food.name })
-        job.cancel()
     }
 }

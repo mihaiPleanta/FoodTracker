@@ -4,70 +4,59 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.foodtracker.R
-import com.example.foodtracker.api.DaysApi
-import com.example.foodtracker.api.LogsApi
 import com.example.foodtracker.api.ProfileApi
 import com.example.foodtracker.api.RetrofitInstance
 import com.example.foodtracker.data.FoodRepository
 import com.example.foodtracker.data.MealLogTracker
 import com.example.foodtracker.data.SettingsRepository
+import com.example.foodtracker.data.journal.JournalRepository
+import com.example.foodtracker.data.journal.LocalDay
+import com.example.foodtracker.data.journal.SyncEvent
 import com.example.foodtracker.model.AppSettings
+import com.example.foodtracker.model.DEFAULT_HYDRATION_GOAL_L
 import com.example.foodtracker.model.DayStatus
-import com.example.foodtracker.model.DayStatusUpdateDto
 import com.example.foodtracker.model.FoodIngredient
 import com.example.foodtracker.model.FoodItem
-import com.example.foodtracker.model.FoodLogCreateDto
-import com.example.foodtracker.model.toDayStatus
-import com.example.foodtracker.model.FoodLogDeleteBatchDto
-import com.example.foodtracker.model.FoodLogDto
-import com.example.foodtracker.model.FoodLogUpdateDto
-import com.example.foodtracker.model.mealKeyToBackend
+import com.example.foodtracker.model.LoggedFood
+import com.example.foodtracker.model.NutritionGoals
+import com.example.foodtracker.model.UserProfile
 import com.example.foodtracker.model.mealNameFromBackend
-import com.example.foodtracker.model.toDto
+import com.example.foodtracker.model.toProfileDto
 import com.example.foodtracker.model.totalGrams
 import com.example.foodtracker.model.withIngredients
-import com.example.foodtracker.model.HydrationUpdateDto
-import com.example.foodtracker.model.LoggedFood
-import com.example.foodtracker.model.DEFAULT_HYDRATION_GOAL_L
-import com.example.foodtracker.model.NutritionGoals
-import com.example.foodtracker.model.toProfileDto
-import com.example.foodtracker.model.UserProfile
-import com.example.foodtracker.model.WeightCheckInCreateDto
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import java.util.UUID
 
 private const val HYDRATION_SAVE_DEBOUNCE_MS = 600L
 
-private data class DayMeals(
-    val breakfast: List<LoggedFood> = emptyList(),
-    val lunch: List<LoggedFood> = emptyList(),
-    val dinner: List<LoggedFood> = emptyList(),
-    val snacks: List<LoggedFood> = emptyList()
-)
+/** Home's weight card / stats trend show the last 30 days of check-ins. */
+private const val WEIGHT_HISTORY_DAYS = 30L
 
 data class WeightCheckIn(
     val date: Date,
@@ -78,9 +67,8 @@ class FoodViewModel(
     private val settingsRepository: SettingsRepository,
     private val mealLogTracker: MealLogTracker,
     private val foodRepository: FoodRepository,
-    private val logsApi: LogsApi = RetrofitInstance.retrofit.create(LogsApi::class.java),
+    private val journal: JournalRepository,
     private val profileApi: ProfileApi = RetrofitInstance.retrofit.create(ProfileApi::class.java),
-    private val daysApi: DaysApi = RetrofitInstance.retrofit.create(DaysApi::class.java),
     private val clock: () -> Date = { Date() },
 ) : ViewModel() {
 
@@ -261,17 +249,18 @@ class FoodViewModel(
         }
     }
 
-    // ── Date-driven food history ───────────────────────────────────────────────
+    // ── Date-driven journal (local mirror + op queue, see JournalRepository) ──
     private val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.US)
 
     private fun dateKey(date: Date): String = dateFormatter.format(date)
 
     private fun todayKey(): String = dateKey(clock())
 
-    private val _loadingDay = MutableStateFlow(false)
-    val loadingDay: StateFlow<Boolean> = _loadingDay.asStateFlow()
+    private fun localDate(date: Date): LocalDate = LocalDate.parse(dateKey(date))
 
-    private val _loadedDates = mutableSetOf<String>()
+    private val _loadingDay = MutableStateFlow(false)
+    /** True while the selected day is fetched for the first time (a day already in the mirror shows instantly). */
+    val loadingDay: StateFlow<Boolean> = _loadingDay.asStateFlow()
 
     private val _toastEvents = MutableSharedFlow<ToastEvent>(extraBufferCapacity = 8)
     val toastEvents: SharedFlow<ToastEvent> = _toastEvents.asSharedFlow()
@@ -279,10 +268,18 @@ class FoodViewModel(
     private val _selectedHomeDate = MutableStateFlow(clock())
     val selectedHomeDate: StateFlow<Date> = _selectedHomeDate.asStateFlow()
 
-    private val _foodsByDate = MutableStateFlow<Map<String, DayMeals>>(emptyMap())
+    /**
+     * The mirror's view of the selected day; null until the mirror emits for the date currently
+     * selected (so a date switch never shows the previous day's rows).
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val selectedDay: StateFlow<LocalDay?> = _selectedHomeDate
+        .map { localDate(it) }
+        .distinctUntilChanged()
+        .flatMapLatest { journal.observeDay(it) }
+        .let { days -> combine(_selectedHomeDate, days) { selected, day -> day?.takeIf { it.date == localDate(selected) } } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    // Hydration: liters by day key, used by Home quick-add water card.
-    private val _hydrationByDate = MutableStateFlow<Map<String, Float>>(emptyMap())
     val hydrationGoalLiters: StateFlow<Float> = _nutritionGoals
         .map { it?.hydration?.goalL ?: DEFAULT_HYDRATION_GOAL_L }
         .stateIn(viewModelScope, SharingStarted.Eagerly, DEFAULT_HYDRATION_GOAL_L)
@@ -324,92 +321,74 @@ class FoodViewModel(
         }
     }
 
-    val hydrationTodayLiters: StateFlow<Float> = combine(_selectedHomeDate, _hydrationByDate) { date, all ->
-        all[dateKey(date)] ?: 0f
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), _hydrationByDate.value[todayKey()] ?: 0f)
+    val hydrationTodayLiters: StateFlow<Float> = selectedDay.map { it?.hydrationL ?: 0f }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0f)
 
-    private val _weightHistory = MutableStateFlow<List<WeightCheckIn>>(emptyList())
-    val weightHistory: StateFlow<List<WeightCheckIn>> = _weightHistory.asStateFlow()
+    /** Weight check-ins of the last [WEIGHT_HISTORY_DAYS] days, from the mirror. */
+    val weightHistory: StateFlow<List<WeightCheckIn>> = journal.observeWeights()
+        .map { list ->
+            val from = localDate(clock()).minusDays(WEIGHT_HISTORY_DAYS)
+            list.filter { !it.first.isBefore(from) }
+                .mapNotNull { (d, kg) -> dateFormatter.parse(d.toString())?.let { WeightCheckIn(it, kg) } }
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    // Serializes read-modify-write of the hydration counter so quick taps never lose an increment.
+    private val hydrationMutex = Mutex()
 
     fun incrementHydration(amountLiters: Float = 0.25f) {
-        val key = dateKey(_selectedHomeDate.value)
-        val current = _hydrationByDate.value[key] ?: 0f
-        val updated = (current + amountLiters).coerceAtMost(8f)
-        _hydrationByDate.value = _hydrationByDate.value + (key to updated)
-
+        val date = localDate(_selectedHomeDate.value)
         viewModelScope.launch {
-            try {
-                logsApi.putHydration(key, HydrationUpdateDto(liters = updated))
-            } catch (e: java.io.IOException) {
-                _hydrationByDate.value = _hydrationByDate.value + (key to current)
-                _toastEvents.tryEmit(ToastEvent(R.string.error_no_internet))
-            } catch (e: retrofit2.HttpException) {
-                _hydrationByDate.value = _hydrationByDate.value + (key to current)
-                _toastEvents.tryEmit(ToastEvent(R.string.error_save_hydration, e.code()))
-            } catch (e: Throwable) {
-                _hydrationByDate.value = _hydrationByDate.value + (key to current)
-                _toastEvents.tryEmit(ToastEvent(R.string.error_save_hydration))
+            hydrationMutex.withLock {
+                val current = journal.observeDay(date).first().hydrationL
+                journal.setHydration(date, (current + amountLiters).coerceAtMost(8f))
             }
         }
     }
 
     private fun sameDay(a: Date, b: Date): Boolean = dateKey(a) == dateKey(b)
 
-    private suspend fun loadDay(date: Date) {
-        val key = dateKey(date)
-        if (key in _loadedDates) return
-        _loadingDay.value = true
+    /** Best-effort server refresh; only a day the mirror has never seen reports a failure. */
+    private suspend fun refreshDay(date: LocalDate) {
+        val known = journal.observeDay(date).first().fetched
+        if (!known) _loadingDay.value = true
         try {
-            val day = logsApi.getDay(key)
-            val meals = DayMeals(
-                breakfast = day.foodsByMeal["breakfast"].orEmpty().map { it.toLogged() },
-                lunch     = day.foodsByMeal["lunch"].orEmpty().map { it.toLogged() },
-                dinner    = day.foodsByMeal["dinner"].orEmpty().map { it.toLogged() },
-                snacks    = day.foodsByMeal["snacks"].orEmpty().map { it.toLogged() },
-            )
-            _foodsByDate.value = _foodsByDate.value + (key to meals)
-            _hydrationByDate.value = _hydrationByDate.value + (key to day.hydrationLiters)
-            _dayStatusByDate.value = _dayStatusByDate.value + (key to day.status.toDayStatus())
-            day.weightCheckIn?.let { wc ->
-                val parsed = dateFormatter.parse(wc.date) ?: return@let
-                val existing = _weightHistory.value.filterNot { sameDay(it.date, parsed) }
-                _weightHistory.value = (existing + WeightCheckIn(parsed, wc.weightKg))
-                    .sortedBy { it.date }
-            }
-            _loadedDates += key
-        } catch (e: java.io.IOException) {
-            _toastEvents.tryEmit(ToastEvent(R.string.error_no_internet))
-        } catch (e: retrofit2.HttpException) {
-            _toastEvents.tryEmit(ToastEvent(R.string.error_load_day, e.code()))
+            journal.refreshDay(date)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Throwable) {
-            _toastEvents.tryEmit(ToastEvent(R.string.error_load_day))
+            if (!journal.observeDay(date).first().fetched && !journal.isCovered(date, date)) {
+                _toastEvents.tryEmit(
+                    when (e) {
+                        is java.io.IOException -> ToastEvent(R.string.error_no_internet)
+                        is retrofit2.HttpException -> ToastEvent(R.string.error_load_day, e.code())
+                        else -> ToastEvent(R.string.error_load_day)
+                    }
+                )
+            }
         } finally {
-            _loadingDay.value = false
+            if (!known) _loadingDay.value = false
         }
     }
 
     // ── Day completion status ─────────────────────────────────────────────────
-    private val _dayStatusByDate = MutableStateFlow<Map<String, DayStatus?>>(emptyMap())
-    // Yesterday-prompt state is keyed to the date it was computed for, so it can't go stale after midnight.
-    private val _yesterdayHasFood = MutableStateFlow<Pair<String, Boolean>?>(null)
+    // Yesterday-prompt state is keyed to the date it was answered for, so it can't go stale after midnight.
     private val _yesterdayAnsweredFor = MutableStateFlow<String?>(null)
     private var yesterdayRequestedFor: String? = null
 
     private val _dayStatusChanged = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
-    /** Emits after every successful status write (set, answer, clear). */
+    /** Emits after every local status write (set, answer, clear) and after every sync. */
     val dayStatusChanged: SharedFlow<Unit> = _dayStatusChanged.asSharedFlow()
 
     private val _foodLogsChanged = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
-    /** Emits after a food log was successfully created or deleted on the backend (streak refresh). */
+    /** Emits after every local food log write and after every sync (streak refresh). */
     val foodLogsChanged: SharedFlow<Unit> = _foodLogsChanged.asSharedFlow()
 
-    val selectedDayStatus: StateFlow<DayStatus?> = combine(_selectedHomeDate, _dayStatusByDate) { date, all ->
-        all[dateKey(date)]
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val selectedDayStatus: StateFlow<DayStatus?> = selectedDay.map { it?.status }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    val selectedDayHasFood: StateFlow<Boolean> = combine(_selectedHomeDate, _foodsByDate) { date, all ->
-        all[dateKey(date)]?.let { it.breakfast.isNotEmpty() || it.lunch.isNotEmpty() || it.dinner.isNotEmpty() || it.snacks.isNotEmpty() } ?: false
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    val selectedDayHasFood: StateFlow<Boolean> = selectedDay.map { it.hasFood() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     /** True when the selected Home date is after today (day keys are ISO, so string order = date order). */
     val selectedDayIsFuture: StateFlow<Boolean> = _selectedHomeDate.map { dateKey(it) > todayKey() }
@@ -420,151 +399,91 @@ class FoodViewModel(
 
     private fun yesterdayKey(): String = dateKey(yesterday())
 
+    // Re-derived on every date selection, so after midnight it follows the new yesterday.
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val yesterdayDay: Flow<LocalDay> = _selectedHomeDate
+        .map { localDate(yesterday()) }
+        .distinctUntilChanged()
+        .flatMapLatest { journal.observeDay(it) }
+
     val showYesterdayPrompt: StateFlow<Boolean> = combine(
-        _selectedHomeDate, _dayStatusByDate, _yesterdayHasFood, _yesterdayAnsweredFor,
-    ) { selected, statuses, yesterdayHasFood, answeredFor ->
+        _selectedHomeDate, yesterdayDay, _yesterdayAnsweredFor,
+    ) { selected, yDay, answeredFor ->
         val key = yesterdayKey()
         dateKey(selected) == todayKey() &&
-            yesterdayHasFood?.first == key && yesterdayHasFood.second &&
-            answeredFor != key && statuses[key] == null
+            yDay.date.toString() == key && yDay.hasFood() &&
+            answeredFor != key && yDay.status == null
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
-    /** Fetches yesterday once per date (without touching the selected date or [loadingDay]). */
+    /** Refreshes yesterday once per date (without touching the selected date or [loadingDay]). */
     private fun loadYesterdayIfToday() {
         val key = yesterdayKey()
         if (yesterdayRequestedFor == key || dateKey(_selectedHomeDate.value) != todayKey()) return
         yesterdayRequestedFor = key
         viewModelScope.launch {
             try {
-                val day = logsApi.getDay(key)
-                _yesterdayHasFood.value = key to day.foodsByMeal.values.any { it.isNotEmpty() }
-                _dayStatusByDate.value = _dayStatusByDate.value + (key to day.status.toDayStatus())
-            } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+                journal.refreshDay(LocalDate.parse(key))
+            } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                if (yesterdayRequestedFor == key) yesterdayRequestedFor = null // best-effort prompt: stay silent, retry on the next visit to today
+                // Best-effort: the mirror may already know yesterday; retry on the next visit to today.
+                if (yesterdayRequestedFor == key) yesterdayRequestedFor = null
             }
         }
     }
 
     fun setDayComplete(date: Date, complete: Boolean) {
         if (complete && dateKey(date) > todayKey()) return // a future day cannot be finished yet
-        writeStatus(dateKey(date), if (complete) DayStatus.COMPLETE else DayStatus.INCOMPLETE) {
-            daysApi.putStatus(it, DayStatusUpdateDto(complete))
-        }
+        writeStatus(date, complete)
     }
 
-    fun clearDayStatus(date: Date) = writeStatus(dateKey(date), null) { daysApi.deleteStatus(it) }
+    fun clearDayStatus(date: Date) = writeStatus(date, null)
 
     fun answerYesterdayPrompt(complete: Boolean) {
         _yesterdayAnsweredFor.value = yesterdayKey()
         setDayComplete(yesterday(), complete)
     }
 
-    private fun writeStatus(key: String, target: DayStatus?, call: suspend (String) -> Unit) {
-        val previous = _dayStatusByDate.value[key]
-        _dayStatusByDate.value = _dayStatusByDate.value + (key to target)
+    private fun writeStatus(date: Date, complete: Boolean?) {
+        val day = localDate(date)
         viewModelScope.launch {
-            try {
-                call(key)
-                _dayStatusChanged.tryEmit(Unit)
-            } catch (e: kotlin.coroutines.cancellation.CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                _dayStatusByDate.value = _dayStatusByDate.value + (key to previous)
-                _toastEvents.tryEmit(
-                    ToastEvent(if (e is java.io.IOException) R.string.error_no_internet else R.string.error_day_status)
-                )
-            }
+            journal.setDayStatus(day, complete)
+            _dayStatusChanged.tryEmit(Unit)
         }
     }
 
-    fun loadWeightHistory(daysBack: Int = 30) {
-        viewModelScope.launch {
-            val cal = Calendar.getInstance()
-            val today = dateFormatter.format(cal.time)
-            cal.add(Calendar.DAY_OF_YEAR, -daysBack)
-            val from = dateFormatter.format(cal.time)
-            try {
-                val response = logsApi.getWeightCheckIns(from = from, to = today)
-                _weightHistory.value = response.items.mapNotNull { dto ->
-                    val parsed = dateFormatter.parse(dto.date) ?: return@mapNotNull null
-                    WeightCheckIn(parsed, dto.weightKg)
-                }
-            } catch (e: java.io.IOException) {
-                _toastEvents.tryEmit(ToastEvent(R.string.error_no_internet))
-            } catch (e: retrofit2.HttpException) {
-                _toastEvents.tryEmit(ToastEvent(R.string.error_weight_history, e.code()))
-            } catch (e: Throwable) {
-                _toastEvents.tryEmit(ToastEvent(R.string.error_weight_history))
-            }
-        }
-    }
+    /** No-op kept for the screens: weights come from the mirror, which is refreshed on resume. */
+    @Suppress("UNUSED_PARAMETER")
+    fun loadWeightHistory(daysBack: Int = 30) = Unit
+
+    // Dates with a weight written locally and not yet synced: goals are reloaded once the server has it.
+    private val weightDatesAwaitingSync = mutableSetOf<String>()
 
     fun addWeightCheckIn(weightKg: Float, date: Date = _selectedHomeDate.value) {
-        val dateStr = dateFormatter.format(date)
-        val previousHistory = _weightHistory.value
-        val previousProfileWeight = _userProfile.value.currentWeightKg
-
-        // Optimistic: replace or append today's point
-        val withoutToday = previousHistory.filterNot { sameDay(it.date, date) }
-        val newHistory = (withoutToday + WeightCheckIn(date, weightKg)).sortedBy { it.date }
-        _weightHistory.value = newHistory
-
-        // If the selected day is now the most recent, sync local profile
-        val isMostRecent = newHistory.lastOrNull()?.let { sameDay(it.date, date) } == true
+        // If the day is now the most recent check-in, keep the local profile in step.
+        val isMostRecent = weightHistory.value.none { it.date.after(date) && !sameDay(it.date, date) }
         if (isMostRecent) {
             _userProfile.value = _userProfile.value.copy(currentWeightKg = weightKg)
         }
-
-        viewModelScope.launch {
-            try {
-                logsApi.postWeightCheckIn(WeightCheckInCreateDto(date = dateStr, weightKg = weightKg))
-                loadGoals()
-            } catch (e: java.io.IOException) {
-                _weightHistory.value = previousHistory
-                _userProfile.value = _userProfile.value.copy(currentWeightKg = previousProfileWeight)
-                _toastEvents.tryEmit(ToastEvent(R.string.error_no_internet))
-            } catch (e: retrofit2.HttpException) {
-                _weightHistory.value = previousHistory
-                _userProfile.value = _userProfile.value.copy(currentWeightKg = previousProfileWeight)
-                _toastEvents.tryEmit(ToastEvent(R.string.error_weight_checkin, e.code()))
-            } catch (e: Throwable) {
-                _weightHistory.value = previousHistory
-                _userProfile.value = _userProfile.value.copy(currentWeightKg = previousProfileWeight)
-                _toastEvents.tryEmit(ToastEvent(R.string.error_weight_checkin))
-            }
-        }
+        val day = localDate(date)
+        weightDatesAwaitingSync += day.toString()
+        viewModelScope.launch { journal.setWeight(day, weightKg) }
     }
 
     fun setSelectedHomeDate(date: Date) {
-        val key = dateKey(date)
-        if (!_foodsByDate.value.containsKey(key)) {
-            _foodsByDate.value = _foodsByDate.value + (key to DayMeals())
-        }
-        if (!_hydrationByDate.value.containsKey(key)) {
-            _hydrationByDate.value = _hydrationByDate.value + (key to 0f)
-        }
         _selectedHomeDate.value = date
-        viewModelScope.launch { loadDay(date) }
+        viewModelScope.launch { refreshDay(localDate(date)) }
         loadYesterdayIfToday()
     }
 
-    val breakfastFoods: StateFlow<List<LoggedFood>> = combine(_selectedHomeDate, _foodsByDate) { date, all ->
-        all[dateKey(date)]?.breakfast ?: emptyList()
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    private fun mealFlow(mealName: String): StateFlow<List<LoggedFood>> =
+        selectedDay.map { it?.meals?.get(mealName).orEmpty() }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val lunchFoods: StateFlow<List<LoggedFood>> = combine(_selectedHomeDate, _foodsByDate) { date, all ->
-        all[dateKey(date)]?.lunch ?: emptyList()
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    val dinnerFoods: StateFlow<List<LoggedFood>> = combine(_selectedHomeDate, _foodsByDate) { date, all ->
-        all[dateKey(date)]?.dinner ?: emptyList()
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    val snacksFoods: StateFlow<List<LoggedFood>> = combine(_selectedHomeDate, _foodsByDate) { date, all ->
-        all[dateKey(date)]?.snacks ?: emptyList()
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val breakfastFoods: StateFlow<List<LoggedFood>> = mealFlow("Breakfast")
+    val lunchFoods: StateFlow<List<LoggedFood>> = mealFlow("Lunch")
+    val dinnerFoods: StateFlow<List<LoggedFood>> = mealFlow("Dinner")
+    val snacksFoods: StateFlow<List<LoggedFood>> = mealFlow("Snacks")
 
     fun getFoodsFlow(mealName: String): StateFlow<List<LoggedFood>> = when (mealName) {
         "Breakfast" -> breakfastFoods
@@ -574,298 +493,121 @@ class FoodViewModel(
         else         -> breakfastFoods
     }
 
+    /** Current rows of [mealName] on the selected day (empty while the mirror hasn't emitted for it). */
+    private fun currentMeal(mealName: String): List<LoggedFood> =
+        selectedDay.value?.meals?.get(mealName).orEmpty()
+
+    // Adds launched but not yet visible in [selectedDay], per "date|meal": keeps returned indexes
+    // increasing when several adds happen before the mirror emits.
+    private val addsInFlight = mutableMapOf<String, Int>()
+
     fun addFoodToMeal(mealName: String, food: LoggedFood) {
         addFoodToMealReturningIndex(mealName, food)
     }
 
-    fun addFoodToMealReturningIndex(mealName: String, food: LoggedFood): Int =
-        addFoodAt(mealName, food, insertAt = null)
-
-    /** Undo of [removeFoodFromMeal]: logs the same food again (new id) back at its old position. */
-    fun restoreRemovedFood(mealName: String, index: Int, food: LoggedFood) {
-        // The DELETE may have failed and already put the entry back — don't log it twice.
-        val current = mealList(_foodsByDate.value[dateKey(_selectedHomeDate.value)] ?: DayMeals(), mealName)
-        if (food.id != null && current.any { it.id == food.id }) return
-        addFoodAt(mealName, food, insertAt = index)
-    }
-
-    private fun addFoodAt(mealName: String, food: LoggedFood, insertAt: Int?): Int {
-        val tempId = UUID.randomUUID().toString()
-        val optimistic = food.copy(id = null, clientId = tempId)
-        val key = dateKey(_selectedHomeDate.value)
-        val day = _foodsByDate.value[key] ?: DayMeals()
-        val currentList = mealList(day, mealName)
-        val insertedIndex = (insertAt ?: currentList.size).coerceIn(0, currentList.size)
-        val newList = currentList.toMutableList().also { it.add(insertedIndex, optimistic) }
-        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
-
+    fun addFoodToMealReturningIndex(mealName: String, food: LoggedFood): Int {
+        val date = localDate(_selectedHomeDate.value)
+        val slot = "$date|$mealName"
+        val index = currentMeal(mealName).size + (addsInFlight[slot] ?: 0)
+        addsInFlight[slot] = (addsInFlight[slot] ?: 0) + 1
         viewModelScope.launch {
             try {
-                val response = logsApi.createFoodLog(
-                    FoodLogCreateDto(
-                        logDate = key,
-                        meal = mealKeyToBackend(mealName),
-                        grams = optimistic.grams,
-                        barcode = optimistic.food.barcode,
-                        name = optimistic.food.name,
-                        brand = optimistic.food.brand,
-                        imageUrl = optimistic.food.imageUrl,
-                        categories = optimistic.food.categories,
-                        kcal100g = optimistic.food.per100g.toFloat(),
-                        protein100g = optimistic.food.protein100g,
-                        carbs100g = optimistic.food.carbs100g,
-                        fat100g = optimistic.food.fat100g,
-                        ingredients = optimistic.food.ingredients?.map { it.toDto() },
-                        unit = optimistic.unit,
-                        unitQty = optimistic.unitQty,
-                    )
-                )
-                replaceByTempId(key, mealName, tempId) { it.copy(id = response.id, clientId = null) }
-                _foodLogsChanged.tryEmit(Unit)
-                // Hint local pentru worker-ul de remindere — sursa de adevăr rămâne backend-ul.
-                launch {
-                    runCatching {
-                        mealLogTracker.markLogged(LocalDate.parse(key), mealName)
-                    }
-                }
-            } catch (e: java.io.IOException) {
-                removeByTempId(key, mealName, tempId)
-                _toastEvents.tryEmit(ToastEvent(R.string.error_no_internet))
-            } catch (e: retrofit2.HttpException) {
-                removeByTempId(key, mealName, tempId)
-                _toastEvents.tryEmit(ToastEvent(R.string.error_save, e.code()))
-            } catch (e: Throwable) {
-                removeByTempId(key, mealName, tempId)
-                _toastEvents.tryEmit(ToastEvent(R.string.error_save))
+                addLog(date, mealName, food, sortKey = null)
+            } finally {
+                addsInFlight[slot] = (addsInFlight[slot] ?: 1) - 1
+                if (addsInFlight[slot] == 0) addsInFlight.remove(slot)
             }
         }
-        return insertedIndex
+        return index
     }
 
-    /** Adaugă local logurile deja create de backend prin copiere (fără request). */
-    fun appendCopiedLogs(dateKey: String, logs: List<FoodLogDto>) {
-        if (logs.isEmpty()) return
-        var day = _foodsByDate.value[dateKey] ?: DayMeals()
-        val meals = linkedSetOf<String>()
-        for (log in logs) {
-            val mealName = mealNameFromBackend(log.meal)
-            meals += mealName
-            day = updateMealList(day, mealName, mealList(day, mealName) + log.toLogged())
-        }
-        _foodsByDate.value = _foodsByDate.value + (dateKey to day)
+    /** Undo of [removeFoodFromMeal]: logs the same food again (new clientId) at its old position. */
+    fun restoreRemovedFood(mealName: String, index: Int, food: LoggedFood) {
+        if (food.clientId != null && currentMeal(mealName).any { it.clientId == food.clientId }) return
+        val date = localDate(_selectedHomeDate.value)
+        viewModelScope.launch { addLog(date, mealName, food, sortKey = food.sortKey) }
+    }
+
+    private suspend fun addLog(date: LocalDate, mealName: String, food: LoggedFood, sortKey: Long?) {
+        val clean = food.copy(id = null, clientId = null, pending = false, sortKey = null)
+        journal.addLog(date, mealName, clean, sortKey)
+        _foodLogsChanged.tryEmit(Unit)
+        // Hint local pentru worker-ul de remindere — sursa de adevăr rămâne backend-ul.
+        runCatching { mealLogTracker.markLogged(date, mealName) }
+    }
+
+    /**
+     * Temporary (until the copy sheet copies through the mirror): logs already created by
+     * `POST /food-logs/copy` reach the mirror through a refresh of [dateKey].
+     */
+    fun refreshAfterServerCopy(dateKey: String, backendMeals: List<String>) {
+        if (backendMeals.isEmpty()) return
+        val date = LocalDate.parse(dateKey)
         _foodLogsChanged.tryEmit(Unit)
         viewModelScope.launch {
-            val date = LocalDate.parse(dateKey)
-            meals.forEach { meal -> runCatching { mealLogTracker.markLogged(date, meal) } }
-        }
-    }
-
-    /** Anulează o copiere: scoate optimist rândurile locale și le șterge ÎNTOTDEAUNA în lot pe backend. */
-    fun undoCopy(dateKey: String, ids: List<Long>) {
-        val idSet = ids.toSet()
-        // (nume masă, rând) pentru fiecare rând scos local, ca la eșec să le re-inserăm în masa lor.
-        val removed = mutableListOf<Pair<String, LoggedFood>>()
-        val day = _foodsByDate.value[dateKey]
-        if (day != null) {
-            var updated: DayMeals = day
-            for (meal in listOf("Breakfast", "Lunch", "Dinner", "Snacks")) {
-                val list = mealList(updated, meal)
-                val (gone, kept) = list.partition { it.id in idSet }
-                gone.forEach { removed += meal to it }
-                if (gone.isNotEmpty()) updated = updateMealList(updated, meal, kept)
-            }
-            _foodsByDate.value = _foodsByDate.value + (dateKey to updated)
-        }
-        viewModelScope.launch {
+            backendMeals.map { mealNameFromBackend(it) }.distinct()
+                .forEach { meal -> runCatching { mealLogTracker.markLogged(date, meal) } }
             try {
-                logsApi.deleteFoodLogs(FoodLogDeleteBatchDto(ids))
-                _foodLogsChanged.tryEmit(Unit)
-            } catch (e: java.io.IOException) {
-                restoreRemoved(dateKey, removed)
-                _toastEvents.tryEmit(ToastEvent(R.string.error_no_internet))
-            } catch (e: retrofit2.HttpException) {
-                restoreRemoved(dateKey, removed)
-                _toastEvents.tryEmit(ToastEvent(R.string.error_undo_copy, e.code()))
-            } catch (e: Throwable) {
-                restoreRemoved(dateKey, removed)
-                _toastEvents.tryEmit(ToastEvent(R.string.error_undo_copy))
+                journal.refreshDay(date)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Throwable) {
+                // Offline: the next refresh brings the copied rows.
             }
         }
     }
 
-    /** Re-inserează doar rândurile scoase, în starea CURENTĂ a zilei (sare peste id-urile deja prezente). */
-    private fun restoreRemoved(dateKey: String, removed: List<Pair<String, LoggedFood>>) {
-        if (removed.isEmpty()) return
-        var day = _foodsByDate.value[dateKey] ?: DayMeals()
-        val present = listOf("Breakfast", "Lunch", "Dinner", "Snacks")
-            .flatMap { mealList(day, it) }.mapNotNull { it.id }.toMutableSet()
-        for ((meal, food) in removed) {
-            val id = food.id
-            if (id != null && !present.add(id)) continue
-            day = updateMealList(day, meal, mealList(day, meal) + food)
+    /** Undoes a copy: deletes the copied rows locally; the queue removes them on the server. */
+    fun undoCopy(dateKey: String, clientIds: List<String>) {
+        if (clientIds.isEmpty()) return
+        viewModelScope.launch {
+            journal.deleteLogs(clientIds)
+            _foodLogsChanged.tryEmit(Unit)
         }
-        _foodsByDate.value = _foodsByDate.value + (dateKey to day)
-    }
-
-    private fun mealList(day: DayMeals, mealName: String): List<LoggedFood> = when (mealName) {
-        "Breakfast" -> day.breakfast
-        "Lunch"     -> day.lunch
-        "Dinner"    -> day.dinner
-        "Snacks"    -> day.snacks
-        else        -> day.breakfast
-    }
-
-    private fun updateMealList(day: DayMeals, mealName: String, newList: List<LoggedFood>): DayMeals =
-        when (mealName) {
-            "Breakfast" -> day.copy(breakfast = newList)
-            "Lunch"     -> day.copy(lunch = newList)
-            "Dinner"    -> day.copy(dinner = newList)
-            "Snacks"    -> day.copy(snacks = newList)
-            else        -> day.copy(breakfast = newList)
-        }
-
-    private fun replaceByTempId(
-        key: String,
-        mealName: String,
-        tempId: String,
-        transform: (LoggedFood) -> LoggedFood,
-    ) {
-        val day = _foodsByDate.value[key] ?: return
-        val list = mealList(day, mealName)
-        val newList = list.map { if (it.clientId == tempId) transform(it) else it }
-        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
-    }
-
-    private fun removeByTempId(key: String, mealName: String, tempId: String) {
-        val day = _foodsByDate.value[key] ?: return
-        val list = mealList(day, mealName)
-        val newList = list.filterNot { it.clientId == tempId }
-        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
     }
 
     fun removeFoodFromMeal(mealName: String, index: Int) {
-        val key = dateKey(_selectedHomeDate.value)
-        val day = _foodsByDate.value[key] ?: return
-        val list = mealList(day, mealName)
-        if (index !in list.indices) return
-        val target = list[index]
-        val id = target.id ?: return  // still pending POST — UI should disable DELETE
-
-        // Optimistic remove
-        val newList = list.toMutableList().also { it.removeAt(index) }
-        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
-
+        val target = currentMeal(mealName).getOrNull(index) ?: return
+        val clientId = target.clientId ?: return
         viewModelScope.launch {
-            val response = try {
-                logsApi.deleteFoodLog(id)
-            } catch (e: java.io.IOException) {
-                restoreFood(key, mealName, index, target)
-                _toastEvents.tryEmit(ToastEvent(R.string.error_no_internet))
-                return@launch
-            } catch (e: retrofit2.HttpException) {
-                restoreFood(key, mealName, index, target)
-                _toastEvents.tryEmit(ToastEvent(R.string.error_delete, e.code()))
-                return@launch
-            } catch (e: Throwable) {
-                restoreFood(key, mealName, index, target)
-                _toastEvents.tryEmit(ToastEvent(R.string.error_delete))
-                return@launch
-            }
-            if (!response.isSuccessful) {
-                restoreFood(key, mealName, index, target)
-                _toastEvents.tryEmit(ToastEvent(R.string.error_delete, response.code()))
-            } else {
-                _foodLogsChanged.tryEmit(Unit)
-            }
+            journal.deleteLogs(listOf(clientId))
+            _foodLogsChanged.tryEmit(Unit)
         }
-    }
-
-    private fun restoreFood(key: String, mealName: String, index: Int, food: LoggedFood) {
-        val day = _foodsByDate.value[key] ?: DayMeals()
-        val list = mealList(day, mealName).toMutableList()
-        val insertAt = index.coerceIn(0, list.size)
-        list.add(insertAt, food)
-        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, list))
     }
 
     fun updateFoodPortion(mealName: String, index: Int, grams: Int, unit: String?, unitQty: Float?) {
-        val key = dateKey(_selectedHomeDate.value)
-        val day = _foodsByDate.value[key] ?: return
-        val list = mealList(day, mealName)
-        if (index !in list.indices) return
-        val target = list[index]
-        val id = target.id ?: return          // încă în POST pending — edit indisponibil
+        val target = currentMeal(mealName).getOrNull(index) ?: return
         if (grams == target.grams && unit == target.unit && unitQty == target.unitQty) return  // no-op
-
-        // Optimistic update (pe loc, fără reordonare)
-        val optimistic = target.copy(grams = grams, unit = unit, unitQty = unitQty)
-        val newList = list.toMutableList().also { it[index] = optimistic }
-        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
-
-        viewModelScope.launch {
-            try {
-                logsApi.updateFoodLog(id, FoodLogUpdateDto(grams = grams, unit = unit, unitQty = unitQty))
-            } catch (e: java.io.IOException) {
-                restorePortion(key, mealName, id, target)
-                _toastEvents.tryEmit(ToastEvent(R.string.error_no_internet))
-            } catch (e: retrofit2.HttpException) {
-                restorePortion(key, mealName, id, target)
-                _toastEvents.tryEmit(ToastEvent(R.string.error_save, e.code()))
-            } catch (e: Throwable) {
-                restorePortion(key, mealName, id, target)
-                _toastEvents.tryEmit(ToastEvent(R.string.error_save))
-            }
-        }
+        updateLog(target, target.copy(grams = grams, unit = unit, unitQty = unitQty))
     }
 
-    private fun restorePortion(key: String, mealName: String, id: Long, old: LoggedFood) {
-        val day = _foodsByDate.value[key] ?: return
-        val list = mealList(day, mealName)
-        val newList = list.map { if (it.id == id) it.copy(grams = old.grams, unit = old.unit, unitQty = old.unitQty) else it }
-        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
-    }
-
-    /** Edit a recipe portion: recompute totals from the (possibly added/removed)
-     *  ingredients, optimistic-update in place, PATCH with ingredients, rollback on error. */
+    /** Edit a recipe portion: totals are recomputed from the (possibly added/removed) ingredients. */
     fun updateRecipeLog(mealName: String, index: Int, ingredients: List<FoodIngredient>) {
-        val key = dateKey(_selectedHomeDate.value)
-        val day = _foodsByDate.value[key] ?: return
-        val list = mealList(day, mealName)
-        if (index !in list.indices) return
-        val target = list[index]
-        val id = target.id ?: return          // încă în POST pending — edit indisponibil
+        val target = currentMeal(mealName).getOrNull(index) ?: return
         if (ingredients.isEmpty()) return
-
         val totalG = ingredients.totalGrams()
-        val newFood = target.food.withIngredients(ingredients)
-        val optimistic = target.copy(food = newFood, grams = totalG.toInt())
-        val newList = list.toMutableList().also { it[index] = optimistic }
-        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
+        updateLog(target, target.copy(food = target.food.withIngredients(ingredients), grams = totalG.toInt()))
+    }
 
+    private fun updateLog(target: LoggedFood, updated: LoggedFood) {
+        val clientId = target.clientId ?: return
         viewModelScope.launch {
-            try {
-                logsApi.updateFoodLog(
-                    id,
-                    FoodLogUpdateDto(grams = totalG.toInt(), ingredients = ingredients.map { it.toDto() }),
-                )
-            } catch (e: java.io.IOException) {
-                restoreLog(key, mealName, id, target)
-                _toastEvents.tryEmit(ToastEvent(R.string.error_no_internet))
-            } catch (e: retrofit2.HttpException) {
-                restoreLog(key, mealName, id, target)
-                _toastEvents.tryEmit(ToastEvent(R.string.error_save, e.code()))
-            } catch (e: Throwable) {
-                restoreLog(key, mealName, id, target)
-                _toastEvents.tryEmit(ToastEvent(R.string.error_save))
-            }
+            journal.updateLog(clientId, updated)
+            _foodLogsChanged.tryEmit(Unit)
         }
     }
 
-    private fun restoreLog(key: String, mealName: String, id: Long, original: LoggedFood) {
-        val day = _foodsByDate.value[key] ?: return
-        val list = mealList(day, mealName)
-        val newList = list.map { if (it.id == id) original else it }
-        _foodsByDate.value = _foodsByDate.value + (key to updateMealList(day, mealName, newList))
+    private fun onSyncEvent(event: SyncEvent) {
+        when (event) {
+            is SyncEvent.Synced -> {
+                _foodLogsChanged.tryEmit(Unit)
+                _dayStatusChanged.tryEmit(Unit)
+                // Goals depend on the server's latest weight; per-date ops sync in order, so reloading on
+                // every sync of such a date also covers ops queued before the weight.
+                if (event.dates.any { it in weightDatesAwaitingSync }) loadGoals()
+            }
+            SyncEvent.Rejected -> _toastEvents.tryEmit(ToastEvent(R.string.sync_rejected))
+        }
     }
 
     // ── Computed totals ───────────────────────────────────────────────────────
@@ -882,8 +624,8 @@ class FoodViewModel(
     /**
      * Wipes every piece of per-user state so a different account that logs in on the
      * same process starts clean. The ViewModel is scoped to [MainActivity] and survives
-     * logout, so without this the previous user's meals, profile and the [_loadedDates]
-     * guard would leak into the next account (the day would never be re-fetched).
+     * logout. The journal itself lives in the mirror ([JournalRepository.clearAll] on logout);
+     * here only UI state is reset.
      *
      * App-level state (theme/language/notifications in [appSettings]) is intentionally
      * left untouched — those are device preferences, not user data.
@@ -901,21 +643,20 @@ class FoodViewModel(
         hydrationSaveJob?.cancel()
         hydrationSaveJob = null
         hydrationPrefsBeforeEdit = null
-        _loadedDates.clear()
-        _dayStatusByDate.value = emptyMap()
-        _yesterdayHasFood.value = null
         yesterdayRequestedFor = null
         _yesterdayAnsweredFor.value = null
         _loadingDay.value = false
         _selectedHomeDate.value = clock()
-        _foodsByDate.value = emptyMap()
-        _hydrationByDate.value = emptyMap()
-        _weightHistory.value = emptyList()
+        addsInFlight.clear()
+        weightDatesAwaitingSync.clear()
     }
 
     init {
-        viewModelScope.launch { loadDay(clock()) }
+        viewModelScope.launch { journal.events.collect(::onSyncEvent) }
+        viewModelScope.launch { refreshDay(localDate(clock())) }
         loadYesterdayIfToday()
         loadGoals()
     }
 }
+
+private fun LocalDay?.hasFood(): Boolean = this != null && meals.values.any { it.isNotEmpty() }
