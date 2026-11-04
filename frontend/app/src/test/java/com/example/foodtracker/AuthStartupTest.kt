@@ -11,6 +11,7 @@ import com.example.foodtracker.viewmodel.AuthUser
 import com.example.foodtracker.viewmodel.AuthViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -43,8 +44,11 @@ class AuthStartupTest {
         override suspend fun deleteAccount(): Response<Unit> = throw UnsupportedOperationException()
     }
 
+    private val dsScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO)
+
     private fun store() = ProfileSnapshotStore(
         PreferenceDataStoreFactory.create(
+            scope = dsScope,
             produceFile = { File(tempFolder.newFolder(), "profile_snapshot.preferences_pb") }
         )
     )
@@ -68,7 +72,7 @@ class AuthStartupTest {
     }
 
     @Before fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
-    @After fun tearDown() = Dispatchers.resetMain()
+    @After fun tearDown() { dsScope.cancel(); Dispatchers.resetMain() }
 
     @Test
     fun offlineStartupWithSnapshotGoesHome() = runTest {
@@ -128,5 +132,28 @@ class AuthStartupTest {
         vm.start()
         assertEquals(AuthUiState.NavigateHome, vm.uiState.value)
         assertNotNull(s.read("u1")?.profile)
+    }
+
+    @Test
+    fun nonIoFailureUsesSnapshot() = runTest {
+        val s = store()
+        s.save("u1", profile, null)
+        val vm = vm(FakeApi { throw IllegalStateException("token refresh failed") }, s)
+        vm.start()
+        assertEquals(AuthUiState.NavigateHome, vm.uiState.value)
+    }
+
+    @Test
+    fun snapshotWriteFailureStillGoesHome() = runTest {
+        val failing = ProfileSnapshotStore(
+            PreferenceDataStoreFactory.create(
+                scope = dsScope,
+                produceFile = { File(tempFolder.newFolder(), "x.preferences_pb") }
+            )
+        )
+        dsScope.cancel() // writes now fail
+        val vm = vm(FakeApi { Response.success(profile) }, failing)
+        vm.start()
+        assertEquals(AuthUiState.NavigateHome, vm.uiState.value)
     }
 }

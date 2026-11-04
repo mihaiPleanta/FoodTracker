@@ -397,7 +397,8 @@ class AuthViewModel(
                 response.isSuccessful -> {
                     response.body()?.let {
                         _loadedProfile.value = it.toUserProfile()
-                        snapshots?.save(uid, it, null)
+                        // A cache write failure must never turn a 200 into "offline".
+                        runCatching { snapshots?.save(uid, it, null) }
                     }
                     return AuthUiState.NavigateHome
                 }
@@ -405,15 +406,14 @@ class AuthViewModel(
                 response.code() >= 500 -> true
                 else -> false
             }
-        } catch (_: java.io.IOException) {
-            true
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (_: Exception) {
-            false
+            // IOException, or a token refresh failure from AuthInterceptor: no usable connection.
+            true
         }
         if (unreachable) {
-            val cached = snapshots?.read(uid)?.profile
+            val cached = runCatching { snapshots?.read(uid)?.profile }.getOrNull()
             if (cached != null) {
                 _loadedProfile.value = cached.toUserProfile()
                 return AuthUiState.NavigateHome

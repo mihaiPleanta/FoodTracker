@@ -47,6 +47,7 @@ fun LoginScreen(
     val uiState by authViewModel.uiState.collectAsState()
     val isLoading = uiState is AuthUiState.Loading
     val errorResId = (uiState as? AuthUiState.Error)?.messageRes
+        ?: if (uiState is AuthUiState.Offline) R.string.startup_offline else null
     val errorMessage = errorResId?.let { stringResource(it) }
 
     val context = LocalContext.current
