@@ -27,7 +27,17 @@ class MirrorMergeTest {
         assertTrue(r[1].logged.pending)
     }
 
-    @Test fun pendingDeleteHidesServerRow() {
+    @Test fun localPendingWithoutQueuedOpAbsentOnServerIsDropped() {
+        assertTrue(mergeServerDay(emptyList(), listOf(log("a", 1, pending = true)), emptyList()).isEmpty())
+    }
+
+    @Test fun touchedRowWithoutLocalCopyFallsBackToServerPending() {
+        val r = mergeServerDay(listOf(log("a", 1)), emptyList(), listOf(SyncOp.UpdateLog("a", FoodLogUpdateDto(5))))
+        assertTrue(r[0].pending)
+        assertTrue(r[0].logged.pending)
+    }
+
+    @Test fun serverDayDoesNotResurrectPendingDelete() {
         val r = mergeServerDay(listOf(log("a", 1), log("b", 2)), emptyList(), listOf(SyncOp.DeleteLog("a")))
         assertEquals(listOf("b"), r.map { it.clientId })
     }
@@ -40,7 +50,7 @@ class MirrorMergeTest {
     }
 
     @Test fun resultSortedBySortKey() {
-        val r = mergeServerDay(listOf(log("a", 5), log("c", 1)), listOf(log("b", 3, pending = true)), emptyList())
+        val r = mergeServerDay(listOf(log("a", 5), log("c", 1)), listOf(log("b", 3, pending = true)), listOf(SyncOp.CreateLog("b", createBody())))
         assertEquals(listOf("c", "b", "a"), r.map { it.clientId })
     }
 
@@ -52,7 +62,7 @@ class MirrorMergeTest {
         assertEquals(LocalDayValues(2f, DayStatus.COMPLETE, g1), r)
     }
 
-    @Test fun dayValuesLocalWinsWithPending() {
+    @Test fun pendingHydrationWinsOverServer() {
         val r = mergeServerDayValues(
             LocalDayValues(2f, DayStatus.COMPLETE, g1), LocalDayValues(1f, DayStatus.INCOMPLETE, g2), "d",
             listOf(SyncOp.PutHydration("d", 1f), SyncOp.PutDayStatus("d", false)),

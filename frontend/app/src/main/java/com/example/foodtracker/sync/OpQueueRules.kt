@@ -5,7 +5,12 @@ import com.example.foodtracker.model.FoodLogCreateDto
 import com.example.foodtracker.model.FoodLogUpdateDto
 import com.example.foodtracker.model.toDomain
 import com.example.foodtracker.model.toDto
+import com.example.foodtracker.model.totalGrams
 import com.example.foodtracker.model.withIngredients
+
+/** True when the create may be rewritten or cancelled: never sent in any form. */
+private fun QueuedOp.isUnsentCreate(clientId: String) =
+    !inFlight && !attempted && (op as? SyncOp.CreateLog)?.clientId == clientId
 
 private fun QueuedOp.clientIdOrNull(): String? = when (val o = op) {
     is SyncOp.CreateLog -> o.clientId
@@ -16,14 +21,15 @@ private fun QueuedOp.clientIdOrNull(): String? = when (val o = op) {
 
 private fun applyUpdateToCreate(body: FoodLogCreateDto, upd: FoodLogUpdateDto): FoodLogCreateDto {
     val withUnit = body.copy(grams = upd.grams, unit = upd.unit, unitQty = upd.unitQty)
-    val ing = upd.ingredients ?: return withUnit
-    if (ing.isEmpty()) return withUnit.copy(ingredients = ing)
+    val ing = upd.ingredients
+    if (ing.isNullOrEmpty()) return withUnit
     val food = FoodItem(
         barcode = body.barcode, name = body.name, brand = body.brand, imageUrl = body.imageUrl,
         categories = body.categories, per100g = body.kcal100g.toInt(),
         protein100g = body.protein100g, carbs100g = body.carbs100g, fat100g = body.fat100g,
     ).withIngredients(ing.map { it.toDomain() })
     return withUnit.copy(
+        grams = ing.map { it.toDomain() }.totalGrams().toInt(),
         kcal100g = food.per100g.toFloat(),
         protein100g = food.protein100g,
         carbs100g = food.carbs100g,
@@ -38,7 +44,7 @@ fun enqueue(queue: List<QueuedOp>, op: SyncOp): List<QueuedOp> {
     return when (op) {
         is SyncOp.UpdateLog -> {
             val createIdx = queue.indexOfFirst {
-                !it.inFlight && (it.op as? SyncOp.CreateLog)?.clientId == op.clientId
+                it.isUnsentCreate(op.clientId)
             }
             if (createIdx >= 0) {
                 val c = queue[createIdx]
@@ -55,11 +61,9 @@ fun enqueue(queue: List<QueuedOp>, op: SyncOp): List<QueuedOp> {
             }
         }
         is SyncOp.DeleteLog -> {
-            val hasPendingCreate = queue.any {
-                !it.inFlight && (it.op as? SyncOp.CreateLog)?.clientId == op.clientId
-            }
+            val hasPendingCreate = queue.any { it.isUnsentCreate(op.clientId) }
             if (hasPendingCreate) {
-                queue.filterNot { it.clientIdOrNull() == op.clientId && !it.inFlight }
+                queue.filterNot { it.clientIdOrNull() == op.clientId }
             } else {
                 queue.filterNot { !it.inFlight && it.op is SyncOp.UpdateLog && it.clientIdOrNull() == op.clientId } + new()
             }

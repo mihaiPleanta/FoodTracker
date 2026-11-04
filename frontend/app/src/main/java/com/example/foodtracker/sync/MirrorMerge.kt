@@ -35,9 +35,9 @@ fun mergeServerDay(server: List<LocalLog>, local: List<LocalLog>, pending: List<
 
     val fromServer = server.filter { it.clientId !in deleted }.map { s ->
         val l = localById[s.clientId]
-        if (s.clientId in touched && l != null) l.withPending(true) else s.withPending(false)
+        if (s.clientId in touched) (l ?: s).withPending(true) else s.withPending(false)
     }
-    val localOnly = local.filter { it.pending && it.clientId !in serverIds && it.clientId !in deleted }
+    val localOnly = local.filter { it.clientId in touched && it.clientId !in serverIds && it.clientId !in deleted }
         .map { it.withPending(true) }
     return (fromServer + localOnly).sortedBy { it.sortKey }
 }

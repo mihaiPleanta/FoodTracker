@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class OpQueueRulesTest {
-    @Test fun updateFoldsIntoPendingCreate() {
+    @Test fun createThenUpdateMergesIntoCreate() {
         val create = SyncOp.CreateLog("c1", createBody())
         val r = enqueue(listOf(q(create, 1)), SyncOp.UpdateLog("c1", FoodLogUpdateDto(250, unit = "tbsp", unitQty = 2f)))
         assertEquals(1, r.size)
@@ -23,8 +23,9 @@ class OpQueueRulesTest {
             FoodLogIngredientDto("a", 100f, 100f, 10f, 20f, 1f),
             FoodLogIngredientDto("b", 100f, 300f, 0f, 40f, 5f),
         )
-        val r = enqueue(listOf(q(SyncOp.CreateLog("c1", createBody()), 1)), SyncOp.UpdateLog("c1", FoodLogUpdateDto(200, ing)))
+        val r = enqueue(listOf(q(SyncOp.CreateLog("c1", createBody()), 1)), SyncOp.UpdateLog("c1", FoodLogUpdateDto(999, ing)))
         val body = (r[0].op as SyncOp.CreateLog).body
+        assertEquals(200, body.grams)
         assertEquals(200f, body.kcal100g, 0.01f)
         assertEquals(5f, body.protein100g, 0.01f)
         assertEquals(30f, body.carbs100g, 0.01f)
@@ -32,10 +33,34 @@ class OpQueueRulesTest {
         assertEquals(ing, body.ingredients)
     }
 
-    @Test fun updateOfInFlightCreateIsAppended() {
+    @Test fun updateOnInFlightCreateIsAppended() {
         val r = enqueue(listOf(q(SyncOp.CreateLog("c1", createBody()), 1, inFlight = true)), SyncOp.UpdateLog("c1", FoodLogUpdateDto(5)))
         assertEquals(2, r.size)
         assertTrue(r[1].op is SyncOp.UpdateLog)
+    }
+
+    @Test fun updateOnAttemptedCreateIsAppended() {
+        val r = enqueue(listOf(QueuedOp(1, SyncOp.CreateLog("c1", createBody()), attempted = true)), SyncOp.UpdateLog("c1", FoodLogUpdateDto(5)))
+        assertEquals(2, r.size)
+        assertEquals(100, (r[0].op as SyncOp.CreateLog).body.grams)
+        assertTrue(r[1].op is SyncOp.UpdateLog)
+    }
+
+    @Test fun deleteOnAttemptedCreateAppendsDelete() {
+        val queue = listOf(QueuedOp(1, SyncOp.CreateLog("c1", createBody()), attempted = true), q(SyncOp.UpdateLog("c1", FoodLogUpdateDto(5)), 2))
+        val r = enqueue(queue, SyncOp.DeleteLog("c1"))
+        assertEquals(2, r.size)
+        assertTrue(r[0].op is SyncOp.CreateLog)
+        assertEquals(SyncOp.DeleteLog("c1"), r[1].op)
+    }
+
+    @Test fun foldWithEmptyIngredientsKeepsCreateIngredients() {
+        val ing = listOf(FoodLogIngredientDto("a", 100f, 100f, 10f, 20f, 1f))
+        val create = SyncOp.CreateLog("c1", createBody().copy(ingredients = ing))
+        val r = enqueue(listOf(q(create, 1)), SyncOp.UpdateLog("c1", FoodLogUpdateDto(300, emptyList())))
+        val body = (r[0].op as SyncOp.CreateLog).body
+        assertEquals(ing, body.ingredients)
+        assertEquals(300, body.grams)
     }
 
     @Test fun secondUpdateReplacesFirst() {
@@ -49,7 +74,7 @@ class OpQueueRulesTest {
         assertEquals(2, r.size)
     }
 
-    @Test fun deleteOfPendingCreateCancelsEverything() {
+    @Test fun createThenDeleteCancelsBoth() {
         val queue = listOf(q(SyncOp.CreateLog("c1", createBody()), 1), q(SyncOp.UpdateLog("c1", FoodLogUpdateDto(5)), 2), q(SyncOp.PutHydration("d", 1f), 3))
         val r = enqueue(queue, SyncOp.DeleteLog("c1"))
         assertEquals(listOf(SyncOp.PutHydration("d", 1f)), r.map { it.op })

@@ -23,4 +23,7 @@ val SyncOp.date: String?
         is SyncOp.UpdateLog, is SyncOp.DeleteLog -> null
     }
 
-data class QueuedOp(val seq: Long, val op: SyncOp, val inFlight: Boolean = false)
+data class QueuedOp(val seq: Long, val op: SyncOp, val inFlight: Boolean = false,
+    /** Set when the op was ever sent (never cleared): the server may already hold its effect. */
+    val attempted: Boolean = false,
+)
