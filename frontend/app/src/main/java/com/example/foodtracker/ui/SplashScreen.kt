@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -72,6 +73,18 @@ fun SplashScreen(
                 fontSize = 14.sp,
                 color = GlassColors.textSecondary
             )
+            if (uiState is AuthUiState.Offline) {
+                Spacer(Modifier.height(24.dp))
+                Text(
+                    stringResource(R.string.startup_offline),
+                    fontSize = 14.sp,
+                    color = GlassColors.textSecondary
+                )
+                Spacer(Modifier.height(12.dp))
+                Button(onClick = { authViewModel.checkAuthState() }) {
+                    Text(stringResource(R.string.action_retry))
+                }
+            }
         }
     }
 }

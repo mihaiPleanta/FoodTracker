@@ -90,6 +90,7 @@ private class RecordingProfileApi : ProfileApi {
     var getGoalsCalls = 0
     var saveFailure: Throwable? = null
     var goals: GoalsDto? = null
+    var goalsFailure: Throwable? = null
 
     override suspend fun getProfile(): retrofit2.Response<ProfileDto> = throw UnsupportedOperationException()
     override suspend fun saveProfile(profile: ProfileDto): retrofit2.Response<ProfileDto> {
@@ -101,6 +102,7 @@ private class RecordingProfileApi : ProfileApi {
         throw UnsupportedOperationException()
     override suspend fun getGoals(): retrofit2.Response<GoalsDto> {
         getGoalsCalls++
+        goalsFailure?.let { throw it }
         return retrofit2.Response.success(goals)
     }
     override suspend fun deleteAccount(): retrofit2.Response<Unit> = throw UnsupportedOperationException()
@@ -164,12 +166,15 @@ class FoodViewModelTest {
         foodApi: FoodApi = NoOpFoodApi,
         settingsRepository: SettingsRepository = FakeSettingsRepository(),
         tracker: MealLogTracker = newTracker(),
+        snapshots: com.example.foodtracker.data.ProfileSnapshotStore? = null,
     ) = FoodViewModel(
         settingsRepository = settingsRepository,
         mealLogTracker = tracker,
         foodRepository = FoodRepository(foodApi, NoOpCache),
         journal = journal.repo,
         profileApi = profileApi,
+        profileSnapshots = snapshots,
+        currentUid = { "u1" },
     )
 
     private fun todayKey() = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
@@ -921,5 +926,21 @@ class FoodViewModelTest {
 
         assertEquals(loaded, vm.userProfile.value)
         assertEquals(before + 1, api.getGoalsCalls)
+    }
+
+    @Test
+    fun goalsFallBackToSnapshotOffline() = runTest {
+        val snapshots = com.example.foodtracker.data.ProfileSnapshotStore(
+            PreferenceDataStoreFactory.create(
+                scope = dataStoreScope,
+                produceFile = { File(tempFolder.newFolder(), "profile_snapshot.preferences_pb") }
+            )
+        )
+        val saved = goalsWithHydration(2.5f)
+        snapshots.save("u1", null, saved)
+        val api = RecordingProfileApi().apply { goalsFailure = java.io.IOException("offline") }
+        val vm = newVm(profileApi = api, snapshots = snapshots)
+        advanceUntilIdle()
+        assertEquals(saved.calorieGoal, vm.nutritionGoals.value?.calorieGoal)
     }
 }

@@ -29,6 +29,7 @@
 
     <!-- Splash -->
     <string name="app_tagline">Mănâncă inteligent</string>
+    <string name="startup_offline">Nu există conexiune. Reîncearcă.</string>
 
     <!-- Login -->
     <string name="login_subtitle">Conectează-te pentru a continua</string>

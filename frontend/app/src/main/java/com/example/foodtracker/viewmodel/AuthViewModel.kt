@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.foodtracker.R
 import com.example.foodtracker.api.ProfileApi
+import com.example.foodtracker.data.ProfileSnapshotStore
 import com.example.foodtracker.api.RetrofitInstance
 import com.example.foodtracker.model.ActivityLevel
 import com.example.foodtracker.model.Gender
@@ -41,7 +42,12 @@ sealed class AuthUiState {
     object NavigateHome : AuthUiState()
     object NavigateOnboarding : AuthUiState()
     object NavigateVerifyEmail : AuthUiState()
+    /** Startup could not reach the server and there is no cached profile to fall back on. */
+    object Offline : AuthUiState()
 }
+
+/** The bits of the signed-in Firebase user the startup flow needs (seam for tests). */
+data class AuthUser(val uid: String, val isEmailVerified: Boolean)
 
 sealed class PasswordResetState {
     object Idle : PasswordResetState()
@@ -88,10 +94,15 @@ internal fun OnboardingData.toProfileDtoOrNull(): ProfileDto? {
     )
 }
 
-class AuthViewModel : ViewModel() {
+class AuthViewModel(
+    private val snapshots: ProfileSnapshotStore? = null,
+    private val profileApi: ProfileApi = RetrofitInstance.retrofit.create(ProfileApi::class.java),
+    private val currentUser: () -> AuthUser? = {
+        FirebaseAuth.getInstance().currentUser?.let { AuthUser(it.uid, it.isEmailVerified) }
+    },
+) : ViewModel() {
 
-    private val auth = FirebaseAuth.getInstance()
-    private val profileApi = RetrofitInstance.retrofit.create(ProfileApi::class.java)
+    private val auth: FirebaseAuth get() = FirebaseAuth.getInstance()
 
     private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
@@ -229,7 +240,7 @@ class AuthViewModel : ViewModel() {
     /** Called by SplashScreen on startup. */
     fun checkAuthState() {
         viewModelScope.launch {
-            val user = auth.currentUser
+            val user = currentUser()
             if (user == null) {
                 _uiState.value = AuthUiState.NavigateLogin
                 return@launch
@@ -239,15 +250,7 @@ class AuthViewModel : ViewModel() {
                 return@launch
             }
             _uiState.value = AuthUiState.Loading
-            _uiState.value = try {
-                val response = profileApi.getProfile()
-                if (response.isSuccessful) {
-                    response.body()?.let { _loadedProfile.value = it.toUserProfile() }
-                    AuthUiState.NavigateHome
-                } else AuthUiState.NavigateOnboarding
-            } catch (_: Exception) {
-                AuthUiState.NavigateOnboarding
-            }
+            _uiState.value = fetchProfileState(user.uid)
         }
     }
 
@@ -352,6 +355,7 @@ class AuthViewModel : ViewModel() {
             _uiState.value = AuthUiState.Loading
             try {
                 profileApi.saveProfile(dto)
+                saveSnapshot(dto)
                 _loadedProfile.value = dto.toUserProfile()
                 _uiState.value = AuthUiState.NavigateHome
             } catch (e: Exception) {
@@ -367,6 +371,7 @@ class AuthViewModel : ViewModel() {
         viewModelScope.launch {
             runCatching { profileApi.saveProfile(profile.toProfileDto()) }
                 .onSuccess {
+                    saveSnapshot(profile.toProfileDto())
                     _profileUpdates.tryEmit(Unit)
                     _profileSaveState.value = ProfileSaveState.Success
                 }
@@ -377,14 +382,48 @@ class AuthViewModel : ViewModel() {
     }
 
     private suspend fun resolvePostAuth() {
-        _uiState.value = try {
+        val uid = currentUser()?.uid
+        _uiState.value = if (uid == null) AuthUiState.Offline else fetchProfileState(uid)
+    }
+
+    /**
+     * GET /profile: 200 caches the profile and goes home; 404 means no profile yet (onboarding);
+     * network/5xx fall back to the cached profile of this account, otherwise [AuthUiState.Offline].
+     */
+    private suspend fun fetchProfileState(uid: String): AuthUiState {
+        val unreachable = try {
             val response = profileApi.getProfile()
-            if (response.isSuccessful) {
-                response.body()?.let { _loadedProfile.value = it.toUserProfile() }
-                AuthUiState.NavigateHome
-            } else AuthUiState.NavigateOnboarding
+            when {
+                response.isSuccessful -> {
+                    response.body()?.let {
+                        _loadedProfile.value = it.toUserProfile()
+                        snapshots?.save(uid, it, null)
+                    }
+                    return AuthUiState.NavigateHome
+                }
+                response.code() == 404 -> return AuthUiState.NavigateOnboarding
+                response.code() >= 500 -> true
+                else -> false
+            }
+        } catch (_: java.io.IOException) {
+            true
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (_: Exception) {
-            AuthUiState.NavigateOnboarding
+            false
         }
+        if (unreachable) {
+            val cached = snapshots?.read(uid)?.profile
+            if (cached != null) {
+                _loadedProfile.value = cached.toUserProfile()
+                return AuthUiState.NavigateHome
+            }
+        }
+        return AuthUiState.Offline
+    }
+
+    private fun saveSnapshot(profile: ProfileDto) {
+        val uid = currentUser()?.uid ?: return
+        viewModelScope.launch { snapshots?.save(uid, profile, null) }
     }
 }

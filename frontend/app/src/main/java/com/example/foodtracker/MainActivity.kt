@@ -45,6 +45,8 @@ import com.example.foodtracker.api.RetrofitInstance
 import com.example.foodtracker.data.DataStoreSettingsRepository
 import com.example.foodtracker.data.FoodRepository
 import com.example.foodtracker.data.MealLogTracker
+import com.example.foodtracker.data.ProfileSnapshotStore
+import com.example.foodtracker.data.profileSnapshotDataStore
 import com.example.foodtracker.data.StreakSnapshotStore
 import com.example.foodtracker.data.streakSnapshotDataStore
 import com.example.foodtracker.data.cache.FoodCacheDb
@@ -129,16 +131,26 @@ class MainActivity : ComponentActivity() {
                     cache = RoomFoodCache(FoodCacheDb.get(applicationContext).foodCacheDao()),
                 )
             }
+            val profileSnapshotStore = remember { ProfileSnapshotStore(applicationContext.profileSnapshotDataStore) }
             val foodViewModelFactory = remember {
                 FoodViewModelFactory(
                     settingsRepository = DataStoreSettingsRepository(applicationContext.settingsDataStore),
                     mealLogTracker = MealLogTracker(applicationContext.mealLogTrackerDataStore),
                     foodRepository = foodRepository,
                     journal = JournalProvider.repository(applicationContext),
+                    profileSnapshots = profileSnapshotStore,
                 )
             }
             val viewModel: FoodViewModel = viewModel(factory = foodViewModelFactory)
-            val authViewModel: AuthViewModel = viewModel()
+            val authViewModel: AuthViewModel = viewModel(
+                factory = remember {
+                    object : androidx.lifecycle.ViewModelProvider.Factory {
+                        @Suppress("UNCHECKED_CAST")
+                        override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
+                            AuthViewModel(snapshots = profileSnapshotStore) as T
+                    }
+                }
+            )
             // Activity-scoped so logout can reset it (see resetUserState); otherwise the
             // bottom bar's saveState/restoreState keeps the previous account's recipes.
             val recipeViewModel: RecipeViewModel = viewModel()

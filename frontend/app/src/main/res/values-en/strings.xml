@@ -26,6 +26,7 @@
 
     <!-- Splash -->
     <string name="app_tagline">Eat smart</string>
+    <string name="startup_offline">No connection. Try again.</string>
 
     <!-- Login -->
     <string name="login_subtitle">Sign in to continue</string>

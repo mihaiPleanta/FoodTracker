@@ -7,6 +7,7 @@ import com.example.foodtracker.R
 import com.example.foodtracker.api.ProfileApi
 import com.example.foodtracker.api.RetrofitInstance
 import com.example.foodtracker.data.FoodRepository
+import com.example.foodtracker.data.ProfileSnapshotStore
 import com.example.foodtracker.data.MealLogTracker
 import com.example.foodtracker.data.SettingsRepository
 import com.example.foodtracker.data.journal.JournalRepository
@@ -24,6 +25,7 @@ import com.example.foodtracker.model.mealNameFromBackend
 import com.example.foodtracker.model.toProfileDto
 import com.example.foodtracker.model.totalGrams
 import com.example.foodtracker.model.withIngredients
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.FlowPreview
@@ -71,6 +73,8 @@ class FoodViewModel(
     private val journal: JournalRepository,
     private val profileApi: ProfileApi = RetrofitInstance.retrofit.create(ProfileApi::class.java),
     private val clock: () -> Date = { Date() },
+    private val profileSnapshots: ProfileSnapshotStore? = null,
+    private val currentUid: () -> String? = { FirebaseAuth.getInstance().currentUser?.uid },
 ) : ViewModel() {
 
     // ── Search state ──────────────────────────────────────────────────────────
@@ -241,13 +245,30 @@ class FoodViewModel(
             try {
                 val response = profileApi.getGoals()
                 if (response.isSuccessful) {
-                    _nutritionGoals.value = response.body()?.toDomain()
+                    val body = response.body()
+                    _nutritionGoals.value = body?.toDomain()
+                    if (body != null) {
+                        val uid = runCatching { currentUid() }.getOrNull()
+                        if (uid != null) runCatching { profileSnapshots?.save(uid, null, body) }
+                    }
+                } else {
+                    // non-2xx (inclusiv 404 fără profil) → rămâne null, UI folosește defaults
+                    loadGoalsFromSnapshot()
                 }
-                // non-2xx (inclusiv 404 fără profil) → rămâne null, UI folosește defaults
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (_: Exception) {
-                // network error → rămâne null, UI folosește defaults
+                // network error → ultimele obiective salvate, altfel defaults
+                loadGoalsFromSnapshot()
             }
         }
+    }
+
+    private suspend fun loadGoalsFromSnapshot() {
+        if (_nutritionGoals.value != null) return
+        val uid = runCatching { currentUid() }.getOrNull() ?: return
+        val goals = runCatching { profileSnapshots?.read(uid)?.goals }.getOrNull() ?: return
+        if (_nutritionGoals.value == null) _nutritionGoals.value = goals.toDomain()
     }
 
     // ── Date-driven journal (local mirror + op queue, see JournalRepository) ──
