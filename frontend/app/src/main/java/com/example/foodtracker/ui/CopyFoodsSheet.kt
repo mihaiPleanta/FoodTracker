@@ -92,7 +92,7 @@ fun CopyFoodsSheet(
     LaunchedEffect(copy) { copy.copied.collect { currentOnDismiss() } }
 
     var showDatePicker by remember { mutableStateOf(false) }
-    var editingId by remember { mutableStateOf<Long?>(null) }
+    var editingId by remember { mutableStateOf<String?>(null) }
     // A day change resets selection/edits in the VM, so an open editor must not outlive it.
     LaunchedEffect(state.selectedDay) { editingId = null }
 
@@ -382,9 +382,9 @@ private fun CandidateList(
     candidates: List<CopyCandidate>,
     groupByMeal: Boolean,
     accentColor: Color,
-    onToggle: (Long) -> Unit,
+    onToggle: (String) -> Unit,
     onToggleMeal: (String) -> Unit,
-    onEdit: (Long) -> Unit,
+    onEdit: (String) -> Unit,
 ) {
     val checkColors = CheckboxDefaults.colors(checkedColor = accentColor, checkmarkColor = Color.Black)
     LazyColumn(Modifier.fillMaxWidth()) {
@@ -425,8 +425,8 @@ private fun CandidateList(
 private fun CandidateRow(
     c: CopyCandidate,
     checkColors: androidx.compose.material3.CheckboxColors,
-    onToggle: (Long) -> Unit,
-    onEdit: (Long) -> Unit,
+    onToggle: (String) -> Unit,
+    onEdit: (String) -> Unit,
 ) {
     val l = c.logged
     val portion = if (l.unit != null && l.unitQty != null) {

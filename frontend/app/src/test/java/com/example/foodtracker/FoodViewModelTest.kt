@@ -712,10 +712,10 @@ class FoodViewModelTest {
         assertFalse(tracker.wasLogged(java.time.LocalDate.now(), "Dinner"))
     }
 
-    // ── Copy (server copy until the copy sheet uses the mirror) ─────────────────
+    // ── Copy (local, through the mirror) ─────────────────
 
     @Test
-    fun refreshAfterServerCopy_showsCopiedRows_andUndoQueuesDeletes() = runTest(testDispatcher) {
+    fun onCopied_showsCopiedRows_andUndoRemovesThem() = runTest(testDispatcher) {
         val key = todayKey()
         val journal = journalWithBreakfast(serverLog(1, key, name = "Oats"))
         val vm = newVm(journal)
@@ -724,24 +724,22 @@ class FoodViewModelTest {
         val changes = countEmissions(vm.foodLogsChanged)
         advanceUntilIdle()
 
-        // POST /food-logs/copy created two rows on the server.
-        val copied = listOf(serverLog(100, key, "BREAKFAST", "Eggs"), serverLog(101, key, "DINNER", "Rice"))
-        journal.logsApi.days[key] = DayResponseDto(
-            mapOf("breakfast" to listOf(serverLog(1, key, name = "Oats"), copied[0]), "dinner" to listOf(copied[1])),
-            0f, null,
+        val source = listOf(
+            "Breakfast" to serverLog(100, key, "BREAKFAST", "Eggs").toLogged(),
+            "Dinner" to serverLog(101, key, "DINNER", "Rice").toLogged(),
         )
-        vm.refreshAfterServerCopy(key, copied.map { it.meal })
+        val ids = journal.repo.copyLogs(java.time.LocalDate.parse(key), source)
+        vm.onCopied(key, setOf("Breakfast", "Dinner"))
         advanceUntilIdle()
         assertEquals(listOf("Oats", "Eggs"), breakfast().map { it.food.name })
         assertEquals(listOf("Rice"), dinner().map { it.food.name })
         assertEquals(1, changes())
 
-        vm.undoCopy(key, copied.map { it.clientId })
+        vm.undoCopy(key, ids)
         advanceUntilIdle()
 
         assertEquals(listOf("Oats"), breakfast().map { it.food.name })
         assertEquals(emptyList<String>(), dinner().map { it.food.name })
-        assertEquals(copied.map { SyncOp.DeleteLog(it.clientId) }, journal.ops())
         assertEquals(2, changes())
     }
 

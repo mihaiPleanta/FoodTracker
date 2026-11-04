@@ -141,7 +141,13 @@ class MainActivity : ComponentActivity() {
             // Activity-scoped like recipeViewModel; reset on logout so lists never leak between accounts.
             val quickPicksViewModel: QuickPicksViewModel = viewModel()
             val portionsViewModel: PortionsViewModel = viewModel()
-            val copyViewModel: CopyViewModel = viewModel()
+            val copyViewModel: CopyViewModel = viewModel(
+                factory = remember {
+                    viewModelFactory {
+                        initializer { CopyViewModel(journal = JournalProvider.repository(applicationContext)) }
+                    }
+                },
+            )
             val statsViewModel: StatsViewModel = viewModel()
             val streakViewModel: StreakViewModel = viewModel(
                 factory = remember {

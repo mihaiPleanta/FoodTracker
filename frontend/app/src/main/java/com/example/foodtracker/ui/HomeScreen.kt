@@ -173,8 +173,8 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
 
     LaunchedEffect(Unit) {
         copy.copied.collect { r ->
-            viewModel.refreshAfterServerCopy(r.targetDateKey, r.logs.map { it.meal })
-            val n = r.logs.size
+            viewModel.onCopied(r.targetDateKey, r.meals)
+            val n = r.clientIds.size
             val res = resources.getQuantityString(R.plurals.copy_done, n, n)
             launch {
                 val result = snackbarHostState.showSnackbar(
@@ -183,7 +183,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
                     duration = SnackbarDuration.Short,
                 )
                 if (result == SnackbarResult.ActionPerformed) {
-                    viewModel.undoCopy(r.targetDateKey, r.logs.map { it.clientId })
+                    viewModel.undoCopy(r.targetDateKey, r.clientIds)
                 }
             }
         }

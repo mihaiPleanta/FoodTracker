@@ -6,17 +6,15 @@ import androidx.lifecycle.viewModelScope
 import com.example.foodtracker.R
 import com.example.foodtracker.api.LogsApi
 import com.example.foodtracker.api.RetrofitInstance
+import com.example.foodtracker.data.journal.JournalRepository
+import com.example.foodtracker.data.journal.LocalDay
 import com.example.foodtracker.model.DayResponseDto
 import com.example.foodtracker.model.FoodIngredient
-import com.example.foodtracker.model.FoodLogCopyItemDto
-import com.example.foodtracker.model.FoodLogCopyRequestDto
-import com.example.foodtracker.model.FoodLogDto
 import com.example.foodtracker.model.FoodLogSummaryDto
 import com.example.foodtracker.model.LoggedFood
 import com.example.foodtracker.model.MEAL_ORDER
 import com.example.foodtracker.model.mealKeyToBackend
 import com.example.foodtracker.model.mealNameFromBackend
-import com.example.foodtracker.model.toDto
 import com.example.foodtracker.model.totalGrams
 import com.example.foodtracker.model.withIngredients
 import kotlinx.coroutines.CancellationException
@@ -27,10 +25,9 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import retrofit2.HttpException
-import java.io.IOException
 import java.time.LocalDate
 import kotlin.math.roundToInt
 
@@ -40,7 +37,7 @@ sealed interface CopyMode {
 }
 
 data class CopyCandidate(
-    val sourceId: Long,
+    val sourceId: String,
     val mealName: String,
     val logged: LoggedFood,
     val checked: Boolean = true,
@@ -70,7 +67,7 @@ data class CopyUiState(
         get() = (source as? SourceDayState.Loaded)?.candidates?.count { it.checked } ?: 0
 }
 
-data class CopyResult(val targetDateKey: String, val logs: List<FoodLogDto>)
+data class CopyResult(val targetDateKey: String, val clientIds: List<String>, val meals: Set<String> = emptySet())
 
 const val COPY_STRIP_DAYS = 7
 const val COPY_PRESELECT_WINDOW_DAYS = 30L
@@ -88,6 +85,15 @@ fun daysWithContent(summary: FoodLogSummaryDto, mode: CopyMode): Set<LocalDate> 
         .toSet()
 }
 
+/** Same as above, from mirror days. */
+fun daysWithContent(days: List<LocalDay>, mode: CopyMode): Set<LocalDate> =
+    days.filter { day ->
+        when (mode) {
+            is CopyMode.Meal -> day.meals[mode.mealName].orEmpty().isNotEmpty()
+            CopyMode.Day -> day.meals.values.any { it.isNotEmpty() }
+        }
+    }.map { it.date }.toSet()
+
 fun preselectDay(days: Set<LocalDate>): LocalDate? = days.maxOrNull()
 
 fun candidatesFrom(day: DayResponseDto, mode: CopyMode): List<CopyCandidate> {
@@ -97,7 +103,19 @@ fun candidatesFrom(day: DayResponseDto, mode: CopyMode): List<CopyCandidate> {
     }
     return meals.flatMap { name ->
         day.foodsByMeal[mealKeyToBackend(name).lowercase()].orEmpty().map { dto ->
-            CopyCandidate(dto.id, mealNameFromBackend(dto.meal), dto.toLogged())
+            CopyCandidate(dto.clientId, mealNameFromBackend(dto.meal), dto.toLogged())
+        }
+    }
+}
+
+fun candidatesFrom(day: LocalDay, mode: CopyMode): List<CopyCandidate> {
+    val meals = when (mode) {
+        is CopyMode.Meal -> listOf(mode.mealName)
+        CopyMode.Day -> MEAL_ORDER
+    }
+    return meals.flatMap { name ->
+        day.meals[name].orEmpty().mapNotNull { l ->
+            l.clientId?.let { CopyCandidate(it, name, l) }
         }
     }
 }
@@ -107,6 +125,7 @@ fun candidatesFrom(day: DayResponseDto, mode: CopyMode): List<CopyCandidate> {
  * [resetUserState].
  */
 class CopyViewModel(
+    private val journal: JournalRepository,
     private val logsApi: LogsApi = RetrofitInstance.logsApi,
 ) : ViewModel() {
 
@@ -134,11 +153,19 @@ class CopyViewModel(
         )
         openJob = viewModelScope.launch {
             try {
-                val summary = logsApi.getFoodLogSummary(
-                    from = targetDate.minusDays(COPY_PRESELECT_WINDOW_DAYS).toString(),
-                    to = targetDate.minusDays(1).toString(),
-                )
-                val days = daysWithContent(summary, mode)
+                val from = targetDate.minusDays(COPY_PRESELECT_WINDOW_DAYS)
+                val to = targetDate.minusDays(1)
+                val days = if (journal.isCovered(from, to)) {
+                    val mirrored = mutableListOf<LocalDay>()
+                    var d = from
+                    while (!d.isAfter(to)) {
+                        mirrored += journal.observeDay(d).first()
+                        d = d.plusDays(1)
+                    }
+                    daysWithContent(mirrored, mode)
+                } else {
+                    daysWithContent(logsApi.getFoodLogSummary(from = from.toString(), to = to.toString()), mode)
+                }
                 var toLoad: LocalDate? = null
                 _state.update {
                     if (it.selectedDay != null) {
@@ -194,7 +221,12 @@ class CopyViewModel(
         dayJob?.cancel()
         val job = viewModelScope.launch {
             val result = try {
-                SourceDayState.Loaded(candidatesFrom(logsApi.getDay(day.toString()), _state.value.mode))
+                val mode = _state.value.mode
+                if (journal.isCovered(day, day)) {
+                    SourceDayState.Loaded(candidatesFrom(journal.observeDay(day).first(), mode))
+                } else {
+                    SourceDayState.Loaded(candidatesFrom(logsApi.getDay(day.toString()), mode))
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -212,10 +244,10 @@ class CopyViewModel(
         }
     }
 
-    private fun editCandidate(sourceId: Long, edit: (CopyCandidate) -> CopyCandidate) =
+    private fun editCandidate(sourceId: String, edit: (CopyCandidate) -> CopyCandidate) =
         updateCandidates { list -> list.map { if (it.sourceId == sourceId) edit(it) else it } }
 
-    fun toggle(sourceId: Long) = editCandidate(sourceId) { it.copy(checked = !it.checked) }
+    fun toggle(sourceId: String) = editCandidate(sourceId) { it.copy(checked = !it.checked) }
 
     fun toggleMeal(mealName: String) = updateCandidates { list ->
         val group = list.filter { it.mealName == mealName }
@@ -223,12 +255,12 @@ class CopyViewModel(
         list.map { if (it.mealName == mealName) it.copy(checked = target) else it }
     }
 
-    fun updatePortion(sourceId: Long, grams: Int, unit: String?, unitQty: Float?) =
+    fun updatePortion(sourceId: String, grams: Int, unit: String?, unitQty: Float?) =
         editCandidate(sourceId) {
             it.copy(logged = it.logged.copy(grams = grams, unit = unit, unitQty = unitQty))
         }
 
-    fun updateIngredients(sourceId: Long, ingredients: List<FoodIngredient>) {
+    fun updateIngredients(sourceId: String, ingredients: List<FoodIngredient>) {
         if (ingredients.isEmpty()) return
         editCandidate(sourceId) {
             it.copy(
@@ -248,32 +280,15 @@ class CopyViewModel(
         if (s.copying) return
         val checked = (s.source as? SourceDayState.Loaded)?.candidates?.filter { it.checked }.orEmpty()
         if (checked.isEmpty()) return
-        val body = FoodLogCopyRequestDto(
-            toDate = s.targetDate.toString(),
-            items = checked.map {
-                FoodLogCopyItemDto(
-                    sourceId = it.sourceId,
-                    grams = it.logged.grams,
-                    unit = it.logged.unit,
-                    unitQty = it.logged.unitQty,
-                    ingredients = if (it.ingredientsEdited) it.logged.food.ingredients!!.map { i -> i.toDto() } else null,
-                )
-            },
-        )
+        val target = s.targetDate
         _state.update { it.copy(copying = true) }
         copyJob = viewModelScope.launch {
             try {
-                val logs = logsApi.copyFoodLogs(body)
+                val ids = journal.copyLogs(target, checked.map { it.mealName to it.logged })
                 _state.update { it.copy(copying = false) }
-                _copied.tryEmit(CopyResult(body.toDate, logs))
+                _copied.tryEmit(CopyResult(target.toString(), ids, checked.map { it.mealName }.toSet()))
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: IOException) {
-                _state.update { it.copy(copying = false) }
-                _errors.tryEmit(FoodViewModel.ToastEvent(R.string.error_no_internet))
-            } catch (e: HttpException) {
-                _state.update { it.copy(copying = false) }
-                _errors.tryEmit(FoodViewModel.ToastEvent(R.string.error_save, e.code()))
             } catch (e: Throwable) {
                 _state.update { it.copy(copying = false) }
                 _errors.tryEmit(FoodViewModel.ToastEvent(R.string.error_save))

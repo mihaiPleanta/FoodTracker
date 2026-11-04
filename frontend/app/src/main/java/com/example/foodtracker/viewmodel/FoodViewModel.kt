@@ -569,24 +569,12 @@ class FoodViewModel(
         return clientId
     }
 
-    /**
-     * Temporary (until the copy sheet copies through the mirror): logs already created by
-     * `POST /food-logs/copy` reach the mirror through a refresh of [dateKey].
-     */
-    fun refreshAfterServerCopy(dateKey: String, backendMeals: List<String>) {
-        if (backendMeals.isEmpty()) return
+    /** After a local copy the mirror already emits; only the reminder hints are needed. */
+    fun onCopied(dateKey: String, meals: Set<String>) {
         val date = LocalDate.parse(dateKey)
         _foodLogsChanged.tryEmit(Unit)
         viewModelScope.launch {
-            backendMeals.map { mealNameFromBackend(it) }.distinct()
-                .forEach { meal -> runCatching { mealLogTracker.markLogged(date, meal) } }
-            try {
-                journal.refreshDay(date)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Throwable) {
-                // Offline: the next refresh brings the copied rows.
-            }
+            meals.forEach { meal -> runCatching { mealLogTracker.markLogged(date, meal) } }
         }
     }
 
