@@ -245,6 +245,13 @@
     <string name="settings_usda_data">Date nutriționale alimente generice</string>
     <string name="settings_usda_source">USDA FoodData Central (domeniu public)</string>
     <string name="settings_logout_confirm">Ești sigur că vrei să te deconectezi?</string>
+    <string name="logout_unsynced_title">Modificări nesincronizate</string>
+    <plurals name="logout_unsynced_body">
+        <item quantity="one">Ai %d modificare nesincronizată. Dacă te deloghezi acum, se pierde.</item>
+        <item quantity="few">Ai %d modificări nesincronizate. Dacă te deloghezi acum, se pierd.</item>
+        <item quantity="other">Ai %d de modificări nesincronizate. Dacă te deloghezi acum, se pierd.</item>
+    </plurals>
+    <string name="logout_anyway">Deloghează oricum</string>
     <string name="settings_delete_confirm">Această acțiune este ireversibilă. Ești sigur?</string>
 
     <!-- Scaffold -->

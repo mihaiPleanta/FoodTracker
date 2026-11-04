@@ -35,8 +35,11 @@ import com.example.foodtracker.model.AppLanguage
 import com.example.foodtracker.data.TOLERANCE_OPTIONS
 import com.example.foodtracker.ui.theme.GlassColors
 import com.example.foodtracker.ui.theme.glassCard
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.example.foodtracker.R
+import com.example.foodtracker.data.LogoutCheck
+import com.example.foodtracker.data.LogoutCoordinator
 import com.example.foodtracker.viewmodel.AuthViewModel
 import com.example.foodtracker.viewmodel.DeleteAccountState
 import com.example.foodtracker.viewmodel.FoodViewModel
@@ -49,6 +52,7 @@ fun SettingsScreen(
     navController: NavController,
     viewModel: FoodViewModel,
     authViewModel: AuthViewModel,
+    logoutCoordinator: LogoutCoordinator,
     onLogout: () -> Unit,
     onAccountDeleted: () -> Unit,
 ) {
@@ -71,6 +75,8 @@ fun SettingsScreen(
     }
 
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var checkingLogout by remember { mutableStateOf(false) }
+    var unsyncedCount by remember { mutableStateOf<Int?>(null) }
     var editingMeal by remember { mutableStateOf<MealReminderScheduler.Meal?>(null) }
     var editingDayComplete by remember { mutableStateOf(false) }
     var editingStreak by remember { mutableStateOf(false) }
@@ -481,16 +487,67 @@ fun SettingsScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = { showLogoutDialog = false; onLogout() }) {
-                    Text(
-                        logoutLabel,
+                if (checkingLogout) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
                         color = GlassColors.accentOrange,
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    TextButton(onClick = {
+                        checkingLogout = true
+                        scope.launch {
+                            val check = try {
+                                logoutCoordinator.tryLogout()
+                            } finally {
+                                checkingLogout = false
+                            }
+                            showLogoutDialog = false
+                            when (check) {
+                                LogoutCheck.Ready -> onLogout()
+                                is LogoutCheck.Unsynced -> unsyncedCount = check.count
+                            }
+                        }
+                    }) {
+                        Text(
+                            logoutLabel,
+                            color = GlassColors.accentOrange,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialog = false }) {
+                    Text(cancelLabel, color = GlassColors.textSecondary)
+                }
+            },
+            containerColor = GlassColors.cardBackground,
+            shape = RoundedCornerShape(20.dp)
+        )
+    }
+
+    unsyncedCount?.let { count ->
+        AlertDialog(
+            onDismissRequest = { unsyncedCount = null },
+            title = { Text(stringResource(R.string.logout_unsynced_title), color = GlassColors.textPrimary) },
+            text = {
+                Text(
+                    pluralStringResource(R.plurals.logout_unsynced_body, count, count),
+                    color = GlassColors.textSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { unsyncedCount = null; onLogout() }) {
+                    Text(
+                        stringResource(R.string.logout_anyway),
+                        color = Color(0xFFFF4444),
                         fontWeight = FontWeight.Bold
                     )
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showLogoutDialog = false }) {
+                TextButton(onClick = { unsyncedCount = null }) {
                     Text(cancelLabel, color = GlassColors.textSecondary)
                 }
             },

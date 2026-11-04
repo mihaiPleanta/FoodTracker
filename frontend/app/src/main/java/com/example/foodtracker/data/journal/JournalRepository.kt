@@ -259,6 +259,11 @@ class JournalRepository(
     /** True while a locally written weight for [date] hasn't been accepted by the server. */
     suspend fun isWeightPending(date: LocalDate): Boolean = dao.getWeight(date.toString())?.pending == true
 
+    /** Last successful quick-pick response (recent per meal / favorites), served when the network fails. */
+    suspend fun saveQuickPicks(key: String, json: String) = dao.upsertQuickPick(QuickPickEntity(key, json))
+
+    suspend fun readQuickPicks(key: String): String? = dao.getQuickPick(key)?.json
+
     suspend fun clearAll() {
         tx.run {
             clears.incrementAndGet()

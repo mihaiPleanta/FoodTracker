@@ -242,6 +242,12 @@
     <string name="settings_usda_data">Generic food nutrition data</string>
     <string name="settings_usda_source">USDA FoodData Central (public domain)</string>
     <string name="settings_logout_confirm">Are you sure you want to log out?</string>
+    <string name="logout_unsynced_title">Unsynced changes</string>
+    <plurals name="logout_unsynced_body">
+        <item quantity="one">You have %d unsynced change. If you log out now, it will be lost.</item>
+        <item quantity="other">You have %d unsynced changes. If you log out now, they\'ll be lost.</item>
+    </plurals>
+    <string name="logout_anyway">Log out anyway</string>
     <string name="settings_delete_confirm">This action is irreversible. Are you sure?</string>
 
     <!-- Scaffold -->

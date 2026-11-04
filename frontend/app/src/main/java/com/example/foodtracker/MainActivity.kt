@@ -45,6 +45,7 @@ import com.example.foodtracker.api.RetrofitInstance
 import com.example.foodtracker.data.DataStoreSettingsRepository
 import com.example.foodtracker.data.FoodRepository
 import com.example.foodtracker.data.MealLogTracker
+import com.example.foodtracker.data.LogoutCoordinator
 import com.example.foodtracker.data.ProfileSnapshotStore
 import com.example.foodtracker.data.profileSnapshotDataStore
 import com.example.foodtracker.data.StreakSnapshotStore
@@ -78,6 +79,7 @@ import com.example.foodtracker.viewmodel.StreakViewModel
 import java.net.URLDecoder
 import java.net.URLEncoder
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -90,33 +92,6 @@ class MainActivity : ComponentActivity() {
         val mealIcon: String,
         val accentHex: String,
     )
-
-    /** The journal mirror and its unsent queue belong to the account that is leaving. */
-    private fun clearJournal() {
-        runCatching {
-            WorkManager.getInstance(applicationContext).cancelUniqueWork(WorkManagerSyncScheduler.UNIQUE_NAME)
-        }
-        lifecycleScope.launch {
-            try {
-                JournalProvider.repository(applicationContext).clearAll()
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (_: Exception) {
-            }
-        }
-    }
-
-    /** Private custom foods must not survive in the Room cache for the next account on this device. */
-    private fun clearFoodCache(repository: FoodRepository) {
-        lifecycleScope.launch {
-            try {
-                repository.clearAll()
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (_: Exception) {
-            }
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -132,6 +107,22 @@ class MainActivity : ComponentActivity() {
                 )
             }
             val profileSnapshotStore = remember { ProfileSnapshotStore(applicationContext.profileSnapshotDataStore) }
+            val logoutCoordinator = remember {
+                val journal = JournalProvider.repository(applicationContext)
+                val processor = JournalProvider.processor(applicationContext)
+                LogoutCoordinator(
+                    sync = processor::syncNow,
+                    pendingCount = { journal.pendingCount.first() },
+                    clearLocal = {
+                        runCatching {
+                            WorkManager.getInstance(applicationContext).cancelUniqueWork(WorkManagerSyncScheduler.UNIQUE_NAME)
+                        }
+                        journal.clearAll()
+                        profileSnapshotStore.clear()
+                        foodRepository.clearAll()
+                    },
+                )
+            }
             val foodViewModelFactory = remember {
                 FoodViewModelFactory(
                     settingsRepository = DataStoreSettingsRepository(applicationContext.settingsDataStore),
@@ -155,7 +146,11 @@ class MainActivity : ComponentActivity() {
             // bottom bar's saveState/restoreState keeps the previous account's recipes.
             val recipeViewModel: RecipeViewModel = viewModel()
             // Activity-scoped like recipeViewModel; reset on logout so lists never leak between accounts.
-            val quickPicksViewModel: QuickPicksViewModel = viewModel()
+            val quickPicksViewModel: QuickPicksViewModel = viewModel(
+                factory = viewModelFactory {
+                    initializer { QuickPicksViewModel(journal = JournalProvider.repository(applicationContext)) }
+                }
+            )
             val portionsViewModel: PortionsViewModel = viewModel()
             val copyViewModel: CopyViewModel = viewModel(
                 factory = remember {
@@ -442,6 +437,7 @@ class MainActivity : ComponentActivity() {
                                         navController = navController,
                                         viewModel = viewModel,
                                         authViewModel = authViewModel,
+                                        logoutCoordinator = logoutCoordinator,
                                         onLogout = {
                                             authViewModel.logout()
                                             viewModel.resetUserState()
@@ -452,10 +448,17 @@ class MainActivity : ComponentActivity() {
                                             statsViewModel.resetUserState()
                                             streakViewModel.resetUserState()
                                             customFoodViewModel.resetUserState()
-                                            clearFoodCache(foodRepository)
-                                            clearJournal()
-                                            navController.navigate("login") {
-                                                popUpTo(0) { inclusive = true }
+                                            // Wipe before leaving, so a fast re-login can't race the clear.
+                                            lifecycleScope.launch {
+                                                try {
+                                                    logoutCoordinator.clearLocal()
+                                                } catch (e: kotlinx.coroutines.CancellationException) {
+                                                    throw e
+                                                } catch (_: Exception) {
+                                                }
+                                                navController.navigate("login") {
+                                                    popUpTo(0) { inclusive = true }
+                                                }
                                             }
                                         },
                                         onAccountDeleted = {
@@ -467,10 +470,17 @@ class MainActivity : ComponentActivity() {
                                             statsViewModel.resetUserState()
                                             streakViewModel.resetUserState()
                                             customFoodViewModel.resetUserState()
-                                            clearFoodCache(foodRepository)
-                                            clearJournal()
-                                            navController.navigate("login") {
-                                                popUpTo(0) { inclusive = true }
+                                            // Wipe before leaving, so a fast re-login can't race the clear.
+                                            lifecycleScope.launch {
+                                                try {
+                                                    logoutCoordinator.clearLocal()
+                                                } catch (e: kotlinx.coroutines.CancellationException) {
+                                                    throw e
+                                                } catch (_: Exception) {
+                                                }
+                                                navController.navigate("login") {
+                                                    popUpTo(0) { inclusive = true }
+                                                }
                                             }
                                         }
                                     )

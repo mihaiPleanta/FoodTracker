@@ -294,4 +294,44 @@ class QuickPicksViewModelTest {
         assertEquals("new", items.first().food.barcode)
         assertTrue(items.none { it.food.barcode == "f20" })
     }
+
+    @Test
+    fun recentServedFromCacheOffline() = runTest(testDispatcher) {
+        val j = TestJournal()
+        val api = FakeQuickPicksApi().apply { recent = listOf(RecentFoodDto(food("a").toDto(), 150)) }
+        val vm = QuickPicksViewModel(api, j.repo)
+        vm.load("Breakfast")
+        advanceUntilIdle()
+        assertTrue(j.repo.readQuickPicks("recent:BREAKFAST") != null)
+
+        api.failRecent = true
+        vm.load("Breakfast")
+        advanceUntilIdle()
+        val recent = vm.recent.value as QuickListState.Loaded
+        assertEquals("a", recent.items.single().food.barcode)
+        assertEquals(150, recent.items.single().lastGrams)
+    }
+
+    @Test
+    fun favoritesServedFromCacheOffline() = runTest(testDispatcher) {
+        val j = TestJournal()
+        val api = FakeQuickPicksApi().apply { favorites = listOf(food("f").toDto()) }
+        val vm = QuickPicksViewModel(api, j.repo)
+        vm.load("Lunch")
+        advanceUntilIdle()
+
+        api.failFavorites = true
+        vm.load("Lunch")
+        advanceUntilIdle()
+        assertEquals(setOf("f"), favCodes(vm))
+    }
+
+    @Test
+    fun offlineWithoutCacheStillErrors() = runTest(testDispatcher) {
+        val api = FakeQuickPicksApi().apply { failRecent = true }
+        val vm = QuickPicksViewModel(api, TestJournal().repo)
+        vm.load("Lunch")
+        advanceUntilIdle()
+        assertTrue(vm.recent.value is QuickListState.Error)
+    }
 }

@@ -6,7 +6,12 @@ import androidx.lifecycle.viewModelScope
 import com.example.foodtracker.R
 import com.example.foodtracker.api.QuickPicksApi
 import com.example.foodtracker.api.RetrofitInstance
+import com.example.foodtracker.data.journal.JournalRepository
 import com.example.foodtracker.model.FoodItem
+import com.example.foodtracker.model.FoodItemDto
+import com.example.foodtracker.model.RecentFoodDto
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import com.example.foodtracker.model.RecentFood
 import com.example.foodtracker.model.mealKeyToBackend
 import com.example.foodtracker.model.toDto
@@ -38,7 +43,9 @@ sealed interface QuickListState<out T> {
  */
 class QuickPicksViewModel(
     private val api: QuickPicksApi = RetrofitInstance.quickPicksApi,
+    private val journal: JournalRepository? = null,
 ) : ViewModel() {
+    private val gson = Gson()
 
     private val _recent = MutableStateFlow<QuickListState<RecentFood>>(QuickListState.Loading)
     val recent: StateFlow<QuickListState<RecentFood>> = _recent.asStateFlow()
@@ -136,26 +143,60 @@ class QuickPicksViewModel(
     }
 
     private suspend fun fetchRecent(meal: String) {
+        val key = "recent:${mealKeyToBackend(meal)}"
         _recent.value = try {
-            QuickListState.Loaded(api.getRecent(mealKeyToBackend(meal)).map { it.toDomain() })
+            val dtos = api.getRecent(mealKeyToBackend(meal))
+            cache(key, gson.toJson(dtos))
+            QuickListState.Loaded(dtos.map { it.toDomain() })
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            QuickListState.Error(errorRes(e))
+            val cached = if (isOfflineFailure(e)) readCache<RecentFoodDto>(key) else null
+            if (cached != null) QuickListState.Loaded(cached.map { it.toDomain() })
+            else QuickListState.Error(errorRes(e))
         }
     }
 
     private suspend fun fetchFavorites() {
         _favorites.value = try {
-            QuickListState.Loaded(api.getFavorites().map { it.toDomain() })
+            val dtos = api.getFavorites()
+            cache(FAVORITES_KEY, gson.toJson(dtos))
+            QuickListState.Loaded(dtos.map { it.toDomain() })
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            QuickListState.Error(errorRes(e))
+            val cached = if (isOfflineFailure(e)) readCache<FoodItemDto>(FAVORITES_KEY) else null
+            if (cached != null) QuickListState.Loaded(cached.map { it.toDomain() })
+            else QuickListState.Error(errorRes(e))
         }
+    }
+
+    private fun isOfflineFailure(e: Exception) = e is IOException || (e is HttpException && e.code() >= 500)
+
+    private suspend fun cache(key: String, json: String) {
+        try {
+            journal?.saveQuickPicks(key, json)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+        }
+    }
+
+    private suspend inline fun <reified T> readCache(key: String): List<T>? = try {
+        journal?.readQuickPicks(key)?.let {
+            gson.fromJson<List<T>>(it, TypeToken.getParameterized(List::class.java, T::class.java).type)
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        null
     }
 
     @StringRes
     private fun errorRes(e: Exception): Int =
         if (e is IOException) R.string.error_no_internet else R.string.error_generic
+
+    private companion object {
+        const val FAVORITES_KEY = "favorites"
+    }
 }
