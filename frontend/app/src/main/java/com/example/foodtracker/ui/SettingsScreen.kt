@@ -45,6 +45,7 @@ import com.example.foodtracker.viewmodel.DeleteAccountState
 import com.example.foodtracker.viewmodel.FoodViewModel
 import com.example.foodtracker.util.notifications.MealReminderScheduler
 import com.example.foodtracker.util.notifications.withReminder
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 @Composable
@@ -76,6 +77,7 @@ fun SettingsScreen(
 
     var showLogoutDialog by remember { mutableStateOf(false) }
     var checkingLogout by remember { mutableStateOf(false) }
+    var logoutJob by remember { mutableStateOf<Job?>(null) }
     var unsyncedCount by remember { mutableStateOf<Int?>(null) }
     var editingMeal by remember { mutableStateOf<MealReminderScheduler.Meal?>(null) }
     var editingDayComplete by remember { mutableStateOf(false) }
@@ -478,7 +480,7 @@ fun SettingsScreen(
 
     if (showLogoutDialog) {
         AlertDialog(
-            onDismissRequest = { showLogoutDialog = false },
+            onDismissRequest = { logoutJob?.cancel(); showLogoutDialog = false },
             title = { Text(logoutLabel, color = GlassColors.textPrimary) },
             text  = {
                 Text(
@@ -496,7 +498,7 @@ fun SettingsScreen(
                 } else {
                     TextButton(onClick = {
                         checkingLogout = true
-                        scope.launch {
+                        logoutJob = scope.launch {
                             val check = try {
                                 logoutCoordinator.tryLogout()
                             } finally {
@@ -518,7 +520,7 @@ fun SettingsScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showLogoutDialog = false }) {
+                TextButton(onClick = { logoutJob?.cancel(); showLogoutDialog = false }) {
                     Text(cancelLabel, color = GlassColors.textSecondary)
                 }
             },

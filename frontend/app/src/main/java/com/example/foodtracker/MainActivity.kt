@@ -45,6 +45,7 @@ import com.example.foodtracker.api.RetrofitInstance
 import com.example.foodtracker.data.DataStoreSettingsRepository
 import com.example.foodtracker.data.FoodRepository
 import com.example.foodtracker.data.MealLogTracker
+import com.example.foodtracker.data.LocalDataWiper
 import com.example.foodtracker.data.LogoutCoordinator
 import com.example.foodtracker.data.ProfileSnapshotStore
 import com.example.foodtracker.data.profileSnapshotDataStore
@@ -81,7 +82,9 @@ import java.net.URLEncoder
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private var pendingDeepLink by mutableStateOf<DeepLink?>(null)
@@ -113,14 +116,18 @@ class MainActivity : ComponentActivity() {
                 LogoutCoordinator(
                     sync = processor::syncNow,
                     pendingCount = { journal.pendingCount.first() },
-                    clearLocal = {
-                        runCatching {
-                            WorkManager.getInstance(applicationContext).cancelUniqueWork(WorkManagerSyncScheduler.UNIQUE_NAME)
-                        }
-                        journal.clearAll()
-                        profileSnapshotStore.clear()
-                        foodRepository.clearAll()
-                    },
+                    clearLocal = LocalDataWiper(
+                        listOf(
+                            { foodRepository.clearAll() },
+                            { profileSnapshotStore.clear() },
+                            {
+                                runCatching {
+                                    WorkManager.getInstance(applicationContext).cancelUniqueWork(WorkManagerSyncScheduler.UNIQUE_NAME)
+                                }
+                            },
+                            { journal.clearAll() },
+                        )
+                    )::wipe,
                 )
             }
             val foodViewModelFactory = remember {
@@ -450,12 +457,7 @@ class MainActivity : ComponentActivity() {
                                             customFoodViewModel.resetUserState()
                                             // Wipe before leaving, so a fast re-login can't race the clear.
                                             lifecycleScope.launch {
-                                                try {
-                                                    logoutCoordinator.clearLocal()
-                                                } catch (e: kotlinx.coroutines.CancellationException) {
-                                                    throw e
-                                                } catch (_: Exception) {
-                                                }
+                                                withContext(NonCancellable) { logoutCoordinator.clearLocal() }
                                                 navController.navigate("login") {
                                                     popUpTo(0) { inclusive = true }
                                                 }
@@ -472,12 +474,7 @@ class MainActivity : ComponentActivity() {
                                             customFoodViewModel.resetUserState()
                                             // Wipe before leaving, so a fast re-login can't race the clear.
                                             lifecycleScope.launch {
-                                                try {
-                                                    logoutCoordinator.clearLocal()
-                                                } catch (e: kotlinx.coroutines.CancellationException) {
-                                                    throw e
-                                                } catch (_: Exception) {
-                                                }
+                                                withContext(NonCancellable) { logoutCoordinator.clearLocal() }
                                                 navController.navigate("login") {
                                                     popUpTo(0) { inclusive = true }
                                                 }

@@ -1,6 +1,7 @@
 package com.example.foodtracker
 
 import com.example.foodtracker.data.LOGOUT_SYNC_TIMEOUT_MS
+import com.example.foodtracker.data.LocalDataWiper
 import com.example.foodtracker.data.LogoutCheck
 import com.example.foodtracker.data.LogoutCoordinator
 import com.example.foodtracker.model.FoodItem
@@ -61,5 +62,18 @@ class LogoutFlowTest {
         val day = j.repo.observeDay(date).first()
         assertEquals(0f, day.hydrationL)
         assertEquals(true, day.meals.values.all { it.isEmpty() })
+    }
+
+    @Test
+    fun wipeRunsAllStepsEvenIfOneFails() = runTest {
+        val ran = mutableListOf<String>()
+        LocalDataWiper(
+            listOf(
+                { ran += "food" },
+                { ran += "journal"; throw IllegalStateException("disk") },
+                { ran += "snapshot" },
+            )
+        ).wipe()
+        assertEquals(listOf("food", "journal", "snapshot"), ran)
     }
 }
