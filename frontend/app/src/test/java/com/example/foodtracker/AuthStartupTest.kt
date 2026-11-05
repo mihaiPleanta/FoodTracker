@@ -21,6 +21,8 @@ import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -111,9 +113,64 @@ class AuthStartupTest {
 
     @Test
     fun otherCodesShowOffline() = runTest {
-        val vm = vm(FakeApi { error(403) }, store())
+        val vm = vm(FakeApi { error(400) }, store())
         vm.start()
         assertEquals(AuthUiState.Offline, vm.uiState.value)
+    }
+
+    @Test
+    fun unauthorizedProfileGoesToLogin() = runTest {
+        for (code in listOf(401, 403)) {
+            val s = store()
+            s.save("u1", profile, null)
+            var signedOut = false
+            val vm = AuthViewModel(
+                snapshots = s, profileApi = FakeApi { error(code) },
+                currentUser = { AuthUser("u1", true) }, signOut = { signedOut = true },
+            )
+            vm.start()
+            assertEquals(AuthUiState.NavigateLogin, vm.uiState.value)
+            assertTrue(signedOut)
+            assertNull(vm.loadedProfile.value)
+        }
+    }
+
+    @Test
+    fun ownerMismatchOnLoginClearsJournalBeforeHome() = runTest {
+        val j = TestJournal()
+        j.uid = "someone-else"
+        j.repo.setHydration(java.time.LocalDate.of(2026, 11, 4), 1.5f)
+        val homeStates = mutableListOf<Int>()
+        val vm = AuthViewModel(
+            snapshots = store(), profileApi = FakeApi { Response.success(profile) },
+            currentUser = { AuthUser("u1", true) },
+            bindJournal = { uid -> j.repo.resetIfOwnedByOther(uid) },
+            onHome = { homeStates += j.repo.pendingCount.first() },
+        )
+        vm.start()
+        assertEquals(AuthUiState.NavigateHome, vm.uiState.value)
+        assertEquals(0, j.repo.pendingCount.first())
+        assertNull(j.repo.ownerUid())
+        assertEquals(listOf(0), homeStates)
+    }
+
+    @Test
+    fun sameOwnerKeepsJournalOnLogin() = runTest {
+        val j = TestJournal()
+        j.uid = "u1"
+        j.repo.setHydration(java.time.LocalDate.of(2026, 11, 4), 1.5f)
+        val s = store()
+        s.save("u1", profile, null)
+        var bound: String? = null
+        val vm = AuthViewModel(
+            snapshots = s, profileApi = FakeApi { throw IOException("offline") },
+            currentUser = { AuthUser("u1", true) },
+            bindJournal = { uid -> bound = uid; j.repo.resetIfOwnedByOther(uid) },
+        )
+        vm.start()
+        assertEquals(AuthUiState.NavigateHome, vm.uiState.value)
+        assertEquals("u1", bound)
+        assertEquals(1, j.repo.pendingCount.first())
     }
 
     @Test

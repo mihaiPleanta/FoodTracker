@@ -84,6 +84,8 @@ data class MealEntry(
     val unitQty: Float? = null,
     val id: Long? = null,
     val pending: Boolean = false,
+    /** Stable local identity (set before the server id exists); keys the swipe row. */
+    val clientId: String? = null,
 )
 
 data class MealSection(
@@ -281,7 +283,7 @@ fun HomeScreen(navController: NavController, viewModel: FoodViewModel, portions:
                 protein          = foods.sumOf { it.protein.toDouble() }.toInt(),
                 carbs            = foods.sumOf { it.carbs.toDouble() }.toInt(),
                 fat              = foods.sumOf { it.fat.toDouble() }.toInt(),
-                entries          = foods.map { MealEntry(it.food.name, it.grams, it.calories, it.food.ingredients != null, it.unit, it.unitQty, it.id, it.pending) },
+                entries          = foods.map { MealEntry(it.food.name, it.grams, it.calories, it.food.ingredients != null, it.unit, it.unitQty, it.id, it.pending, it.clientId) },
                 accentColor      = color
             )
         }
@@ -824,7 +826,7 @@ fun MealCard(
                         .background(meal.accentColor.copy(.12f)))
                     Spacer(Modifier.height(10.dp))
                     meal.entries.forEachIndexed { i, entry ->
-                        key(entry.id ?: "pending-$i-${entry.name}") {
+                        key(entry.clientId ?: entry.id ?: "pending-$i-${entry.name}") {
                             SwipeToDeleteRow(onDelete = { onDeleteEntry(i) }) {
                                 MealEntryRow(entry, meal.accentColor, onEdit = { onEditEntry(i) })
                             }

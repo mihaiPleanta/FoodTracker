@@ -26,7 +26,7 @@ import com.example.foodtracker.data.journal.JournalProvider
 import com.example.foodtracker.model.NutritionGoals
 import com.example.foodtracker.model.StatsGoalsDto
 import com.example.foodtracker.sync.WorkManagerSyncScheduler
-import androidx.work.WorkManager
+import com.example.foodtracker.sync.cancelJournalSync
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -121,9 +121,7 @@ class MainActivity : ComponentActivity() {
                             { foodRepository.clearAll() },
                             { profileSnapshotStore.clear() },
                             {
-                                runCatching {
-                                    WorkManager.getInstance(applicationContext).cancelUniqueWork(WorkManagerSyncScheduler.UNIQUE_NAME)
-                                }
+                                runCatching { cancelJournalSync(applicationContext) }
                             },
                             { journal.clearAll() },
                         )
@@ -145,7 +143,18 @@ class MainActivity : ComponentActivity() {
                     object : androidx.lifecycle.ViewModelProvider.Factory {
                         @Suppress("UNCHECKED_CAST")
                         override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
-                            AuthViewModel(snapshots = profileSnapshotStore) as T
+                            AuthViewModel(
+                                snapshots = profileSnapshotStore,
+                                bindJournal = { uid ->
+                                    JournalProvider.repository(applicationContext).resetIfOwnedByOther(uid) {
+                                        runCatching { cancelJournalSync(applicationContext) }
+                                    }
+                                },
+                                onHome = {
+                                    JournalProvider.repository(applicationContext).refreshWindow()
+                                },
+                                cancelSync = { cancelJournalSync(applicationContext) },
+                            ) as T
                     }
                 }
             )
@@ -261,7 +270,7 @@ class MainActivity : ComponentActivity() {
                         if (event == Lifecycle.Event.ON_RESUME) {
                             streakViewModel.refresh()
                             // Push the offline queue and refresh the local mirror (best-effort).
-                            runCatching { WorkManagerSyncScheduler(applicationContext).requestSync() }
+                            runCatching { WorkManagerSyncScheduler(applicationContext).requestSync(replace = true) }
                             lifecycleOwner.lifecycleScope.launch {
                                 runCatching { JournalProvider.repository(applicationContext).refreshWindow() }
                             }

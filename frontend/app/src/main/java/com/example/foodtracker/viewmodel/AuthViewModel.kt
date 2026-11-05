@@ -100,6 +100,16 @@ class AuthViewModel(
     private val currentUser: () -> AuthUser? = {
         FirebaseAuth.getInstance().currentUser?.let { AuthUser(it.uid, it.isEmailVerified) }
     },
+    private val signOut: () -> Unit = { FirebaseAuth.getInstance().signOut() },
+    /**
+     * Runs (awaited) once the signed-in account is resolved, before Home/Onboarding: wipes a local
+     * journal left by another account (kill / forced sign-out) so its queue never reaches this one.
+     */
+    private val bindJournal: suspend (uid: String) -> Unit = {},
+    /** Launched (best-effort) after landing Home: downloads the mirror window. */
+    private val onHome: suspend () -> Unit = {},
+    /** Stops the background sync before the account is deleted. */
+    private val cancelSync: () -> Unit = {},
 ) : ViewModel() {
 
     private val auth: FirebaseAuth get() = FirebaseAuth.getInstance()
@@ -142,6 +152,8 @@ class AuthViewModel(
         _deleteAccountState.value = DeleteAccountState.Deleting
         viewModelScope.launch {
             try {
+                // A drain running during DELETE /profile could recreate rows for the deleted account.
+                runCatching { cancelSync() }
                 val response = profileApi.deleteAccount()
                 if (response.isSuccessful) {
                     auth.signOut()
@@ -358,6 +370,7 @@ class AuthViewModel(
                 saveSnapshot(dto)
                 _loadedProfile.value = dto.toUserProfile()
                 _uiState.value = AuthUiState.NavigateHome
+                launchOnHome()
             } catch (e: Exception) {
                 _uiState.value = AuthUiState.Error(mapFirebaseError(e))
             }
@@ -391,6 +404,25 @@ class AuthViewModel(
      * network/5xx fall back to the cached profile of this account, otherwise [AuthUiState.Offline].
      */
     private suspend fun fetchProfileState(uid: String): AuthUiState {
+        val state = resolveProfileState(uid)
+        if (state == AuthUiState.NavigateHome || state == AuthUiState.NavigateOnboarding) {
+            try {
+                bindJournal(uid)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Best-effort: the sync worker still refuses to send another account's queue.
+            }
+        }
+        if (state == AuthUiState.NavigateHome) launchOnHome()
+        return state
+    }
+
+    private fun launchOnHome() {
+        viewModelScope.launch { runCatching { onHome() } }
+    }
+
+    private suspend fun resolveProfileState(uid: String): AuthUiState {
         val unreachable = try {
             val response = profileApi.getProfile()
             when {
@@ -403,6 +435,12 @@ class AuthViewModel(
                     return AuthUiState.NavigateHome
                 }
                 response.code() == 404 -> return AuthUiState.NavigateOnboarding
+                // The server no longer accepts this session (revoked / disabled account): sign in again.
+                response.code() == 401 || response.code() == 403 -> {
+                    runCatching { signOut() }
+                    _loadedProfile.value = null
+                    return AuthUiState.NavigateLogin
+                }
                 response.code() >= 500 -> true
                 else -> false
             }

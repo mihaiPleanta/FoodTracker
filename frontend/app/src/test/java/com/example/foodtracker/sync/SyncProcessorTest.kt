@@ -31,6 +31,8 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -104,6 +106,28 @@ private class SDaysApi : DaysApi {
 }
 
 private class NoopScheduler : SyncScheduler { override fun requestSync() = Unit }
+
+/** Serializes transactions like Room's exclusive write transaction. */
+private class MutexTx : TxRunner {
+    private val mutex = kotlinx.coroutines.sync.Mutex()
+    override suspend fun <R> run(block: suspend () -> R): R = mutex.withLock { block() }
+}
+
+/** [onFirstOp] runs right after the queue head is read; [failDeleteOps] makes completing an op throw. */
+private class HookDao(private val inner: FakeUserDataDao = FakeUserDataDao()) :
+    com.example.foodtracker.data.journal.UserDataDao by inner {
+    var onFirstOp: (suspend () -> Unit)? = null
+    var failDeleteOps = false
+    override suspend fun firstOp(): com.example.foodtracker.data.journal.OpEntity? {
+        val head = inner.firstOp()
+        onFirstOp?.let { onFirstOp = null; it() }
+        return head
+    }
+    override suspend fun deleteOps(seqs: List<Long>) {
+        if (failDeleteOps) throw IllegalStateException("disk I/O error")
+        inner.deleteOps(seqs)
+    }
+}
 
 private val oats = FoodItem("123", "Oats", per100g = 380, protein100g = 13f, carbs100g = 60f, fat100g = 7f)
 
@@ -225,5 +249,65 @@ class SyncProcessorTest {
 
         assertEquals(listOf(DrainResult.DONE, DrainResult.DONE), results)
         assertEquals(listOf("create:$a", "create:$b"), logsApi.calls)
+    }
+
+    @Test fun undoBetweenReadAndSendCannotCancelClaimedCreate() = runTest {
+        val dao = HookDao()
+        val repo = JournalRepository(dao, MutexTx(), logsApi, daysApi, NoopScheduler(), { clock++ }, { today })
+        val processor = SyncProcessor(repo, logsApi, daysApi)
+        val a = repo.addLog(today, "Lunch", LoggedFood(oats, 50))
+        // The user undoes the log while the processor is between reading the head and sending it.
+        dao.onFirstOp = {
+            backgroundScope.launch { repo.deleteLogs(listOf(a)) }
+            yield()
+        }
+
+        processor.drain()
+        assertEquals(DrainResult.DONE, processor.drain())
+
+        // The create went out, so the delete must follow it: the log can't reappear on the server.
+        assertEquals(listOf("create:$a", "delete:$a"), logsApi.calls)
+        assertNull(repo.nextOp())
+    }
+
+    @Test fun unexpectedExceptionInDrainReturnsRetry() = runTest {
+        val dao = HookDao()
+        val repo = JournalRepository(dao, MutexTx(), logsApi, daysApi, NoopScheduler(), { clock++ }, { today })
+        val processor = SyncProcessor(repo, logsApi, daysApi)
+        repo.addLog(today, "Lunch", LoggedFood(oats, 50))
+        dao.failDeleteOps = true
+
+        assertEquals(DrainResult.RETRY, processor.drain())
+        assertFalse(repo.nextOp()!!.inFlight)
+        assertFalse(processor.syncNow(5_000))
+
+        dao.failDeleteOps = false
+        assertEquals(DrainResult.DONE, processor.drain())
+        assertNull(repo.nextOp())
+    }
+
+    @Test fun drainRefusesWhenSignedInUidDiffersFromOwner() = runTest {
+        var uid: String? = "uid-a"
+        val repo = JournalRepository(
+            FakeUserDataDao(), MutexTx(), logsApi, daysApi, NoopScheduler(), { clock++ }, { today },
+            meta = com.example.foodtracker.data.journal.InMemoryJournalMeta(),
+            currentUid = { uid },
+        )
+        val processor = SyncProcessor(repo, logsApi, daysApi)
+        repo.addLog(today, "Lunch", LoggedFood(oats, 50))
+        assertEquals("uid-a", repo.ownerUid())
+
+        uid = "uid-b"
+        assertEquals(DrainResult.DONE, processor.drain())
+        assertTrue(logsApi.calls.isEmpty())
+        assertEquals(1, repo.pendingCount.first())
+
+        uid = null
+        assertEquals(DrainResult.DONE, processor.drain())
+        assertTrue(logsApi.calls.isEmpty())
+
+        uid = "uid-a"
+        assertEquals(DrainResult.DONE, processor.drain())
+        assertEquals(1, logsApi.calls.size)
     }
 }

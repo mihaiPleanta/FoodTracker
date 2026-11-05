@@ -4,6 +4,7 @@ import com.example.foodtracker.api.DaysApi
 import com.example.foodtracker.api.LogsApi
 import com.example.foodtracker.data.journal.FakeSyncScheduler
 import com.example.foodtracker.data.journal.FakeUserDataDao
+import com.example.foodtracker.data.journal.InMemoryJournalMeta
 import com.example.foodtracker.data.journal.JournalJson
 import com.example.foodtracker.data.journal.JournalRepository
 import com.example.foodtracker.data.journal.TxRunner
@@ -70,6 +71,9 @@ internal class TestJournal(
     today: () -> LocalDate = { LocalDate.now() },
 ) {
     val dao = FakeUserDataDao()
+    val meta = InMemoryJournalMeta()
+    /** Signed-in account seen by the journal. */
+    var uid: String? = null
     val scheduler = FakeSyncScheduler()
     private var clock = 1_000_000L
     /** When true every transaction throws, as a failing Room database would. */
@@ -87,6 +91,8 @@ internal class TestJournal(
         scheduler = scheduler,
         now = { clock++ },
         today = today,
+        meta = meta,
+        currentUid = { uid },
     )
 
     /** The queued ops, in order. */

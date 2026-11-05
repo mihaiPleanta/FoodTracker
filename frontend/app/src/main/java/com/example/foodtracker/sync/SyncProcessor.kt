@@ -2,6 +2,7 @@ package com.example.foodtracker.sync
 
 import com.example.foodtracker.api.DaysApi
 import com.example.foodtracker.api.LogsApi
+import android.util.Log
 import com.example.foodtracker.data.journal.JournalRepository
 import com.example.foodtracker.model.DayStatusUpdateDto
 import com.example.foodtracker.model.FoodLogDto
@@ -29,10 +30,29 @@ class SyncProcessor(
 
     suspend fun drain(): DrainResult = lock.withLock { drainLocked() }
 
-    private suspend fun drainLocked(): DrainResult {
+    /**
+     * Never throws except [CancellationException]: any other failure (Room, mapping...) releases
+     * the claimed op and asks for a retry. Refuses to send another account's queue.
+     */
+    private suspend fun drainLocked(): DrainResult = try {
+        if (repo.ownerMismatch()) {
+            DrainResult.DONE
+        } else {
+            // An op left "in flight" by a crash, a killed process or a timed-out drain is sent again.
+            repo.releaseInFlight()
+            sendAll()
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        try { Log.w("SyncProcessor", "drain failed", e) } catch (_: Throwable) { }
+        try { repo.releaseInFlight() } catch (c: CancellationException) { throw c } catch (_: Exception) { }
+        DrainResult.RETRY
+    }
+
+    private suspend fun sendAll(): DrainResult {
         while (true) {
-            val queued = repo.nextOp() ?: return DrainResult.DONE
-            repo.markInFlight(queued.seq)
+            val queued = repo.claimNextOp() ?: return DrainResult.DONE
             val sent = send(queued.op)
             when (val outcome = classify(sent.code)) {
                 SyncOutcome.SUCCESS -> repo.completeOp(queued, sent.log)
@@ -45,10 +65,16 @@ class SyncProcessor(
         }
     }
 
-    /** For logout: drains for at most [timeoutMs]; true when the queue is empty afterwards. */
+    /** For logout: drains for at most [timeoutMs]; true when the queue is empty afterwards. Never throws but cancellation. */
     suspend fun syncNow(timeoutMs: Long): Boolean {
         withTimeoutOrNull(timeoutMs) { drain() }
-        return repo.nextOp() == null
+        return try {
+            repo.nextOp() == null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private suspend fun send(op: SyncOp): Sent = when (op) {

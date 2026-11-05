@@ -5,6 +5,7 @@ import com.example.foodtracker.api.DaysApi
 import com.example.foodtracker.api.RetrofitInstance
 import com.example.foodtracker.sync.SyncProcessor
 import com.example.foodtracker.sync.WorkManagerSyncScheduler
+import com.google.firebase.auth.FirebaseAuth
 import java.time.LocalDate
 
 /** Process-wide [JournalRepository] and [SyncProcessor] (the repository's refresh epoch is per instance). */
@@ -34,6 +35,8 @@ object JournalProvider {
             scheduler = WorkManagerSyncScheduler(app),
             now = System::currentTimeMillis,
             today = LocalDate::now,
+            meta = DataStoreJournalMeta(app.journalMetaDataStore),
+            currentUid = { runCatching { FirebaseAuth.getInstance().currentUser?.uid }.getOrNull() },
         )
     }
 }

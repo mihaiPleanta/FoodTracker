@@ -31,7 +31,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
-import java.time.temporal.ChronoUnit
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 
@@ -70,6 +69,10 @@ class JournalRepository(
     private val scheduler: SyncScheduler,
     private val now: () -> Long,
     private val today: () -> LocalDate,
+    /** Window fetch day + owning account; survives the process, cleared by [clearAll]. */
+    private val meta: JournalMetaStore = InMemoryJournalMeta(),
+    /** Signed-in account (FirebaseAuth in production); null when signed out. */
+    private val currentUid: () -> String? = { null },
 ) {
     /** Bumped (inside the tx) by completeOp / rejectOp / clearAll; guards refreshes fetched outside the tx. */
     private val epoch = AtomicLong()
@@ -104,8 +107,10 @@ class JournalRepository(
 
     /** GET /days/{d}; throws IOException / HttpException. */
     suspend fun refreshDay(date: LocalDate) {
+        // Another account's journal: never merge this account's server days into it.
+        if (ownerMismatch()) return
         val key = date.toString()
-        guardedRefresh(fetch = { logsApi.getDay(key) }) { resp ->
+        val applied = guardedRefresh(fetch = { logsApi.getDay(key) }) { resp ->
             val pending = pendingOps()
             // GET /days/{d} carries no goals snapshot: keep the local one while the day stays marked.
             val goals = if (resp.status == null) null else JournalJson.decodeGoals(dao.getDay(key)?.goalsJson)
@@ -113,14 +118,17 @@ class JournalRepository(
             applyServerDay(key, resp.foodsByMeal.values.flatten(), values, pending)
             applyServerWeight(key, resp.weightCheckIn?.weightKg, pending)
         }
+        if (applied) recordOwner()
     }
 
     /** Downloads the whole mirror window (+ weights for the EMA warm-up). Days absent on the server become empty. */
     suspend fun refreshWindow() {
+        if (ownerMismatch()) return
         val t = today()
         val from = t.minusDays(MIRROR_DAYS - 1L)
         val weightFrom = t.minusDays(WEIGHT_MIRROR_DAYS - 1L)
-        guardedRefresh(fetch = {
+        val seenClears = clears.get()
+        val applied = guardedRefresh(fetch = {
             val days = logsApi.getDays(from.toString(), t.toString()).days.associateBy { it.date }
             val weights = logsApi.getWeightCheckIns(weightFrom.toString(), t.toString()).items
                 .associate { it.date to it.weightKg }
@@ -135,14 +143,26 @@ class JournalRepository(
             }
             for (d in datesBetween(weightFrom, t)) applyServerWeight(d.toString(), weights[d.toString()], pending)
         }
+        // A clearAll after the merge means the window belongs to the previous session.
+        if (applied && clears.get() == seenClears) {
+            recordOwner()
+            safely { meta.setWindowFetchedOn(t) }
+        }
     }
 
-    /** True when every day of [from]..[to] is inside the mirror window and was downloaded. */
+    /**
+     * True when every day of [from]..[to] is known locally: inside the window downloaded on
+     * `windowFetchedOn` (that day - 61 .. today, so it survives midnight without a refresh; days
+     * since then only hold local writes, which the queue never loses), or fetched on its own.
+     */
     suspend fun isCovered(from: LocalDate, to: LocalDate): Boolean {
         val t = today()
-        if (from.isAfter(to) || from.isBefore(t.minusDays(MIRROR_DAYS - 1L)) || to.isAfter(t)) return false
-        val fetched = dao.getDays(from.toString(), to.toString()).count { it.fetchedAt != null }
-        return fetched.toLong() == ChronoUnit.DAYS.between(from, to) + 1
+        if (from.isAfter(to) || to.isAfter(t)) return false
+        val windowStart = safely { meta.windowFetchedOn() }?.minusDays(MIRROR_DAYS - 1L)
+        val fetched = dao.getDays(from.toString(), to.toString()).filter { it.fetchedAt != null }.mapTo(HashSet()) { it.date }
+        return datesBetween(from, to).all { d ->
+            (windowStart != null && !d.isBefore(windowStart)) || d.toString() in fetched
+        }
     }
 
     /**
@@ -190,6 +210,7 @@ class JournalRepository(
     }
 
     suspend fun updateLog(clientId: String, logged: LoggedFood) {
+        recordOwner()
         val changed = tx.run {
             val row = dao.getLog(clientId) ?: return@run false
             dao.upsertLogs(listOf(row.copy(payloadJson = JournalJson.encodeLogged(logged), pending = true)))
@@ -200,6 +221,7 @@ class JournalRepository(
     }
 
     suspend fun deleteLogs(clientIds: Collection<String>) {
+        recordOwner()
         val changed = tx.run {
             val rows = clientIds.mapNotNull { dao.getLog(it) }
             rows.forEach { enqueueOp(SyncOp.DeleteLog(it.clientId), it.date) }
@@ -274,12 +296,45 @@ class JournalRepository(
             dao.clearOps()
             dao.clearQuickPicks()
         }
+        meta.clear()
+    }
+
+    // ── Account binding ──
+
+    /** Account the local journal belongs to (null until the first write/refresh after a clear). */
+    suspend fun ownerUid(): String? = safely { meta.ownerUid() }
+
+    /** True when the journal belongs to an account other than the signed-in one: nothing may be sent. */
+    suspend fun ownerMismatch(): Boolean {
+        val owner = ownerUid() ?: return false
+        return currentUid() != owner
+    }
+
+    /**
+     * Called when [uid] is resolved at sign-in: if the journal belongs to another account (left by a
+     * kill or a forced sign-out), runs [beforeClear] (stop the sync) and wipes it. True when wiped.
+     */
+    suspend fun resetIfOwnedByOther(uid: String, beforeClear: () -> Unit = {}): Boolean {
+        val owner = ownerUid() ?: return false
+        if (owner == uid) return false
+        beforeClear()
+        clearAll()
+        return true
     }
 
     // ── Used by the sync processor ──
 
     /** Head of the queue (lowest seq), whether in flight or not. */
     suspend fun nextOp(): QueuedOp? = dao.firstOp()?.let(JournalJson::toQueued)
+
+    /**
+     * Reads the head of the queue and marks it in flight in one transaction, so a local write
+     * can never fold into / cancel the op between reading it and sending it.
+     */
+    suspend fun claimNextOp(): QueuedOp? = tx.run {
+        dao.firstOp()?.let(JournalJson::toQueued)?.also { dao.markInFlight(it.seq) }
+            ?.copy(inFlight = true, attempted = true)
+    }
 
     suspend fun markInFlight(seq: Long) = dao.markInFlight(seq)
 
@@ -336,7 +391,7 @@ class JournalRepository(
      * meanwhile ([epoch]); otherwise re-fetches (max [REFRESH_RETRIES] times) then skips silently.
      * After a [clearAll] ([clears]) the snapshot belongs to the previous session and is dropped.
      */
-    private suspend fun <T> guardedRefresh(fetch: suspend () -> T, apply: suspend (T) -> Unit) {
+    private suspend fun <T> guardedRefresh(fetch: suspend () -> T, apply: suspend (T) -> Unit): Boolean {
         repeat(REFRESH_RETRIES + 1) {
             val seenEpoch = epoch.get()
             val seenClears = clears.get()
@@ -348,11 +403,28 @@ class JournalRepository(
                     else -> { apply(data); RefreshResult.APPLIED }
                 }
             }
-            if (result != RefreshResult.RETRY) return
+            if (result != RefreshResult.RETRY) return result == RefreshResult.APPLIED
         }
+        return false
+    }
+
+    /** Binds the journal to the signed-in account on its first write/refresh (never overwrites another owner). */
+    private suspend fun recordOwner() {
+        val uid = currentUid() ?: return
+        safely { if (meta.ownerUid() == null) meta.setOwnerUid(uid) }
+    }
+
+    /** Meta-store I/O is best-effort: a failing DataStore never breaks a journal write. */
+    private suspend fun <T> safely(block: suspend () -> T): T? = try {
+        block()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        null
     }
 
     private suspend fun write(block: suspend () -> Unit) {
+        recordOwner()
         tx.run { block() }
         scheduler.requestSync()
     }

@@ -501,6 +501,11 @@ fun SettingsScreen(
                         logoutJob = scope.launch {
                             val check = try {
                                 logoutCoordinator.tryLogout()
+                            } catch (e: kotlinx.coroutines.CancellationException) {
+                                throw e
+                            } catch (_: Exception) {
+                                // Unknown sync state: ask before discarding anything.
+                                LogoutCheck.Unsynced(1)
                             } finally {
                                 checkingLogout = false
                             }

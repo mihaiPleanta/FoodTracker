@@ -39,6 +39,14 @@ class LogoutFlowTest {
     }
 
     @Test
+    fun tryLogoutAsksWhenTheCheckFails() = runTest {
+        val syncFails = LogoutCoordinator(sync = { throw IllegalStateException("db") }, pendingCount = { 2 }, clearLocal = {})
+        assertEquals(LogoutCheck.Unsynced(2), syncFails.tryLogout())
+        val countFails = LogoutCoordinator(sync = { true }, pendingCount = { throw IllegalStateException("db") }, clearLocal = {})
+        assertEquals(LogoutCheck.Unsynced(1), countFails.tryLogout())
+    }
+
+    @Test
     fun logoutClearsMirrorQueueAndQuickPicks() = runTest {
         val j = TestJournal()
         val date = LocalDate.of(2026, 11, 4)

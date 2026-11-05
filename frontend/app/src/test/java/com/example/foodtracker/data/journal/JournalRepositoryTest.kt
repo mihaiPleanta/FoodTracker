@@ -486,4 +486,84 @@ class JournalRepositoryTest {
         assertTrue(day.fetched)
         assertEquals(1, repo.pendingCount.first())
     }
+
+    private fun repoWith(meta: JournalMetaStore, today: () -> LocalDate, uid: () -> String? = { null }) = JournalRepository(
+        dao = dao,
+        tx = object : TxRunner { override suspend fun <R> run(block: suspend () -> R): R = block() },
+        logsApi = logsApi, daysApi = JDaysApi(), scheduler = scheduler,
+        now = { clock++ }, today = today, meta = meta, currentUid = uid,
+    )
+
+    @Test fun coveredAfterMidnightWithoutRefresh() = runTest {
+        var day = today
+        val meta = InMemoryJournalMeta()
+        val r = repoWith(meta, { day })
+        r.refreshWindow()
+        assertEquals(today, meta.windowFetchedOn())
+
+        day = today.plusDays(1) // past midnight, offline: no refresh since
+        assertTrue(r.isCovered(day, day))
+        assertTrue(r.isCovered(today, day))
+        assertTrue(r.isCovered(day.minusDays(6), day))
+        assertTrue(r.isCovered(today.minusDays(61), day))
+        assertFalse(r.isCovered(today.minusDays(62), day))
+        assertFalse(r.isCovered(day, day.plusDays(1)))
+    }
+
+    @Test fun notCoveredBeforeAnyWindowFetch() = runTest {
+        val r = repoWith(InMemoryJournalMeta(), { today })
+        assertFalse(r.isCovered(today, today))
+        r.refreshDay(today) // a single downloaded day is covered on its own
+        assertTrue(r.isCovered(today, today))
+        assertFalse(r.isCovered(today.minusDays(1), today))
+    }
+
+    @Test fun clearAllForgetsWindowAndOwner() = runTest {
+        val meta = InMemoryJournalMeta()
+        val r = repoWith(meta, { today }, { "uid-a" })
+        r.refreshWindow()
+        assertEquals("uid-a", r.ownerUid())
+        r.clearAll()
+        assertNull(meta.windowFetchedOn())
+        assertNull(r.ownerUid())
+        assertFalse(r.isCovered(today, today))
+    }
+
+    @Test fun ownerIsFirstWriterAndNeverOverwritten() = runTest {
+        var uid: String? = null
+        val r = repoWith(InMemoryJournalMeta(), { today }, { uid })
+        r.setHydration(today, 1f)
+        assertNull(r.ownerUid()) // signed out: nobody owns it yet
+        uid = "uid-a"
+        r.setHydration(today, 1.5f)
+        uid = "uid-b"
+        r.setHydration(today, 2f)
+        assertEquals("uid-a", r.ownerUid())
+    }
+
+    @Test fun ownerMismatchOnLoginClearsJournal() = runTest {
+        val r = repoWith(InMemoryJournalMeta(), { today }, { "uid-a" })
+        r.addLog(today, "Lunch", LoggedFood(oats, 50))
+        var stopped = false
+
+        assertFalse(r.resetIfOwnedByOther("uid-a") { stopped = true })
+        assertEquals(1, r.pendingCount.first())
+
+        assertTrue(r.resetIfOwnedByOther("uid-b") { stopped = true })
+        assertTrue(stopped)
+        assertEquals(0, r.pendingCount.first())
+        assertTrue(r.observeDay(today).first().meals.values.all { it.isEmpty() })
+        assertNull(r.ownerUid())
+    }
+
+    @Test fun refreshIsSkippedForAnotherAccountsJournal() = runTest {
+        var uid: String? = "uid-a"
+        val r = repoWith(InMemoryJournalMeta(), { today }, { uid })
+        r.setHydration(today, 1f)
+        uid = "uid-b"
+        r.refreshWindow()
+        r.refreshDay(today)
+        assertTrue(logsApi.rangeRequests.isEmpty())
+        assertTrue(logsApi.dayRequests.isEmpty())
+    }
 }
