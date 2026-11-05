@@ -22,8 +22,13 @@ fun reconcileStreak(desired: Int?, scheduled: Int?): ReminderAction = when {
  * A snapshot from yesterday only counts if yesterday was logged (streak still alive today);
  * anything older is stale and stays silent.
  */
-fun shouldSendStreakReminder(snapshot: StreakSnapshot?, today: LocalDate): Boolean {
+fun shouldSendStreakReminder(
+    snapshot: StreakSnapshot?,
+    today: LocalDate,
+    todayLoggedLocally: Boolean,
+): Boolean {
     if (snapshot == null || snapshot.current <= 0) return false
+    if (todayLoggedLocally) return false // includes food logged offline and not yet synced
     if (snapshot.lastLoggedDate == today) return false
     return isSnapshotPlausible(snapshot, today)
 }

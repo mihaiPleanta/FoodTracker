@@ -30,25 +30,28 @@ class StreakReminderPlanningTest {
 
     @Test fun reconcile_cancel() = assertEquals(ReminderAction.Cancel, reconcileStreak(null, 1200))
 
-    @Test fun noSnapshotNoReminder() = assertFalse(shouldSendStreakReminder(null, today))
+    @Test fun noSnapshotNoReminder() = assertFalse(shouldSendStreakReminder(null, today, false))
 
     @Test fun zeroStreakNoReminder() =
-        assertFalse(shouldSendStreakReminder(StreakSnapshot(0, today, null), today))
+        assertFalse(shouldSendStreakReminder(StreakSnapshot(0, today, null), today, false))
 
     @Test fun loggedTodayNoReminder() =
-        assertFalse(shouldSendStreakReminder(StreakSnapshot(5, today, today), today))
+        assertFalse(shouldSendStreakReminder(StreakSnapshot(5, today, today), today, false))
 
     @Test fun freshSnapshotNotLoggedSends() =
-        assertTrue(shouldSendStreakReminder(StreakSnapshot(5, today, yesterday), today))
+        assertTrue(shouldSendStreakReminder(StreakSnapshot(5, today, yesterday), today, false))
 
     @Test fun yesterdaySnapshotLoggedYesterdaySends() =
-        assertTrue(shouldSendStreakReminder(StreakSnapshot(5, yesterday, yesterday), today))
+        assertTrue(shouldSendStreakReminder(StreakSnapshot(5, yesterday, yesterday), today, false))
 
     @Test fun yesterdaySnapshotNotLoggedYesterdaySilent() =
-        assertFalse(shouldSendStreakReminder(StreakSnapshot(5, yesterday, today.minusDays(2)), today))
+        assertFalse(shouldSendStreakReminder(StreakSnapshot(5, yesterday, today.minusDays(2)), today, false))
+
+    @Test fun localLogTodaySuppressesReminder() =
+        assertFalse(shouldSendStreakReminder(StreakSnapshot(5, today, yesterday), today, true))
 
     @Test fun staleSnapshotSilent() {
         val old = LocalDate.of(2026, 11, 1)
-        assertFalse(shouldSendStreakReminder(StreakSnapshot(5, old, old), today))
+        assertFalse(shouldSendStreakReminder(StreakSnapshot(5, old, old), today, false))
     }
 }

@@ -13,9 +13,11 @@ import com.example.foodtracker.MainActivity
 import com.example.foodtracker.R
 import com.example.foodtracker.data.DataStoreSettingsRepository
 import com.example.foodtracker.data.StreakSnapshotStore
+import com.example.foodtracker.data.journal.JournalProvider
 import com.example.foodtracker.data.settingsDataStore
 import com.example.foodtracker.data.streakSnapshotDataStore
 import com.example.foodtracker.model.AppLanguage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 import java.util.Locale
@@ -36,7 +38,16 @@ class StreakReminderWorker(
         }
 
         val snapshot = StreakSnapshotStore(applicationContext.streakSnapshotDataStore).read()
-        if (snapshot == null || !shouldSendStreakReminder(snapshot, LocalDate.now())) return Result.success()
+        if (snapshot == null) return Result.success()
+        val today = LocalDate.now()
+        val loggedLocally = try {
+            JournalProvider.repository(applicationContext).hasLocalLog(today)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            false
+        }
+        if (!shouldSendStreakReminder(snapshot, today, loggedLocally)) return Result.success()
 
         val languageTag = if (settings.language == AppLanguage.ENGLISH) "en" else "ro"
         val config = Configuration(applicationContext.resources.configuration).apply {
